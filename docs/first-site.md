@@ -71,6 +71,8 @@ Create the homepage, services and child pages, two news items, projects and a ch
 
 ## 5. Handoff to an editor
 
+After the first publish, check `cms search status`. If `reindex_required:true` or the index version differs from the expected version, have an authorized operator with `search.reindex` run `cms search reindex --environment "$PCMS_ENVIRONMENT" --yes`; wait for reindex completion, then verify a distinctive query and rerun `cms doctor`. Do not add this heavy permission to the content-authoring token or reindex after ordinary edits. See [Search](search.md).
+
 Check public HTML, all routes, search, media derivatives, forms, four SEO cases, three viewport sizes and the [Admin editor journey](admin.md). The editor must save, preview, seal and publish a new revision without special scripts or database access. Keep the URL list and validation results, with no tokens or personal submission data.
 
 [Documentation index](index.md)
