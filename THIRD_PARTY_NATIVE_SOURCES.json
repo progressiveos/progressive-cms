@@ -3,7 +3,7 @@
   "archive": "progressive-cms-native-sources-sharp-libvips-1.3.4.zip",
   "sha256": "c221aaed0658ee2afbe26803b6b02a2aa7a0b8199054cdf5a1c68e0d90547fb1",
   "bytes": 202153976,
-  "distribution": "Attach this source archive and its checksum alongside every matching binary release at https://github.com/progressiveos/progressive-cms/releases",
+  "distribution": "Reuse this immutable source archive by direct public URL and SHA-256 in every matching binary release. Preserve availability and adjacent source directions; do not replace or delete the original asset.",
   "upstream": "https://github.com/lovell/sharp-libvips/tree/v1.3.4",
   "packages": [
     {
@@ -3116,5 +3116,6 @@
       "bytes": 88879
     }
   ],
-  "notices": 714
+  "notices": 714,
+  "url": "https://github.com/progressiveos/progressive-cms/releases/download/v1.0.0-rc.29/progressive-cms-native-sources-sharp-libvips-1.3.4.zip"
 }

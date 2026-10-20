@@ -1,6 +1,6 @@
 Third-party native library notices
 
-These are upstream licenses/notices for bundled sharp/libvips libraries and their source dependencies. They do not relicense Progressive CMS. Corresponding sources, patches and build scripts accompany the distribution as a separate source archive.
+These are upstream licenses/notices for bundled sharp/libvips libraries and their source dependencies. They do not relicense Progressive CMS. Corresponding sources, patches and build scripts are provided through the public URL and SHA-256 in THIRD_PARTY_NATIVE_SOURCES.json. This immutable source archive is shared by matching binary releases.
 
 
 ===== GPL-3.0.txt =====

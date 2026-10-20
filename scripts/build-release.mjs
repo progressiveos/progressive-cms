@@ -51,6 +51,7 @@ import {
 } from "@pcms/operations";
 import { SEARCH_INDEX_VERSION } from "@pcms/search";
 import { THEME_CONTRACT_VERSION } from "@pcms/themes";
+import { checkNativeSourceSupply } from "./check-native-source-supply.mjs";
 import { assertReleaseZipClean, readPreparedOfficialSkillFiles } from "./check-release-zip.mjs";
 import { pruneReleaseDependencyTests } from "./prune-release-dependency-tests.mjs";
 import {
@@ -636,6 +637,10 @@ sh("npm", ["ci", "--omit=dev"], { cwd: stage });
 const prunedDependencyPayloads = pruneReleaseDependencyTests(stage);
 console.log(
   `build-release: removed ${prunedDependencyPayloads.removedDirs} reviewed package test directories and ${prunedDependencyPayloads.removedFiles} test files (${prunedDependencyPayloads.removedBytes} bytes); runtime dependency graph retained`,
+);
+const nativeSourceSupply = await checkNativeSourceSupply(stage);
+console.log(
+  `build-release: native source supply verified (${nativeSourceSupply.bytes} bytes, SHA-256 ${nativeSourceSupply.sha256}): ${nativeSourceSupply.url}`,
 );
 
 // --- smoke: the compiled artifact runs under plain node ---------------------
