@@ -36,7 +36,7 @@ native packages/binaries, original source URLs, versions, checksums and matching
 source archive. Distribute **progressive-cms-native-sources-sharp-libvips-1.3.4.zip**
 and its SHA-256 sidecar alongside every official release using these binaries,
 at https://github.com/progressiveos/progressive-cms/releases . The source archive
-contains the pinned upstream build repository, 33 library archives/patches and
+contains the pinned upstream build repository, 33 library archives/patches, the pinned GVDB subproject and
 357 Rust crate archives verified against librsvg's Cargo.lock; original notices
 and build modifications remain available. It is part of the release's legal
 supply, not an optional paid download or a source request requiring credentials.

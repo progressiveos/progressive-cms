@@ -1,8 +1,8 @@
 {
   "schema": "pcms-native-sources/1",
   "archive": "progressive-cms-native-sources-sharp-libvips-1.3.4.zip",
-  "sha256": "91532b0ff20ef17ac522eb7b04369d830a3e16db864eea8bc4e889bbf31663e7",
-  "bytes": 202128844,
+  "sha256": "c221aaed0658ee2afbe26803b6b02a2aa7a0b8199054cdf5a1c68e0d90547fb1",
+  "bytes": 202153976,
   "distribution": "Attach this source archive and its checksum alongside every matching binary release at https://github.com/progressiveos/progressive-cms/releases",
   "upstream": "https://github.com/lovell/sharp-libvips/tree/v1.3.4",
   "packages": [
@@ -249,6 +249,13 @@
       "url": "https://gist.githubusercontent.com/lovell/313a6901e9db1bf285f2a1f1180499e4/raw/3988223c7dfa4d22745d9392034b0117abef1446/libvips-cpp-soversion.patch",
       "sha256": "256b7d6f8c973bb53b20cff5171c7117d6b35d3aa4e72d22cb906f4fe1e2c890",
       "bytes": 514
+    },
+    {
+      "file": "sources/34-gvdb-2b42fc75f09dbe1cd1057580b5782b08f2dcb400.tar.gz",
+      "url": "https://gitlab.gnome.org/GNOME/gvdb/-/archive/2b42fc75f09dbe1cd1057580b5782b08f2dcb400/gvdb-2b42fc75f09dbe1cd1057580b5782b08f2dcb400.tar.gz",
+      "sha256": "069a00aa1fc893f18423602f4e095583be5a220429f6e8a58d70511490b4b019",
+      "bytes": 24716,
+      "purpose": "glib forced gvdb Meson fallback, pinned in the upstream source wrap"
     }
   ],
   "rust_crates": [
@@ -3109,5 +3116,5 @@
       "bytes": 88879
     }
   ],
-  "notices": 713
+  "notices": 714
 }
