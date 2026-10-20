@@ -59,6 +59,7 @@ test("0003/0004 upgrade baseline+0002 preserving the old theme and repeat migrat
   assert.deepEqual((await migrateDatabase(pool, migrations, undefined)).applied, [
     "0003_theme_revisions",
     "0004_theme_revision_cleanup",
+    "0005_interaction_privacy",
   ]);
   const state = (
     await db.query(

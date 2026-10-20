@@ -165,10 +165,19 @@ test("public baseline migration applies against a disposable database", async (t
   const migrations = loadMigrations(join(process.cwd(), "db", "migrations"));
   assert.deepEqual(
     migrations.map(({ name }) => name),
-    ["0001_public_baseline"],
+    [
+      "0001_public_baseline",
+      "0002_extension_search_path",
+      "0003_theme_revisions",
+      "0004_theme_revision_cleanup",
+      "0005_interaction_privacy",
+    ],
   );
   const result = await migrateDatabase(pool, migrations, NO_LOG);
-  assert.deepEqual(result.applied, ["0001_public_baseline"]);
+  assert.deepEqual(
+    result.applied,
+    migrations.map((migration) => migration.name),
+  );
   const baseline = await pool.query<{ value: string }>(
     "SELECT value FROM pcms_kernel_metadata WHERE key = 'schema_baseline'",
   );

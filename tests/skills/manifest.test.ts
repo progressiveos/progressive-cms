@@ -2,7 +2,7 @@
 // manifests parse; invalid semver, unknown contract, missing id and invalid
 // capability declarations are rejected with stable codes (task brief §26).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { PERMISSION_REGISTRY } from "@pcms/auth";
 import {
@@ -83,13 +83,17 @@ test("shipped first-party skill manifests parse with registry-checked scopes", (
 test("installed-skill loader parses the skills/ root and fails loudly on junk", () => {
   const loaded = loadInstalledSkills("skills");
   const ids = loaded.skills.map((skill) => skill.manifest.id).sort();
-  assert.deepEqual(ids, [
+  const expected = [
     "progressive-cms-content-agent",
     "progressive-cms-extension-developer",
     "progressive-cms-operator",
     "progressive-cms-theme-developer",
     "progressive-cms-web-research",
-  ]);
+  ];
+  // Public Docs adds three root Skills; the final ZIP gate requires their exact resources.
+  if (existsSync("skills/progressive-cms-site-builder/manifest.json"))
+    expected.push("progressive-cms-152fz", "progressive-cms-seo", "progressive-cms-site-builder");
+  assert.deepEqual(ids, expected.sort());
   assert.equal(loaded.problems.length, 0);
   assert.throws(() => parseSkillManifest(fixture("missing-id")));
 });

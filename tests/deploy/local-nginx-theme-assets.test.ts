@@ -52,6 +52,7 @@ test("API-installed restrictive theme serves CSS/JS/SVG through a real Nginx end
     defaultSiteKey: "default",
     authorize: createAuthorizationService().authorize,
     themeDir: active,
+    themeRuntime: { configuredDir: active },
     blocks: createBlockRegistry(),
     actorResolver: {
       async authenticateToken() {

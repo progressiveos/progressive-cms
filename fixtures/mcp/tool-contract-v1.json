@@ -2,6 +2,240 @@
   "mcp_protocol_version": "2024-11-05",
   "tools": [
     {
+      "name": "cms_preview_interaction_privacy",
+      "description": "Preview a selected personal-data action and all controlled copies; no writes. Owner chooses whether to apply.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "type": "string",
+                "enum": [
+                  "submission",
+                  "quiz_run",
+                  "lead"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              }
+            },
+            "required": [
+              "entity",
+              "id"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "rectify",
+              "block",
+              "unblock",
+              "erase"
+            ]
+          },
+          "correction": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "submission_payload": {
+                "type": "object",
+                "maxProperties": 256
+              },
+              "quiz_answers": {
+                "type": "array",
+                "maxItems": 256,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "question_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "value": {}
+                  },
+                  "required": [
+                    "question_id",
+                    "value"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "target",
+          "action"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "privacy.manage"
+      }
+    },
+    {
+      "name": "cms_apply_interaction_privacy",
+      "description": "Explicit addressed block/unblock/rectify/erase. Requires preview token and stable request_id for safe retries. External copies need followup, not automatic claims of remote deletion.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "type": "string",
+                "enum": [
+                  "submission",
+                  "quiz_run",
+                  "lead"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              }
+            },
+            "required": [
+              "entity",
+              "id"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "rectify",
+              "block",
+              "unblock",
+              "erase"
+            ]
+          },
+          "correction": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "submission_payload": {
+                "type": "object",
+                "maxProperties": 256
+              },
+              "quiz_answers": {
+                "type": "array",
+                "maxItems": 256,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "question_id": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "value": {}
+                  },
+                  "required": [
+                    "question_id",
+                    "value"
+                  ]
+                }
+              }
+            }
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expected_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "request_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "target",
+          "action",
+          "request_id",
+          "expected_token"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "privacy.manage"
+      }
+    },
+    {
+      "name": "cms_get_interaction_privacy_case",
+      "description": "Read a personal-data operation receipt and pending processor followups.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "required": [
+          "case_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "privacy.manage"
+      }
+    },
+    {
+      "name": "cms_acknowledge_interaction_privacy",
+      "description": "Record external processor action evidence or an explicit owner exception; this does not contact a processor.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "delivery_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[47][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "acknowledged",
+              "owner_exception"
+            ]
+          },
+          "evidence_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "case_id",
+          "delivery_id",
+          "decision"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "privacy.manage"
+      }
+    },
+    {
       "name": "cms_list_theme_revisions",
       "description": "List retained theme revisions for the current site; excludes pruned snapshots.",
       "inputSchema": {

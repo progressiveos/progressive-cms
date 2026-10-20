@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { loadMigrations } from "@pcms/core";
 import { cmsProcessEnv } from "../helpers/process-env.js";
 import { spawnPcmsProcess } from "../helpers/spawn-pcms.js";
 import {
@@ -86,7 +87,10 @@ test("M01 gate: migrate zero→current, web+worker+DB green, honest readiness, c
   };
   assert.equal(migrate.ok, true);
   // Public installs apply the single canonical schema baseline.
-  assert.deepEqual(migrate.applied, ["0001_public_baseline"]);
+  assert.deepEqual(
+    migrate.applied,
+    loadMigrations("db/migrations").map((migration) => migration.name),
+  );
   assert.equal(migrate.current, migrate.applied[migrate.applied.length - 1] ?? null);
   // second run is a no-op (idempotent deploy step)
   const migrateAgain = JSON.parse(

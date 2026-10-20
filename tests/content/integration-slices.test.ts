@@ -64,7 +64,7 @@ async function withContent(
     void pool.end();
   });
   const migrations = await migrateDatabase(pool, loadMigrations("db/migrations"), undefined);
-  assert.equal(migrations.current, "0001_public_baseline");
+  assert.equal(migrations.current, loadMigrations("db/migrations").at(-1)?.name);
   await run({ pool, corpus: loadReferenceCorpus() });
 }
 

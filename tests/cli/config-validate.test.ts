@@ -115,7 +115,8 @@ test("unknown commands print top-level usage with exit 2", async () => {
     "figma pull",
     "nav inspect|check | route inspect|check",
     "mail test",
-    "theme list|install|uninstall",
+    "theme list",
+    "theme install|uninstall",
   ]) {
     assert.ok(result.stderr.includes(family), `top-level help omits ${family}`);
   }

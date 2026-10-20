@@ -230,6 +230,12 @@ test("CLI: doctor and media over a real migrated database (T025/T023)", async (t
       }),
     );
 
+    const previousPassword = process.env.PCMS_SECRET_DB_PASSWORD;
+    t.after(() => {
+      if (previousPassword === undefined) delete process.env.PCMS_SECRET_DB_PASSWORD;
+      else process.env.PCMS_SECRET_DB_PASSWORD = previousPassword;
+    });
+    if (info.password !== undefined) process.env.PCMS_SECRET_DB_PASSWORD = info.password;
     const savedEnv = sanitizeEnv(["PCMS_SECRET_DB_PASSWORD"]);
     const doctor = await runCli(["doctor", "--json", "--config", configFile]);
     assert.equal(doctor.exitCode, 0, doctor.stdout);

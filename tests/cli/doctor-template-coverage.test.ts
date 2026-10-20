@@ -160,6 +160,12 @@ test("doctor e2e: published-template-coverage names the orphan, not skipped", as
     }),
   );
 
+  const previousPassword = process.env.PCMS_SECRET_DB_PASSWORD;
+  t.after(() => {
+    if (previousPassword === undefined) delete process.env.PCMS_SECRET_DB_PASSWORD;
+    else process.env.PCMS_SECRET_DB_PASSWORD = previousPassword;
+  });
+  if (info.password !== undefined) process.env.PCMS_SECRET_DB_PASSWORD = info.password;
   const saved: Record<string, string | undefined> = {};
   for (const key of Object.keys(process.env)) {
     if (key.startsWith("PCMS_") && key !== "PCMS_SECRET_DB_PASSWORD") {
@@ -272,6 +278,12 @@ test("doctor e2e: coverage follows the ACTIVATED theme, not the renderDir seed",
     [activeManifest.version],
   );
 
+  const previousPassword = process.env.PCMS_SECRET_DB_PASSWORD;
+  t.after(() => {
+    if (previousPassword === undefined) delete process.env.PCMS_SECRET_DB_PASSWORD;
+    else process.env.PCMS_SECRET_DB_PASSWORD = previousPassword;
+  });
+  if (info.password !== undefined) process.env.PCMS_SECRET_DB_PASSWORD = info.password;
   const saved: Record<string, string | undefined> = {};
   for (const key of Object.keys(process.env)) {
     if (key.startsWith("PCMS_") && key !== "PCMS_SECRET_DB_PASSWORD") {

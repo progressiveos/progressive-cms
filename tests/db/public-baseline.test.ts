@@ -23,13 +23,8 @@ test("public baseline backup restores and accepts the next candidate migration",
     rmSync(temp, { recursive: true, force: true });
   });
 
-  const migrationSource = join(process.cwd(), "db", "migrations", "0001_public_baseline.sql");
-  const baselineSql = readFileSync(migrationSource, "utf8");
   const migrations = loadMigrations(join(process.cwd(), "db", "migrations"));
-  assert.deepEqual(
-    migrations.map(({ name }) => name),
-    ["0001_public_baseline"],
-  );
+  assert.equal(migrations[0]?.name, "0001_public_baseline");
   await migrateDatabase(sourcePool, migrations, undefined);
 
   const sourceRoles = await sourcePool.query<{ count: string }>(
@@ -84,18 +79,18 @@ test("public baseline backup restores and accepts the next candidate migration",
   );
 
   mkdirSync(migrationDir);
-  writeFileSync(join(migrationDir, "0001_public_baseline.sql"), baselineSql);
+  for (const migration of migrations)
+    writeFileSync(join(migrationDir, migration.name + ".sql"), migration.sql);
+  const probeName = `${String(Number(migrations.at(-1)!.name.slice(0, 4)) + 1).padStart(4, "0")}_rc_candidate_probe`;
   writeFileSync(
-    join(migrationDir, "0002_rc_candidate_probe.sql"),
+    join(migrationDir, probeName + ".sql"),
     "CREATE TABLE rc_candidate_probe (id integer PRIMARY KEY); INSERT INTO rc_candidate_probe VALUES (1);",
   );
   const restoredMigrations = loadMigrations(migrationDir);
-  assert.deepEqual((await migrationStatus(restoredPool, restoredMigrations)).pending, [
-    "0002_rc_candidate_probe",
-  ]);
+  assert.deepEqual((await migrationStatus(restoredPool, restoredMigrations)).pending, [probeName]);
   const upgraded = await migrateDatabase(restoredPool, restoredMigrations, undefined);
-  assert.deepEqual(upgraded.applied, ["0002_rc_candidate_probe"]);
-  assert.equal(upgraded.current, "0002_rc_candidate_probe");
+  assert.deepEqual(upgraded.applied, [probeName]);
+  assert.equal(upgraded.current, probeName);
 
   const restoredRoles = await restoredPool.query<{ count: string }>(
     "SELECT count(*)::text AS count FROM auth_roles",

@@ -1,7 +1,7 @@
 // PCMS-SKILL-T001/T017 compatibility result: machine-readable compatible/
 // warning/incompatible with stable issue codes (task brief §27/§71).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { evaluateSkillCompatibility, type SkillServerSnapshot } from "@pcms/skills";
 
@@ -224,9 +224,9 @@ test("shipped manifests accept every supported Core line, including release cand
       accepts: ["1.0.0-rc.1", "1.0.0-rc.18", "1.0.0-rc.19", "1.0.0", "1.9.0"],
     },
     {
-      file: ["docs", "init-package", "skills", "progressive-cms-site-builder", "manifest.json"],
-      // Documented as live-verified on 0.1.x as well as Core 1.0.
-      accepts: ["0.1.98", "0.1.210", "1.0.0-rc.1", "1.0.0-rc.19", "1.0.0"],
+      file: ["skills", "progressive-cms-site-builder", "manifest.json"],
+      // The public Site Builder package targets the current Core 1.0 line.
+      accepts: ["1.0.0-rc.19", "1.0.0-rc.29", "1.0.0"],
     },
   ];
   const rejected = ["0.0.1", "2.0.0", "2.0.0-rc.1", "3.0.0"];
@@ -262,6 +262,9 @@ test("shipped manifests accept every supported Core line, including release cand
     "theme.validate",
   ];
   for (const { file, accepts } of manifests) {
+    // The private Core checkout receives the Docs-owned package only in prepared public composition.
+    if (file.includes("progressive-cms-site-builder") && !existsSync(join(process.cwd(), ...file)))
+      continue;
     const manifest = JSON.parse(readFileSync(join(process.cwd(), ...file), "utf8")) as {
       version: string;
       requires: { cms: string };

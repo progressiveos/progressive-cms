@@ -3,6 +3,7 @@
 // skills — the surface whose absence forced M15 content agents into source
 // archaeology (spangar gap G1). Secret-free by construction.
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { createApiFastify, createApiV1, makeAgentRoutes } from "@pcms/api";
 import { createApiFixture } from "../helpers/api-composition.js";
@@ -100,13 +101,17 @@ test("bootstrap answers site/environment/actor/contracts/skills for a scoped age
   // publish, so the content manifest's required publish capability must NOT
   // be reported satisfied — but compatibility reads on contracts/capabilities.
   const ids = body.skills.installed.map((skill) => skill.id).sort();
-  assert.deepEqual(ids, [
+  const expected = [
     "progressive-cms-content-agent",
     "progressive-cms-extension-developer",
     "progressive-cms-operator",
     "progressive-cms-theme-developer",
     "progressive-cms-web-research",
-  ]);
+  ];
+  // Public Docs adds three root Skills; the final ZIP gate requires their exact resources.
+  if (existsSync("skills/progressive-cms-site-builder/manifest.json"))
+    expected.push("progressive-cms-152fz", "progressive-cms-seo", "progressive-cms-site-builder");
+  assert.deepEqual(ids, expected.sort());
   for (const skill of body.skills.installed) {
     assert.match(skill.version, /^\d+\.\d+\.\d+$/);
     assert.ok(

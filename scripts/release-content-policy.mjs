@@ -5,6 +5,8 @@ export const PUBLIC_LICENSE_FILES = Object.freeze([
   "NOTICE",
   "TRADEMARKS.md",
   "THIRD_PARTY_NOTICES.md",
+  "THIRD_PARTY_NATIVE_NOTICES.txt",
+  "THIRD_PARTY_NATIVE_SOURCES.json",
 ]);
 
 const ROOT_FILES = new Set([

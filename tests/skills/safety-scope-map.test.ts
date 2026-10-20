@@ -81,7 +81,7 @@ test("skill texts never mention an unregistered permission", () => {
   for (const path of [
     "skills/progressive-cms-content-agent/SKILL.md",
     "skills/progressive-cms-theme-developer/SKILL.md",
-    "skills/README.md",
+    "skills/references/INDEX.md",
     "skills/references/common-operating-rules.md",
   ]) {
     const text = readFileSync(path, "utf8");

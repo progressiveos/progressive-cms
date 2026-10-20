@@ -30,8 +30,20 @@ Apache-2.0 code. The @img/sharp-libvips-*/README.md and versions.json files
 identify the included libraries and versions. Preserve them, their license files,
 and users' ability to replace/rebuild these libraries.
 
-The upstream build scripts and corresponding-source instructions are maintained
-at https://github.com/lovell/sharp-libvips and
-https://sharp.pixelplumbing.com/install/#licensing . A distributor of the native
-binaries must also fulfil the applicable corresponding-source obligations; the
-package license allowlist alone is not evidence that these obligations are met.
+The complete native library license/notice texts are supplied in
+THIRD_PARTY_NATIVE_NOTICES.txt. THIRD_PARTY_NATIVE_SOURCES.json identifies the
+native packages/binaries, original source URLs, versions, checksums and matching
+source archive. Distribute **progressive-cms-native-sources-sharp-libvips-1.3.4.zip**
+and its SHA-256 sidecar alongside every official release using these binaries,
+at https://github.com/progressiveos/progressive-cms/releases . The source archive
+contains the pinned upstream build repository, 33 library archives/patches and
+357 Rust crate archives verified against librsvg's Cargo.lock; original notices
+and build modifications remain available. It is part of the release's legal
+supply, not an optional paid download or a source request requiring credentials.
+
+Users may rebuild or replace the libvips shared object in
+node_modules/@img/sharp-libvips-*/lib; no application signature check prevents
+replacement. The archive records upstream tooling/commands; no bit-reproducible
+native rebuild or offline toolchain is claimed. Preserve these licenses/notices
+and corresponding-source access when redistributing native binaries. The package
+license allowlist alone is not evidence of these distribution obligations.

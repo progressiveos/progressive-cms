@@ -4,8 +4,17 @@
 // Homepage/nav/404/redirect surfaces; media scope is empty without storage —
 // block templates degrade to their documented fallbacks.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -13,6 +22,7 @@ import { createApiFastify } from "@pcms/api";
 import { createLogger, systemClock } from "@pcms/core";
 import { LocalMediaStorage } from "@pcms/media";
 import type { FastifyInstance } from "fastify";
+import { changeTheme } from "../../packages/api/src/theme-lifecycle.js";
 import {
   API_CLOCK,
   apiContextOf,
@@ -470,20 +480,32 @@ test("draft RichText media preview prepares its derivative without sealing or pu
 
 test("active theme refreshes after package replacement without a web restart", async (t) => {
   if (!testDatabaseConfigured()) return t.skip("PCMS_TEST_DATABASE_URL is not set");
-  // 2026-10-02 site-developer request: active-stack updates used to require
-  // a web restart (the stack was built once at boot). The active stack now
-  // re-checks its theme.json fingerprint and rebuilds — the operator's
-  // package replacement shows up on the next request.
+  // Active revisions are immutable; deliver replacements through the native lifecycle.
   const root = mkdtempSync(join(tmpdir(), "pcms-theme-active-refresh-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const activeDir = join(root, "active-theme");
-  const writeActive = (marker: string, version: string): void => {
-    mkdirSync(join(activeDir, "templates"), { recursive: true });
-    mkdirSync(join(activeDir, "blocks"), { recursive: true });
-    mkdirSync(join(activeDir, "components"), { recursive: true });
-    mkdirSync(join(activeDir, "tokens"), { recursive: true });
+  const writeActive = (marker: string, version: string, dir = activeDir): void => {
+    mkdirSync(join(dir, "templates"), { recursive: true });
+    mkdirSync(join(dir, "blocks"), { recursive: true });
+    mkdirSync(join(dir, "components"), { recursive: true });
+    mkdirSync(join(dir, "tokens"), { recursive: true });
+    mkdirSync(join(dir, "fixtures"), { recursive: true });
     writeFileSync(
-      join(activeDir, "theme.json"),
+      join(dir, "fixtures", "page.json"),
+      JSON.stringify({
+        name: "page",
+        entry: {
+          templateKey: "page-default",
+          contentTypeKey: "page",
+          contentTypeVersion: 1,
+          title: "Theme fixture",
+          fields: { title: "Theme fixture" },
+          blocks: [],
+        },
+      }),
+    );
+    writeFileSync(
+      join(dir, "theme.json"),
       JSON.stringify({
         id: "active-theme",
         name: "active-theme",
@@ -507,10 +529,10 @@ test("active theme refreshes after package replacement without a web restart", a
     );
     // Different marker lengths keep the fingerprint (size+mtime) honest.
     writeFileSync(
-      join(activeDir, "templates", "page-default.liquid"),
+      join(dir, "templates", "page-default.liquid"),
       `<p data-theme="active">${marker}: {{ entry.fields.title }}</p>`,
     );
-    writeFileSync(join(activeDir, "blocks", "text.liquid"), "{{ block.props.rich_text }}");
+    writeFileSync(join(dir, "blocks", "text.liquid"), "{{ block.props.rich_text }}");
   };
   writeActive("ACTIVE-V1", "1.0.0");
 
@@ -547,24 +569,21 @@ test("active theme refreshes after package replacement without a web restart", a
   assert.equal(live1.statusCode, 200, live1.body);
   assert.ok(live1.body.includes("ACTIVE-V1"), live1.body.slice(0, 400));
 
-  // Package replacement (theme developer flow writes the render dir). The
-  // fingerprint check fires on the NEXT request; the async rebuild lands
-  // within it or on the one after — hence the bounded retry.
-  writeActive("ACTIVE-V2-REFRESHED", "1.1.0");
-  let refreshed = "";
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const response = await siteFastify.inject({ method: "GET", url: "/refresh/" });
-    assert.equal(response.statusCode, 200);
-    if (response.body.includes("ACTIVE-V2-REFRESHED")) {
-      refreshed = response.body;
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  assert.ok(
-    refreshed.includes("ACTIVE-V2-REFRESHED"),
-    "active theme did not refresh without a restart",
+  const candidateDir = join(root, "candidate");
+  writeActive("ACTIVE-V2-REFRESHED", "1.1.0", candidateDir);
+  const archive = join(root, "update.pcTheme");
+  execFileSync(
+    "zip",
+    ["-qr", archive, "theme.json", "templates", "blocks", "components", "tokens", "fixtures"],
+    { cwd: candidateDir },
   );
+  await changeTheme(app, ctx, { kind: "UPDATE", packageBytes: readFileSync(archive) });
+  assert.ok(app.themeDir);
+  for (const dir of ["components", "tokens"])
+    assert.equal(existsSync(join(app.themeDir, dir)), false);
+  const live2 = await siteFastify.inject({ method: "GET", url: "/refresh/" });
+  assert.equal(live2.statusCode, 200, live2.body);
+  assert.match(live2.body, /ACTIVE-V2-REFRESHED/);
 });
 
 test("site route stays gated behind CMS Maintenance Mode (503 for anonymous)", async (t) => {

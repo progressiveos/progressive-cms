@@ -352,7 +352,8 @@ function buildThemeStack(
         snapshot[`${prefix}${entry.name}`] = readFileSync(join(themeDir, dir, entry.name), "utf8");
     }
   };
-  for (const dir of ["templates", "components", "blocks", "tokens"]) collect(dir, `${dir}/`);
+  for (const dir of ["templates", "components", "blocks", "tokens"])
+    if (dir === "templates" || existsSync(join(themeDir, dir))) collect(dir, `${dir}/`);
 
   const renderService = createRenderService({ manifest, snapshot, devMode: false });
   const templates = createTemplateRegistry(manifest);
