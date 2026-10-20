@@ -8,6 +8,8 @@ config/pcms.json
 apps/admin/src/extension/contributions.generated.ts
 *.log
 *.tsbuildinfo
+evals/agent-skills/.work/
+themes/.pcms-theme-revisions/
 .playwright-cli/
 playwright-report/
 test-results/

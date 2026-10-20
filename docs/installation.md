@@ -1,29 +1,101 @@
 # Installation
 
-Contract owner: Core installer.
+This procedure installs a fresh Progressive CMS host from an official release. It is a privileged operator task; it does not require an AI agent. Do not run the fresh-install command against a customer installation or use it as an update procedure.
 
-Use an approved immutable release ZIP and its SHA-256 sidecar. Check the downloaded bytes before extracting anything. Inspect the ZIP inventory and locate its `deploy/scripts/install-release.sh`; do not assume an archive prefix from a previous release.
+## 1. Check the target
 
-Run the installer on an authorized fresh host. Its interactive mode asks for domain, PostgreSQL mode, proxy profile, owner email and artifact path. The installer provisions configuration, secrets, systemd services, database migrations and an owner account. It is a privileged operation, not a command to run in a developer checkout.
+Read the exact [requirements](requirements.md). The accepted deployment target is Ubuntu 26.04 with systemd. Choose one proxy profile and decide whether PostgreSQL will run locally or on a separately prepared database host. For a public site, prepare DNS, persistent media/database storage, a recovery-capable backup destination and a TLS plan before enabling authoring.
 
-New production configurations default `registry.baseUrl` to `https://my.p-cms.ru`; the installer accepts an explicit `--registry-url` override. Account/instance tokens remain secret slots. Updating an existing installation preserves its Registry and proxy configuration, so a new default does not repair an older endpoint automatically. For external reverse proxy installs, `--trusted-proxy-edge` must identify the actual immediate proxy peer seen by Web. The public site IP or an unverified forwarded header is not a substitute for that trust decision.
+The installer needs root to provision packages, systemd units, configuration and secrets, database access and the owner account. Do not give an authoring agent root credentials, PostgreSQL credentials or unrestricted host access.
 
-After installation, verify DNS/TLS, log in to Admin, change the bootstrap password and check configuration and runtime:
+## 2. Download and verify the release
+
+From the project's official GitHub Releases page, download the **installable release ZIP** and its matching `.sha256` sidecar. Do not use GitHub's automatically generated source archive. Save the pair in the same directory, then run:
 
 ```sh
-cms config validate --json
-cms doctor
-cms capabilities --json
+ARTIFACT="$HOME/Downloads/progressive-cms-release.zip"
+cd "$(dirname "$ARTIFACT")"
+sha256sum -c "$(basename "$ARTIFACT").sha256"
+unzip -Z1 "$ARTIFACT" | sed -n '1,40p'
 ```
 
-`cms capabilities` reports the local compiled catalogue; use `cms agent bootstrap --json` for the connected actor and target. These commands describe installed-runtime checks; this documentation pass is not itself a fresh installation acceptance record. Follow [Configuration](configuration.md) before authoring a site.
+Locate and read `build-metadata.json` from the archive to obtain its exact version and release id. Compare those values with the release page and set `RELEASE_VERSION` to the manifest's version; do not infer it from a source branch or a development package.
 
-## Install procedure and separate acceptance
+```sh
+METADATA_PATH="$(unzip -Z1 "$ARTIFACT" | awk '/(^|\/)build-metadata\.json$/ { print; exit }')"
+test -n "$METADATA_PATH"
+unzip -p "$ARTIFACT" "$METADATA_PATH"
+```
 
-Receive the exact release ZIP, independently pinned SHA-256, manifest and install instructions from Release Guardian. Run `sha256sum -c <artifact>.sha256` against the accepted sidecar, inventory the ZIP, then extract its installer into an isolated directory. Locate `deploy/scripts/install-release.sh` beneath the recorded archive prefix. Run the installer’s interactive mode on the authorized fresh host; choose local-nginx or external-rp and local/external PostgreSQL deliberately.
+## 3. Locate the installer
 
-The native installer is privileged: it provisions packages, database roles, service account, configuration/secrets, migrations and services. Those permissions are not needed for ordinary CMS authoring. Do not run it against an existing customer instance as a documentation smoke test.
+Extract the release's deployment assets to a private temporary directory and inspect the installer's supported options:
 
-After installation, confirm the installed build metadata, `cms doctor`, login over HTTPS, changed bootstrap password, actual proxy trust, preview readiness, persistent media/quarantine and an operator-owned recovery path. An installed-CMS Journey and a clean-install rehearsal are different records. Source tests alone do not establish clean-install acceptance for the target release.
+```sh
+WORK_DIR="$(mktemp -d)"
+unzip -q "$ARTIFACT" '*/deploy/*' -d "$WORK_DIR"
+INSTALLER="$(find "$WORK_DIR" -type f -path '*/deploy/scripts/install-release.sh' -print -quit)"
+test -n "$INSTALLER"
+sudo bash "$INSTALLER" --help
+```
+
+Keep the ZIP unchanged. The installer reads deployment templates adjacent to itself and installs the exact verified archive supplied with `--artifact`.
+
+## 4. Install on a fresh host
+
+Choose exactly one profile. Use `local-nginx` when Nginx and the site run on the same host. The installer configures the Nginx virtual host, but TLS is a separate Certbot step; complete it for the real DNS name before sending login credentials. Use `external-rp` when a separate reverse proxy terminates TLS. The application's `--http-host` must be reachable from that proxy, and `--trusted-proxy-edge` must name the immediate proxy peer Web actually sees. Never trust a public client-supplied forwarding header or use a wildcard trusted-proxy range.
+
+For local Nginx with PostgreSQL on the same host:
+
+```sh
+RELEASE_VERSION='<version from build-metadata.json>'
+sudo bash "$INSTALLER" \
+  --site-host cms.example.com \
+  --profile local-nginx \
+  --pg local \
+  --artifact "$ARTIFACT" \
+  --admin-email owner@example.com \
+  --expect-version "$RELEASE_VERSION" \
+  --yes
+```
+
+For an external TLS reverse proxy with PostgreSQL on the application host:
+
+```sh
+RELEASE_VERSION='<version from build-metadata.json>'
+sudo bash "$INSTALLER" \
+  --site-host cms.example.com \
+  --profile external-rp \
+  --http-host 192.0.2.20 \
+  --trusted-proxy-edge 198.51.100.7 \
+  --pg local \
+  --artifact "$ARTIFACT" \
+  --admin-email owner@example.com \
+  --expect-version "$RELEASE_VERSION" \
+  --yes
+```
+
+The addresses in the example are documentation placeholders. Replace them with the private application listen address and the actual immediate proxy peer. For a remote PostgreSQL server, prepare its database and least-privilege application role first; use the installer's `--pg remote` options and a mode-restricted password file. Never place a database password in shell history or command arguments. The interactive installer asks for the same core choices if you omit `--yes` and the corresponding flags.
+
+## 5. Finish TLS and owner setup
+
+The installer creates the owner account and writes its one-time password to `/root/owner-bootstrap.txt` with root-only permissions. Read that value through a secure operator session; do not paste it into an agent prompt, shell transcript, issue, or commit. Complete TLS for the public hostname, sign in at `https://<site-host>/admin`, and immediately change the bootstrap password.
+
+Run the local diagnostics as an operator:
+
+```sh
+sudo cms config validate --json
+sudo cms doctor
+```
+
+Then verify HTTPS, DNS, the expected proxy trust, `cms agent bootstrap --json` for the connected authoring account, and public readiness at `/health/ready`. The owner account is for administration. Before an agent authors content, create a separate Service Account scoped to the intended site and environment with only the scopes required by the task. See [Agent Skills](agent-skills.md) and [Security](security.md).
+
+## 6. Build the first editable site
+
+Follow [First Site](first-site.md) or use the self-contained [Site Builder Skill](skills/progressive-cms-site-builder/SKILL.md). A fresh install has the built-in `folder` Content Type; declare page and article types through the documented schema API before creating those entries. If the schema response returns `restart_required`, have the operator perform the bounded Web and Worker restart and rediscover the effective types.
+
+Install and activate the theme through the supported theme lifecycle operations. `themes.renderDir` is a catalog/boot seed; a persistent active theme takes precedence during rendering. Ordinary theme activation does not require changing `themes.renderDir` or restarting Web.
+
+Use the normal draft → validate → preview → seal → authorized publish workflow. Verify the public route and that an editor can change and republish a revision in Admin. See [Operations](operations.md) for backup, update and recovery procedures.
 
 [Documentation index](index.md)

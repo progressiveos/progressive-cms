@@ -34,3 +34,9 @@ English is the primary documentation language. [Russian translation is partial](
 - [Google/Yandex SEO Skill](skills/progressive-cms-seo/SKILL.md) · [complete audit matrix](skills/progressive-cms-seo/references/audit.md)
 - [Content Agent Skill](skills/progressive-cms-content-agent/SKILL.md) · [local workflow](skills/progressive-cms-content-agent/references/workflow.md)
 - [Skill catalogue](skills/catalog.json) · [example Content Types](reference/examples/content-types.json) · [API schema](reference/openapi-v1.json)
+
+## Project and community documents
+
+- [Install quick entry](INSTALL.md) · [Architecture](ARCHITECTURE.md) · [Requirements](requirements.md)
+- [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Support](SUPPORT.md)
+- [Changelog and release notes](CHANGELOG.md) · [Licensing and attribution](licensing.md)

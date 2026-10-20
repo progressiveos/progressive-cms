@@ -47,7 +47,7 @@ cms theme validate ./theme --cms-version "$PCMS_CORE_VERSION" --json
 (cd theme && zip -X -r ../company-starter.pcTheme theme.json templates components blocks assets tokens fixtures README.md)
 ```
 
-Keep `theme.json` at the `.pcTheme` archive root. Install raw bytes with `POST /themes/install`, `Content-Type: application/octet-stream`, and the same authorization/site/environment headers. Installation adds a catalog package. Activate a new id through `POST /theme/activate` with `{"theme_key":"<installed-id>","theme_version":"<installed-version>"}` and `theme.activate`. Confirm `cms theme active --json`; persisted activation overrides the `themes.renderDir` catalog/boot seed.
+Keep `theme.json` at the `.pcTheme` archive root. Install raw bytes with `POST /themes/install`, `Content-Type: application/octet-stream`, and the same authorization/site/environment headers. Installation adds a catalog package. Activate a new id through `POST /theme/activate` with `{"theme_key":"<installed-id>","theme_version":"<installed-version>"}` and `theme.activate`. Confirm `cms theme active --json`; persisted activation overrides the `themes.renderDir` catalog/boot seed. Do not ask the operator to change `themes.renderDir` to activate a theme; ordinary activation does not require a Web restart.
 
 A newer package of an already active same id uses:
 
