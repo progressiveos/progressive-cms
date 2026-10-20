@@ -1,0 +1,23 @@
+{
+  "id": "com.example.semver",
+  "name": "Bad semver",
+  "version": "1.0",
+  "extension_contract": "2.0",
+  "cms_compatibility": "latest",
+  "requires": [
+    {
+      "capability": "blocks.gallery",
+      "range": "latest"
+    }
+  ],
+  "provides": [
+    {
+      "capability": "com.example.thing",
+      "version": "01.2.3"
+    }
+  ],
+  "entrypoint": {
+    "type": "module"
+  },
+  "registrations": {}
+}

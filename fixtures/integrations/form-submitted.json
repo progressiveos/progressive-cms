@@ -1,0 +1,12 @@
+{
+  "id": "018f1000-0000-7000-8000-000000000001",
+  "aggregate": "form_submission",
+  "aggregate_id": "018f1000-0000-7000-8000-0000000000aa",
+  "event_type": "FormSubmitted",
+  "payload": {
+    "submission_id": "018f1000-0000-7000-8000-0000000000aa",
+    "form_definition_id": "callback-request",
+    "form_schema_version": 1,
+    "source_entry_id": "018f1000-0000-7000-8000-0000000000bb"
+  }
+}

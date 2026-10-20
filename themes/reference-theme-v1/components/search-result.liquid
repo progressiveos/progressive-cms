@@ -1,0 +1,65 @@
+{%- comment -%}
+  Public search results (M11, PCMS-SEARCH-T012; Search spec §14/§21/§22).
+  Scope: `search` = SearchResultPageViewModel (plain data from the M11
+  application service). The engine never emits HTML: snippet segments arrive
+  pre-split, and matched segments render through `em.search-hit` — text is
+  escaped by the engine's autoescape. Search pages are noindex by policy;
+  the meta/headers are emitted by the server route, never by the theme.
+{%- endcomment -%}
+<section class="search" aria-label="Site search">
+  <form class="search__form" action="/search/" method="get" role="search">
+    <input
+      type="search"
+      name="q"
+      value="{{ search.query }}"
+      maxlength="256"
+      placeholder="Search"
+      aria-label="Search query"
+    />
+    <input type="hidden" name="locale" value="{{ search.locale }}" />
+    <input type="hidden" name="sort" value="{{ search.sort }}" />
+    {% for filter in search.filters %}<input type="hidden" name="{{ filter[0] }}" value="{{ filter[1] }}">{% endfor %}
+    <button type="submit">Search</button>
+  </form>
+
+  {%- if search.query == "" -%}
+    <p class="search__empty">Enter a search query.</p>
+  {%- elsif search.items == empty -%}
+    <p class="search__empty">Nothing found for "{{ search.query }}".</p>
+  {%- else -%}
+    <p class="search__meta">Results found: {{ search.total }}</p>
+    <ol class="search__results">
+      {%- for item in search.items -%}
+        <li class="search__result">
+          {% assign cover = media[item.fields.hero_image].presets.thumbnail %}
+          {% if cover %}<img src="{{ cover.src }}" alt="{{ cover.alt }}" width="{{ cover.width }}" height="{{ cover.height }}" loading="lazy">{% endif %}
+          {%- if item.path != null -%}
+            <a class="search__link" href="{{ item.path }}">{{ item.title }}</a>
+          {%- else -%}
+            <span class="search__link">{{ item.title }}</span>
+          {%- endif -%}
+          {%- if item.snippet != null -%}
+            <p class="search__snippet">
+              {%- for segment in item.snippet.segments -%}
+                {%- if segment.match -%}
+                  <em class="search-hit">{{ segment.text }}</em>
+                {%- else -%}
+                  {{ segment.text }}
+                {%- endif -%}
+              {%- endfor -%}
+            </p>
+          {%- elsif item.summary != "" -%}
+            <p class="search__snippet">{{ item.summary }}</p>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ol>
+    {%- if search.next_cursor != null -%}
+      <nav class="search__pagination" aria-label="Result pages">
+        <a href="{{ search.next_url }}">
+          Next page
+        </a>
+      </nav>
+    {%- endif -%}
+  {%- endif -%}
+</section>

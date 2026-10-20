@@ -1,0 +1,42 @@
+<header class="site-header site-header--{{ theme_settings.header_variant }}" data-sticky="{{ theme_settings.sticky_header }}">
+  <div class="container site-header__inner">
+    <a class="site-logo" href="/" aria-label="{{ site.site_name }} — home">
+      <img src="/themes/reference-theme-v1/{{ theme_settings.logo }}" alt="{{ site.site_name }} logo" width="120" height="32">
+    </a>
+    <a class="site-search-link" href="/search/?locale={{ request.locale | default: "default" | url_encode }}">Search</a>
+    <nav class="site-nav site-nav--primary" aria-label="Primary navigation (desktop)">
+      <ul>
+        {% for item in nav['header.primary'].items %}
+          {% if item.type == 'group' %}
+            <li class="group"><span>{{ item.title }}</span>
+              <ul>{% for sub in item.items %}<li><a href="{{ sub.href }}">{{ sub.title }}</a></li>{% endfor %}</ul>
+            </li>
+          {% elsif item.type == 'external_url' %}
+            <li><a href="{{ item.href }}" rel="noopener">{{ item.title }}</a></li>
+          {% elsif item.type == 'internal_entry' %}
+            <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    <nav class="site-nav site-nav--compact" aria-label="Primary navigation (compact)">
+      <ul>{% for item in nav['header.compact'].items %}<li><a href="{{ item.href }}">{{ item.title }}</a></li>{% endfor %}</ul>
+    </nav>
+    <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-nav">Menu</button>
+  </div>
+  <nav id="mobile-nav" class="mobile-nav container" data-open="false" aria-label="Primary navigation (mobile)">
+    <ul>
+      {% for item in nav['header.mobile'].items %}
+        {% if item.type == 'group' %}
+          <li class="group"><span>{{ item.title }}</span>
+            <ul>{% for sub in item.items %}<li><a href="{{ sub.href }}">{{ sub.title }}</a></li>{% endfor %}</ul>
+          </li>
+        {% elsif item.type == 'separator' %}
+          <li><hr></li>
+        {% elsif item.type == 'internal_entry' %}
+          <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </nav>
+</header>

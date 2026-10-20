@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="{{ request.locale | default: "ru" }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ head.title }} — {{ site.site_name }}</title>
+  {% for meta in head.core_meta %}<meta {% if meta.property %}property="{{ meta.property }}"{% else %}name="{{ meta.name }}"{% endif %} content="{{ meta.content }}">{% endfor %}
+  {% if head.canonical %}<link rel="canonical" href="{{ head.canonical }}">{% endif %}
+  {% for alt in head.alternates %}<link rel="alternate" hreflang="{{ alt.hreflang }}" href="{{ alt.href }}">{% endfor %}
+  <link rel="stylesheet" href="/themes/reference-theme-v1/assets/css/theme.css">
+  <style>{{ tokens_css }}</style>
+</head>
+<body>
+  {% include 'components/header.liquid' %}
+  <main class="container page-main" id="main">
+    {% include 'components/breadcrumbs.liquid' %}
+    {% assign hero = media[entry.fields.hero_image] %}
+    {% if hero and hero.presets.hero %}<img src="{{ hero.presets.hero.src }}" alt="{{ hero.alt }}" width="{{ hero.presets.hero.width }}" height="{{ hero.presets.hero.height }}">{% endif %}
+    <h1 class="page-title">{{ entry.title }}</h1>
+    {% if entry.fields.intro %}<p class="page-intro">{{ entry.fields.intro }}</p>{% endif %}
+    {% if entry.fields.price %}<p><strong>Price:</strong> {{ entry.fields.price }}</p>{% endif %}
+    {{ blocks_html }}
+    {{ body_html }}
+    {% if entry.fields.features %}
+      <h2>What is included</h2>
+      <ul class="block-timeline">
+        {% for feature in entry.fields.features %}<li><strong>{{ feature.feature_title }}</strong> {{ feature.feature_text }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </main>
+  {% include 'components/footer.liquid' %}
+  <script src="/themes/reference-theme-v1/assets/js/theme.js" defer></script>
+</body>
+</html>

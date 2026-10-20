@@ -1,0 +1,7 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.0",
+  "description": "Version is not real SemVer (missing patch).",
+  "entry_workflow": ["bootstrap"],
+  "safety_levels": ["READ"]
+}

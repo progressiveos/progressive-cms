@@ -1,0 +1,11 @@
+{
+  "name": "@pcms/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded MCP (Model Context Protocol) server for the CMS application operations (M09; API/MCP/CLI spec §48–§54). Zero @pcms/* dependencies: operations arrive through a structural interface, wired at the composition root.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "Apache-2.0"
+}

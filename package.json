@@ -1,0 +1,53 @@
+{
+  "name": "progressive-cms",
+  "version": "1.0.0-rc.29",
+  "private": true,
+  "type": "module",
+  "description": "Progressive CMS \u2014 modular monolith CMS platform (see docs/specs/INDEX.md)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "npm": ">=11.6.0"
+  },
+  "scripts": {
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "typecheck": "tsc --noEmit && tsc -p apps/admin/tsconfig.json",
+    "check:i18n": "node --import tsx scripts/check-i18n.mts",
+    "test": "node scripts/run-tests.mjs",
+    "cms": "node --env-file-if-exists=.env --import tsx packages/cli/src/bin/cms.ts",
+    "web": "node --env-file-if-exists=.env --import tsx apps/web/src/main.ts",
+    "worker": "node --env-file-if-exists=.env --import tsx apps/worker/src/main.ts",
+    "build": "tsc -p tsconfig.build.json && npm run build:admin",
+    "build:admin": "node scripts/compose-first-party.mjs emit-admin \"${PCMS_ADMIN_COMPOSITION:-standard}\" apps/admin/src/extension/contributions.generated.ts && vite build --config apps/admin/vite.config.ts",
+    "release": "node --import tsx scripts/build-release.mjs",
+    "scan:audit": "npm audit --omit=dev",
+    "scan:licenses": "node scripts/license-check.mjs",
+    "scan:admin-bundle": "node scripts/scan-admin-bundle.mjs",
+    "scan": "npm run scan:audit && npm run scan:licenses && npm run scan:admin-bundle",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run check:i18n && npm test && npm run build && npm run scan",
+    "test:browser": "PCMS_ADMIN_COMPOSITION=\"${PCMS_ADMIN_COMPOSITION:-ui-test}\" npm run build:admin && playwright test",
+    "prepare:extensions": "node scripts/compose-first-party.mjs prepare-supply && node scripts/compose-first-party.mjs emit-admin standard apps/admin/src/extension/contributions.generated.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.5",
+    "@types/pg": "8.23.1",
+    "@types/semver": "7.8.0",
+    "acorn": "8.18.0",
+    "acorn-typescript": "1.4.13",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "yazl": "^3.3.1"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true
+  },
+  "license": "Apache-2.0"
+}

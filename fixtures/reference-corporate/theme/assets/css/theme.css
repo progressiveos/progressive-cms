@@ -1,0 +1,190 @@
+/* Acme Corporate — corporate design adapted onto Theme Contract v1.
+   Distinct look (serif body, topbar, copper accents) achieved purely through
+   theme-level tokens/CSS/components — no CMS Core changes (T029). */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  line-height: 1.65;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+a {
+  color: var(--color-primary);
+}
+.container {
+  max-width: var(--layout-container-max);
+  margin: 0 auto;
+  padding: 0 var(--space-s);
+}
+
+.topbar {
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+}
+.topbar .container {
+  display: flex;
+  justify-content: space-between;
+  min-height: var(--layout-topbar-height);
+  align-items: center;
+}
+.topbar a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.site-header {
+  border-bottom: 2px solid var(--color-accent);
+  background: var(--color-surface);
+}
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding: var(--space-s) 0;
+}
+.site-logo img {
+  display: block;
+  height: 32px;
+}
+.site-nav {
+  margin-left: auto;
+}
+.site-nav ul {
+  display: flex;
+  gap: var(--space-s);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-heading);
+}
+.site-nav a {
+  text-decoration: none;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.9rem;
+}
+.menu-toggle {
+  display: none;
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  background: none;
+  border-radius: var(--radius-s);
+  padding: 0.4rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .site-nav--primary,
+  .site-nav--compact {
+    display: none;
+  }
+  .menu-toggle {
+    display: block;
+  }
+}
+.mobile-nav {
+  display: none;
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-s) 0;
+}
+.mobile-nav[data-open="true"] {
+  display: block;
+}
+.mobile-nav ul {
+  list-style: none;
+  padding: 0;
+}
+.mobile-nav a {
+  display: block;
+  padding: 0.35rem 0;
+  text-decoration: none;
+}
+
+.page-main {
+  padding: var(--space-l) 0;
+}
+.page-title {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-left: 6px solid var(--color-accent);
+  padding-left: var(--space-s);
+}
+.page-intro {
+  color: var(--color-text-muted);
+  font-size: 1.15rem;
+}
+
+.block {
+  margin: var(--space-m) 0;
+}
+.block-cta {
+  border: 1px solid var(--color-border);
+  padding: var(--space-s);
+  display: flex;
+  gap: var(--space-s);
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.block-cta--accent {
+  background: var(--color-accent);
+  color: #fff;
+}
+.btn {
+  display: inline-block;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.45rem 1.4rem;
+  text-decoration: none;
+  border-radius: var(--radius-s);
+  font-family: var(--font-heading);
+}
+.block-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.block-table th,
+.block-table td {
+  border: 1px solid var(--color-border);
+  padding: 0.4rem 0.6rem;
+}
+.block-callout {
+  background: var(--color-surface-muted);
+  border-left: 4px solid var(--color-primary);
+  padding: var(--space-s);
+}
+
+.site-footer {
+  background: var(--color-primary);
+  color: #fff;
+  margin-top: var(--space-l);
+  padding: var(--space-l) 0;
+}
+.site-footer a {
+  color: #fff;
+}
+.site-footer ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

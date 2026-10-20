@@ -1,0 +1,73 @@
+import { defineFragment } from "../fragment.js";
+export const privacy = defineFragment(
+  {
+    "privacy.title": "Персональные данные: адресные операции",
+    "privacy.explanation":
+      "Инструменты по решению владельца. Выберите запись и действие, проверьте затрагиваемые копии, затем явно примените. Эти настройки не блокируют работу сайта.",
+    "privacy.entity": "Тип записи",
+    "privacy.submission": "Заявка формы",
+    "privacy.quiz_run": "Прохождение квиза",
+    "privacy.lead": "Лид",
+    "privacy.record_id": "ID записи",
+    "privacy.action": "Действие",
+    "privacy.block": "Приостановить обработку",
+    "privacy.unblock": "Возобновить обработку",
+    "privacy.rectify": "Исправить данные",
+    "privacy.erase": "Удалить персональные данные",
+    "privacy.load_fields": "Загрузить поля для исправления",
+    "privacy.load_first": "Сначала загрузите поля исходной записи.",
+    "privacy.correct_hint":
+      "Исправляется исходная заявка или ответы квиза и связанные лиды. Для чтения полей нужны обычные права на исходную запись.",
+    "privacy.structured_hint": "Структурированное значение JSON; сохраняйте исходный тип.",
+    "privacy.request_ref": "Ссылка на решение владельца (необязательно, без персональных данных)",
+    "privacy.preview": "Предварительная проверка",
+    "privacy.local_counts": "Связанные лиды: {leads}; события: {outbox}; доставки: {deliveries}",
+    "privacy.affected_ids": "ID затрагиваемых локальных копий",
+    "privacy.in_flight": "Доставка выполняется. Повторите проверку после её завершения.",
+    "privacy.apply": "Применить выбранное действие",
+    "privacy.case_id": "ID выполненной операции",
+    "privacy.open_case": "Открыть результат",
+    "privacy.external_hint":
+      "CMS не удаляет копии у получателей, в выгрузках и резервных копиях автоматически. Организуйте действие у получателя и отметьте подтверждение либо исключение по решению владельца.",
+    "privacy.evidence": "Ссылка на подтверждение/исключение (без персональных данных)",
+    "privacy.acknowledged": "Действие получателя подтверждено",
+    "privacy.owner_exception": "Исключение по решению владельца",
+    "perm.privacy.manage":
+      "Адресно исправлять, блокировать и удалять персональные данные; фиксировать обработку внешних копий. Выдавать осознанно.",
+  },
+  {
+    "privacy.title": "Personal data: addressed operations",
+    "privacy.explanation":
+      "Owner-controlled tools. Select a record and action, review affected copies, then explicitly apply. These controls do not gate normal site operation.",
+    "privacy.entity": "Record type",
+    "privacy.submission": "Form submission",
+    "privacy.quiz_run": "Quiz run",
+    "privacy.lead": "Lead",
+    "privacy.record_id": "Record ID",
+    "privacy.action": "Action",
+    "privacy.block": "Block processing",
+    "privacy.unblock": "Resume processing",
+    "privacy.rectify": "Correct data",
+    "privacy.erase": "Erase personal data",
+    "privacy.load_fields": "Load fields to correct",
+    "privacy.load_first": "Load the source record fields first.",
+    "privacy.correct_hint":
+      "Corrections update the source submission or quiz answers and associated leads. Loading fields requires normal read permission on the source.",
+    "privacy.structured_hint": "Structured JSON value; preserve its original type.",
+    "privacy.request_ref": "Owner decision reference (optional, no personal data)",
+    "privacy.preview": "Preview",
+    "privacy.local_counts": "Associated leads: {leads}; events: {outbox}; deliveries: {deliveries}",
+    "privacy.affected_ids": "Affected local copy IDs",
+    "privacy.in_flight": "A delivery is in progress. Preview again once it finishes.",
+    "privacy.apply": "Apply selected action",
+    "privacy.case_id": "Operation ID",
+    "privacy.open_case": "Open receipt",
+    "privacy.external_hint":
+      "CMS does not automatically erase recipient copies, exports or backups. Arrange recipient action, then record its acknowledgement or the owner's exception.",
+    "privacy.evidence": "Acknowledgement/exception reference (no personal data)",
+    "privacy.acknowledged": "Recipient action acknowledged",
+    "privacy.owner_exception": "Owner exception",
+    "perm.privacy.manage":
+      "Addressed personal-data correction, blocking and erasure; record external-copy handling. Delegate deliberately.",
+  },
+);

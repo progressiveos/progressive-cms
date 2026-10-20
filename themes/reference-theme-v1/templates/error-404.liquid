@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="{{ request.locale | default: "ru" }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — {{ site.site_name }}</title>
+  <link rel="stylesheet" href="/themes/reference-theme-v1/assets/css/theme.css">
+  <style>{{ tokens_css }}</style>
+  {% for icon in head.icons %}<link rel="{{ icon.rel }}" href="{{ icon.href }}"{% if icon.type %} type="{{ icon.type }}"{% endif %}{% if icon.sizes %} sizes="{{ icon.sizes }}"{% endif %}>{% endfor %}
+</head>
+<body>
+  {% include 'components/header.liquid' %}
+  <main class="container page-main" id="main">
+    <h1 class="page-title">404 — page not found</h1>
+    <p>Check the address or return to the homepage.</p>
+    <p><a class="btn" href="/">Home</a></p>
+  </main>
+  {% include 'components/footer.liquid' %}
+  <script src="/themes/reference-theme-v1/assets/js/theme.js" defer></script>
+</body>
+</html>

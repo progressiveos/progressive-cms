@@ -1,0 +1,104 @@
+{
+  "description": "Reference navigation/routing corpus (PCMS-NAV-T027; Navigation spec §71). Every required edge scenario, executable against the public contracts.",
+  "menuScenarios": [
+    {
+      "id": "simple-main-menu",
+      "base": [
+        { "id": "home", "type": "internal_entry", "label": "Главная" },
+        { "id": "about", "type": "internal_entry", "label": "О компании" }
+      ],
+      "overrides": [],
+      "expectLabels": ["Главная", "О компании"]
+    },
+    {
+      "id": "nested-3-level-menu",
+      "base": [
+        {
+          "id": "services",
+          "type": "group",
+          "label": "Услуги",
+          "children": [
+            { "id": "audit", "type": "internal_entry", "label": "Аудит" },
+            {
+              "id": "consulting",
+              "type": "group",
+              "label": "Консалтинг",
+              "children": [
+                { "id": "it-consulting", "type": "internal_entry", "label": "ИТ-консалтинг" }
+              ]
+            }
+          ]
+        }
+      ],
+      "overrides": [],
+      "expectLabels": ["Услуги", "Аудит", "Консалтинг", "ИТ-консалтинг"],
+      "expectMaxDepth": 3
+    },
+    {
+      "id": "external-resource-link",
+      "base": [{ "id": "docs", "type": "external_url", "label": "Документация" }],
+      "overrides": [],
+      "expectLabels": ["Документация"]
+    },
+    {
+      "id": "cta-action-item",
+      "base": [{ "id": "cta", "type": "action", "label": "Оставить заявку", "uiIntent": "cta" }],
+      "overrides": [],
+      "expectLabels": ["Оставить заявку"]
+    },
+    {
+      "id": "shared-desktop-mobile-set",
+      "base": [
+        { "id": "home", "type": "internal_entry", "label": "Главная" },
+        { "id": "contacts", "type": "internal_entry", "label": "Контакты" }
+      ],
+      "overrides": [],
+      "expectLabels": ["Главная", "Контакты"],
+      "note": "the SAME set is bound to header.primary and header.mobile"
+    },
+    {
+      "id": "derived-mobile-overrides",
+      "base": [
+        { "id": "services", "type": "group", "label": "Услуги" },
+        { "id": "contacts", "type": "internal_entry", "label": "Контакты" }
+      ],
+      "overrides": [
+        { "targetItemId": "services", "op": "hide", "payload": {} },
+        { "targetItemId": "contacts", "op": "relabel", "payload": { "label": "Связаться" } }
+      ],
+      "expectLabels": ["Связаться"]
+    },
+    {
+      "id": "stale-override-conflict",
+      "base": [{ "id": "gone", "type": "internal_entry", "label": "Исчезло" }],
+      "overrides": [{ "targetItemId": "gone", "op": "hide", "payload": {} }],
+      "baseItemDeleted": true,
+      "expectStale": true,
+      "note": "base item removed after authoring — materialization must fail NAV_OVERRIDE_STALE"
+    }
+  ],
+  "policyScenarios": [
+    {
+      "id": "legacy-html-route",
+      "policy": "legacy-html",
+      "request": "/about.html",
+      "expect": { "kind": "canonical", "path": "/about.html" }
+    },
+    {
+      "id": "trailing-slash-redirect",
+      "policy": "default",
+      "request": "/services",
+      "expect": { "kind": "redirect", "statusCode": 301, "location": "/services/" }
+    }
+  ],
+  "integrationScenarios": [
+    { "id": "route-rename", "fromPath": "/old-name/", "toPath": "/new-name/" },
+    { "id": "redirect-chain-collapse", "chain": ["/a/", "/b/", "/c/"] },
+    { "id": "collision", "path": "/taken/", "expectCode": "ROUTE_COLLISION" },
+    {
+      "id": "multiple-domains",
+      "domains": ["acme.example", "acme.ru", "legacy-acme.example"],
+      "primary": "acme.example"
+    }
+  ]
+}

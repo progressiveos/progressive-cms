@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "paths": {
+      "@pcms/extensions": ["./packages/extensions/src/sdk.ts"],
+      "@pcms/extensions/internal": ["./packages/extensions/src/index.ts"],
+      "@pcms/*": ["./packages/*/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src",
+    "apps/*/src",
+    "scripts",
+    "tests",
+    "extensions/catalog.ts",
+    "extensions/catalog.ui-test.generated.ts"
+  ],
+  "exclude": ["apps/admin"]
+}

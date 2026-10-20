@@ -1,0 +1,30 @@
+{
+  "nodeEnv": "development",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 3000
+  },
+  "db": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "database": "pcms",
+    "user": "pcms",
+    "passwordSecretRef": "db.password",
+    "sslMode": "disable",
+    "migrationsDir": "db/migrations",
+    "pool": {
+      "webMax": 10,
+      "workerMax": 5,
+      "connectionTimeoutMilliseconds": 5000,
+      "idleTimeoutMilliseconds": 30000
+    }
+  },
+  "log": {
+    "level": "info"
+  },
+  "secrets": {
+    "db.password": {
+      "env": "PCMS_SECRET_DB_PASSWORD"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+---
+pcmd_version: 1
+operation: create
+external_id: main
+content_type: page
+fields:
+  title: Подборка материалов
+route:
+  path: /content-agent-demo/
+---
+:::block image@1
+media_id: "bundle:assets/hero.png"
+alt_override: "Иллюстрация подборки"
+:::
+
+:::block related_content@1
+mode: manual
+title: Связанные материалы
+entry_ids: ["ref:existing-article", "ref:sibling"]
+:::

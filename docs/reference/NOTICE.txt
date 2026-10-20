@@ -1,0 +1,4 @@
+Progressive CMS public documentation and synthetic authoring examples.
+Prepared for inclusion as a public documentation folder at the project owner’s request.
+Core-derived public references and adapted contract/theme examples follow the source contracts; reviewed origin is recorded in the corporate repository. No private Git history or internal reports are included.
+No separate license grant to the private Core source repository or its Git history is made by this folder.

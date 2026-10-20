@@ -1,0 +1,9 @@
+<div class="block block-heading">
+  {% capture anchor_attr %}{% if block.props.anchor %} id="{{ block.props.anchor }}"{% endif %}{% endcapture %}
+  {% if block.props.level == 1 %}<h1{{ anchor_attr }}>{{ block.props.text }}</h1>
+  {% elsif block.props.level == 2 %}<h2{{ anchor_attr }}>{{ block.props.text }}</h2>
+  {% elsif block.props.level == 3 %}<h3{{ anchor_attr }}>{{ block.props.text }}</h3>
+  {% elsif block.props.level == 4 %}<h4{{ anchor_attr }}>{{ block.props.text }}</h4>
+  {% elsif block.props.level == 5 %}<h5{{ anchor_attr }}>{{ block.props.text }}</h5>
+  {% else %}<h6{{ anchor_attr }}>{{ block.props.text }}</h6>{% endif %}
+</div>

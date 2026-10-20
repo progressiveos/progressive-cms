@@ -1,0 +1,10 @@
+<section class="block block-map">
+  <div class="map-shell" role="img" aria-label="Карта: {{ block.props.markers.size }} маркеров">
+    <p>Интерактивная карта (каркас). Провайдер подключается политикой сайта.</p>
+  </div>
+  <ol>
+    {% for marker in block.props.markers %}
+      <li><strong>{{ marker.title }}</strong>{% if marker.address %} — {{ marker.address }}{% endif %}</li>
+    {% endfor %}
+  </ol>
+</section>

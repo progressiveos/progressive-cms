@@ -1,0 +1,13 @@
+---
+pcmd_version: 1
+operation: update
+external_id: article
+content_type: service
+target_entry_id: 01989f5a-0000-7000-8000-000000000000
+base_revision_id: 01989f5a-0000-7000-8000-000000000001
+fields:
+  title: "Обновлённый заголовок"
+---
+:::block text@1
+rich_text: "Обновлённый текст. base_revision_id защищает от затирания чужих правок."
+:::

@@ -1,0 +1,18 @@
+<figure class="block block-gallery">
+  <ul data-lightbox="{% if block.props.lightbox_enabled %}true{% else %}false{% endif %}">
+    {% for item in block.props.items %}
+      {% assign img = media[item.media_id] %}
+      <li>
+        {% if img and img.presets.gallery %}
+          <a href="{{ img.presets.gallery.src }}" data-full="{{ img.presets.gallery.src }}" data-alt="{% if item.alt_override %}{{ item.alt_override }}{% else %}{{ img.alt }}{% endif %}">
+            <img src="{{ img.presets.thumbnail.src }}" alt="{% if item.alt_override %}{{ item.alt_override }}{% else %}{{ img.alt }}{% endif %}" width="{{ img.presets.thumbnail.width }}" height="{{ img.presets.thumbnail.height }}" loading="lazy">
+          </a>
+        {% else %}
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3C/svg%3E" alt="{% if item.alt_override %}{{ item.alt_override }}{% else %}Изображение недоступно{% endif %}" width="96" height="96" loading="lazy">
+        {% endif %}
+        {% if item.caption %}<figcaption>{{ item.caption }}</figcaption>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% if block.props.caption %}<figcaption>{{ block.props.caption }}</figcaption>{% endif %}
+</figure>

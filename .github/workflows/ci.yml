@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: progressive-cms
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pcms
+          POSTGRES_PASSWORD: pcms
+          POSTGRES_DB: pcms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pcms"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PCMS_TEST_DATABASE_URL: postgres://pcms:pcms@127.0.0.1:5432/pcms
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: progressive-cms
+
+      - uses: actions/checkout@v5
+        with:
+          repository: progressiveos/progressive-cms-extensions
+          path: progressive-cms-extensions
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: progressive-cms/.nvmrc
+          cache: npm
+          cache-dependency-path: progressive-cms/package-lock.json
+
+      - name: Install (deterministic)
+        run: npm ci
+
+      - name: Prepare locked public extension supplies
+        run: npm run prepare:extensions
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit + PostgreSQL integration tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency security audit
+        run: npm run scan:audit
+
+      - name: License scan
+        run: npm run scan:licenses

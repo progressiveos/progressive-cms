@@ -1,0 +1,10 @@
+<section class="block block-map">
+  <div class="map-shell" role="img" aria-label="Map: {{ block.props.markers.size }} markers">
+    <p>Interactive map (scaffold). The provider is connected by site policy.</p>
+  </div>
+  <ol>
+    {% for marker in block.props.markers %}
+      <li><strong>{{ marker.title }}</strong>{% if marker.address %} — {{ marker.address }}{% endif %}</li>
+    {% endfor %}
+  </ol>
+</section>

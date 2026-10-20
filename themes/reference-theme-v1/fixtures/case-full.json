@@ -1,0 +1,187 @@
+{
+  "name": "case-full",
+  "entry": {
+    "templateKey": "case-default",
+    "contentTypeKey": "case",
+    "contentTypeVersion": 1,
+    "title": "Внедрение CMS для сети клиник",
+    "fields": {
+      "title": "Внедрение CMS для сети клиник",
+      "client": "Сеть клиник «Здоровье»",
+      "completed_on": "2026-05-14",
+      "hero_image": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02"
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d628",
+        "type": "video",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "provider": "youtube",
+          "video_id": "dQw4w9WgXcQ",
+          "title": "Отзыв клиента",
+          "aspect_ratio": "16:9"
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d629",
+        "type": "map",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "center": {
+            "lat": 55.751244,
+            "lon": 37.618423
+          },
+          "zoom_hint": 12,
+          "markers": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e42",
+              "title": "Клиника на Тверской",
+              "address": "г. Москва, Тверская, 1",
+              "lat": 55.76,
+              "lon": 37.61
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d62b",
+        "type": "timeline",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Хронология проекта",
+          "items": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e44",
+              "date": "2026-01-15",
+              "title": "Старт"
+            },
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e45",
+              "date_text": "весна 2026",
+              "title": "Запуск пилота"
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d62e",
+        "type": "documents",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Документы проекта",
+          "items": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e47",
+              "media_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e03",
+              "display_title": "Техническое задание (PDF)"
+            }
+          ]
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {
+    "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02": {
+      "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02",
+      "alt": "Фото 2",
+      "width": 4000,
+      "height": 3000,
+      "derivatives": [
+        {
+          "preset": "card",
+          "url": "/media/2-card.webp",
+          "width": 800,
+          "height": 600
+        },
+        {
+          "preset": "gallery",
+          "url": "/media/2-gallery.webp",
+          "width": 1200,
+          "height": 900
+        },
+        {
+          "preset": "thumbnail",
+          "url": "/media/2-thumb.webp",
+          "width": 96,
+          "height": 96
+        }
+      ]
+    },
+    "018f6d2c-5f31-7abc-8def-2a3b4c5d6e03": {
+      "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e03",
+      "alt": "Документ PDF",
+      "derivatives": []
+    }
+  },
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": []
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": [
+    "Клиника на Тверской",
+    "Хронология проекта",
+    "youtube-nocookie.com/embed",
+    "Техническое задание"
+  ],
+  "bodyHtml": "<p>Сеть клиник получила единую платформу контента с <strong>быстрыми</strong> страницами.</p>"
+}

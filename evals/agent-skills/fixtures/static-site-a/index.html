@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Static Site A — Rooftop Coffee Roasters</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="/"><img src="assets/logo.svg" alt="Rooftop Coffee Roasters" width="120" height="32">Rooftop Coffee Roasters</a>
+    <nav class="nav-desktop" aria-label="Main">
+      <a href="/coffees">Coffees</a>
+      <a href="/wholesale">Wholesale</a>
+      <a href="/journal">Journal</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <a class="btn btn-primary" href="#order">Order beans</a>
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false">&#9776;</button>
+    <nav class="nav-mobile" aria-label="Mobile" hidden>
+      <a href="/coffees">Coffees</a>
+      <a href="/wholesale">Wholesale</a>
+      <a href="/journal">Journal</a>
+      <a href="/contact">Contact</a>
+      <a class="btn btn-primary" href="#order">Order beans</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">SMALL-BATCH ROASTERY</p>
+      <h1>Coffee roasted three floors above the harbour</h1>
+      <p>We roast every Tuesday and ship the same day — no warehouse, no shelf life.</p>
+      <a class="btn btn-primary" href="#order">Get the weekly roast</a>
+    </section>
+
+    <section class="cards" id="coffees">
+      <h2>This week's coffees</h2>
+      <article class="card">
+        <h3>Harbour Light — filter</h3>
+        <p class="price">€13.50 / 250 g</p>
+        <p>Peach, black tea, honey. Colombia, Huila, 1,750 m.</p>
+      </article>
+      <article class="card">
+        <h3>Night Shift — espresso</h3>
+        <p class="price">€14.00 / 250 g</p>
+        <p>Dark chocolate, plum, brown sugar. Brazil, Cerrado, 1,100 m.</p>
+      </article>
+      <article class="card">
+        <h3>First Light — decaf</h3>
+        <p class="price">€12.00 / 250 g</p>
+        <p>Red apple, caramel. Honduras, Sugarcane EA decaf.</p>
+      </article>
+    </section>
+
+    <section class="prose">
+      <h2>Wholesale</h2>
+      <p>We supply 14 cafés across the city with weekly roasts, barista training
+         and equipment loans. Minimum order 5 kg per week.</p>
+    </section>
+
+    <section class="faq">
+      <h2>Questions</h2>
+      <h3>Do you ship internationally?</h3>
+      <p>Yes — EU-wide, roasted-to-order, every Tuesday.</p>
+    </section>
+
+    <section class="order-form" id="order">
+      <h2>Order the weekly roast</h2>
+      <form action="/api/lead" method="post">
+        <label>Name <input type="text" name="name" required></label>
+        <label>Email <input type="email" name="email" required></label>
+        <label>Preferred roast
+          <select name="roast"><option>Harbour Light</option><option>Night Shift</option><option>First Light</option></select>
+        </label>
+        <label>Consent
+          <input type="checkbox" name="consent" required>
+          I agree to the <a href="/privacy">privacy policy</a>.
+        </label>
+        <button class="btn btn-primary" type="submit">Subscribe</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <img src="assets/logo.svg" alt="Rooftop logo" width="96" height="26">
+      <p>Roasted at Kai 7, done Tue 08:00.</p>
+    </div>
+    <nav aria-label="Footer">
+      <a href="/coffees">Coffees</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </nav>
+    <p>&copy; 2026 Rooftop Coffee Roasters</p>
+  </footer>
+  <script src="assets/main.js"></script>
+</body>
+</html>

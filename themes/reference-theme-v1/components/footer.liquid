@@ -1,0 +1,55 @@
+<footer class="site-footer">
+  <div class="container">
+    <nav aria-label="Footer navigation">
+      <ul>
+        {% for item in nav['footer.primary'].items %}
+          {% if item.type == 'group' %}
+            <li class="group"><span>{{ item.title }}</span>
+              <ul>{% for sub in item.items %}<li><a href="{{ sub.href }}">{{ sub.title }}</a></li>{% endfor %}</ul>
+            </li>
+          {% elsif item.type == 'internal_entry' %}
+            <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    <nav aria-label="Legal information">
+      <ul>
+        {% for item in nav['footer.legal'].items %}
+          <li>{% if item.type == 'external_url' %}<a href="{{ item.href }}" rel="noopener">{{ item.title }}</a>{% else %}<a href="{{ item.href }}">{{ item.title }}</a>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </nav>
+    <p>{{ theme_settings.footer_text }} © {{ site.site_name }}</p>
+  </div>
+</footer>
+{% assign lead_form = forms[theme_settings.lead_form_id] %}
+{% if lead_form %}
+  <form class="footer-form" data-pcms-form action="{{ lead_form.submission_url }}" method="post">
+    <h2>{{ lead_form.title }}</h2>
+    {% for field in lead_form.fields %}
+      {% if field.type == 'consent' %}
+        <label class="footer-form__consent">
+          <input type="checkbox" name="{{ field.key }}" value="1" required />
+          <span>{{ field.label }}</span>
+        </label>
+      {% elsif field.type == 'textarea' %}
+        <label class="footer-form__field">
+          <span>{{ field.label }}</span>
+          <textarea name="{{ field.key }}" rows="3"></textarea>
+        </label>
+      {% else %}
+        <label class="footer-form__field">
+          <span>{{ field.label }}</span>
+          <input type="{{ field.type }}" name="{{ field.key }}" />
+        </label>
+      {% endif %}
+    {% endfor %}
+    <button class="btn" type="submit">{{ lead_form.submit_label | default: 'Submit' }}</button>
+    <p class="footer-form__status" data-pcms-form-status hidden></p>
+  </form>
+{% endif %}
+<div class="lightbox" data-open="false" role="dialog" aria-modal="true" aria-label="Image preview">
+  <button class="lightbox-close btn" type="button">Close</button>
+  <img alt="">
+</div>

@@ -1,0 +1,22 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.0.0",
+  "description": "Canonical content workflow through public machine contracts.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "mcp": "2024-11-05",
+      "block_document": "1",
+      "bundle": "1"
+    },
+    "minimum_capabilities": ["content.read"],
+    "optional_capabilities": ["publication.publish"]
+  },
+  "recommended_scopes": ["content.read", "content.create"],
+  "optional_scopes": ["publication.schedule"],
+  "dangerous_optional_scopes": ["publication.publish"],
+  "entry_workflow": ["bootstrap", "discover", "mutate", "validate", "report"],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PUBLIC_MUTATION"],
+  "references": ["references/media.md"]
+}

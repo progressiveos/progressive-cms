@@ -1,0 +1,95 @@
+{
+  "name": "news-short",
+  "entry": {
+    "templateKey": "news-default",
+    "contentTypeKey": "news",
+    "contentTypeVersion": 1,
+    "title": "Акме открыла офис в Казани",
+    "fields": {
+      "title": "Акме открыла офис в Казани",
+      "published_at": "2026-09-01T10:00:00+03:00",
+      "teaser": "Короткая новость."
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d646",
+        "type": "quote",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "rich_text": {
+            "schema_version": 2,
+            "type": "document",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Рады сообщить хорошую новость."
+                  }
+                ]
+              }
+            ]
+          },
+          "author": "Пресс-служба"
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": []
+    }
+  ],
+  "globals": {},
+  "bodyHtml": "<p>Текст новости.</p>",
+  "expectContains": ["2026-09-01", "Текст новости.", "Рады сообщить"]
+}

@@ -1,0 +1,4 @@
+Read and follow the installed Progressive CMS Skill
+`progressive-cms-extension-developer`.
+The shipped extensions under `extensions/` are the canonical examples.
+Execute the supplied extension task; ship it registered, tested and packaged.

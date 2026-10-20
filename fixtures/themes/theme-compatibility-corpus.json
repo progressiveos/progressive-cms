@@ -1,0 +1,177 @@
+{
+  "description": "Executable Theme Contract compatibility gate (PCMS-THEME-T027). Frozen manifests/settings/tokens from earlier minor releases must keep validating, resolving and rendering tokens byte-identically on the current CMS. Treat like the Content compatibility corpus: a failing test here means a breaking change inside the same Theme Contract major.",
+  "themes": [
+    {
+      "note": "reference-theme-v1 as frozen at contract 1.0 release (1.0.0) — minimal shape without capabilities/directories",
+      "manifest": {
+        "id": "reference-theme-v1",
+        "name": "Progressive Reference",
+        "version": "1.0.0",
+        "theme_contract": "^1.0",
+        "templates": [
+          {
+            "id": "page-default",
+            "file": "templates/page-default.liquid",
+            "accepts_content_types": ["page@1"],
+            "required_fields": ["title"]
+          }
+        ],
+        "components": [
+          {
+            "id": "header",
+            "file": "components/header.liquid"
+          }
+        ],
+        "block_renderers": [
+          {
+            "block": "text@1",
+            "file": "blocks/text.liquid"
+          }
+        ],
+        "navigation_placements": [
+          {
+            "id": "header.primary",
+            "required": true,
+            "max_depth": 2,
+            "supported_item_types": ["internal_entry", "group"]
+          }
+        ],
+        "media_presets": [
+          {
+            "id": "card",
+            "width": 800
+          }
+        ],
+        "settings_schema": [
+          {
+            "key": "primary_color",
+            "type": "color",
+            "default": "#0f62fe",
+            "token": "--color-primary"
+          }
+        ]
+      },
+      "capabilitiesProvided": {
+        "content.block_document": "1"
+      }
+    },
+    {
+      "note": "site-specific theme frozen at 1.2.0 — partial settings shape (pre-label era), placement with fallback",
+      "manifest": {
+        "id": "client-acme-2026",
+        "name": "Acme 2026",
+        "version": "1.2.0",
+        "theme_contract": "^1.0",
+        "templates": [
+          {
+            "id": "page-default",
+            "file": "templates/page-default.liquid",
+            "accepts_content_types": ["page@1"]
+          },
+          {
+            "id": "service-default",
+            "file": "templates/service-default.liquid",
+            "accepts_content_types": ["service@1"]
+          }
+        ],
+        "components": [],
+        "block_renderers": [
+          {
+            "block": "text@1",
+            "file": "blocks/text.liquid"
+          },
+          {
+            "block": "cta@1",
+            "file": "blocks/cta.liquid",
+            "variants": ["inline", "wide"]
+          }
+        ],
+        "navigation_placements": [
+          {
+            "id": "header.primary",
+            "required": true,
+            "max_depth": 3,
+            "supported_item_types": ["internal_entry", "external_url"],
+            "fallback": "header.mobile"
+          },
+          {
+            "id": "header.mobile",
+            "max_depth": 2,
+            "supported_item_types": ["internal_entry"]
+          }
+        ],
+        "media_presets": [
+          {
+            "id": "hero",
+            "width": 1600,
+            "height": 900,
+            "fit": "cover"
+          },
+          {
+            "id": "thumbnail",
+            "width": 96
+          }
+        ],
+        "settings_schema": [
+          {
+            "key": "primary_color",
+            "type": "color",
+            "default": "#003f88",
+            "token": "--color-primary"
+          },
+          {
+            "key": "header_variant",
+            "type": "enum",
+            "default": "default",
+            "choices": ["default", "compact"]
+          },
+          {
+            "key": "sticky_header",
+            "type": "boolean",
+            "default": true
+          }
+        ]
+      },
+      "capabilitiesProvided": {
+        "content.block_document": "1",
+        "blocks.gallery": "1"
+      }
+    }
+  ],
+  "persistedSettings": [
+    {
+      "note": "saved by Admin UI on the 1.0.0 theme — keys/types must keep resolving",
+      "themeId": "reference-theme-v1",
+      "values": {
+        "primary_color": "#1226aa"
+      }
+    },
+    {
+      "note": "saved on client-acme-2026 1.2.0 — enum/boolean values included",
+      "themeId": "client-acme-2026",
+      "values": {
+        "primary_color": "#aa0000",
+        "header_variant": "compact",
+        "sticky_header": false
+      }
+    }
+  ],
+  "frozenTokenCss": {
+    "note": "byte-frozen output of tokensToCss for these tokens at contract 1.0 — must never change within the same major",
+    "tokens": {
+      "color.primary": {
+        "value": "#0f62fe",
+        "type": "color"
+      },
+      "color.accent": {
+        "value": "#ff7ab6",
+        "type": "color"
+      },
+      "space.m": {
+        "value": "1.5rem",
+        "type": "length"
+      }
+    },
+    "css": ":root {\n  /* public tokens — documented in THEME.md, renaming is a breaking change */\n  --color-accent: #ff7ab6;\n  --color-primary: #0f62fe;\n  --space-m: 1.5rem;\n}"
+  }
+}

@@ -1,0 +1,53 @@
+// Core-shell fragment: app-level states, error-panel fallbacks, transport
+// fallback messages. Domain fragments (dom/*.ts) follow the same shape.
+import { defineFragment } from "../fragment.js";
+
+export const core = defineFragment(
+  {
+    "core.cancel": "Отмена",
+    "core.save": "Сохранить",
+    "core.forbidden": "Недостаточно прав",
+    "core.page_not_found": "Страница не найдена",
+    "core.page_not_found_hint": "Проверьте адрес раздела.",
+    "core.loading": "Загрузка…",
+    "core.operation_failed": "Не удалось выполнить операцию",
+    tree_status_published: "Опубликовано",
+    tree_status_draft: "Есть неопубликованные изменения",
+    tree_status_archived: "В архиве",
+    create_entry_template: "Шаблон",
+    create_entry_template_hint: "Определяет, как материал выглядит на сайте",
+    template_label: "Шаблон",
+    template_default_option: "По умолчанию",
+    template_changed: "Шаблон изменён",
+    template_change_failed: "Не удалось изменить шаблон",
+    "core.request_id": "Код обращения:",
+    "core.technical_details": "Технические детали",
+    "core.retry": "Повторить",
+    "core.network_unreachable": "Сервер недоступен. Проверьте подключение и попробуйте ещё раз.",
+    "core.request_failed": "Запрос завершился с ошибкой {code}",
+  },
+  {
+    "core.page_not_found": "Page not found",
+    "core.cancel": "Cancel",
+    "core.save": "Save",
+    "core.forbidden": "Insufficient permissions",
+    "core.page_not_found_hint": "Check the section address.",
+    "core.loading": "Loading…",
+    "core.operation_failed": "The operation failed",
+    "core.request_id": "Request reference:",
+    tree_status_published: "Published",
+    tree_status_draft: "Unpublished changes",
+    tree_status_archived: "Archived",
+    create_entry_template: "Template",
+    create_entry_template_hint: "Controls how the entry looks on the site",
+    template_label: "Template",
+    template_default_option: "Default",
+    template_changed: "Template changed",
+    template_change_failed: "Failed to change the template",
+
+    "core.technical_details": "Technical details",
+    "core.retry": "Retry",
+    "core.network_unreachable": "Server unreachable. Check your connection and try again.",
+    "core.request_failed": "The request failed with error {code}",
+  },
+);

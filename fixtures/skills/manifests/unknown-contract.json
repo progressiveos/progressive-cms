@@ -1,0 +1,8 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.0.0",
+  "description": "Declares a contract key that does not exist in the system registry.",
+  "requires": { "contracts": { "content_contract": "^1.0.0" } },
+  "entry_workflow": ["bootstrap"],
+  "safety_levels": ["READ"]
+}

@@ -1,0 +1,12 @@
+<figure class="block block-video">
+  {% if block.props.provider == 'youtube' %}
+    <div class="video-facade" data-video-facade data-src="https://www.youtube-nocookie.com/embed/{{ block.props.video_id }}?autoplay=1">
+      <button class="btn" type="button">Смотреть видео{{ block.props.title | prepend: ' — ' | default: '' }}</button>
+    </div>
+  {% elsif block.props.provider == 'custom' %}
+    <div class="video-facade"><a class="btn" href="{{ block.props.url }}" rel="noopener">Смотреть видео</a></div>
+  {% else %}
+    <div class="video-facade"><p>Видео: {{ block.props.video_id | default: block.props.url }}</p></div>
+  {% endif %}
+  {% if block.props.caption %}<figcaption>{{ block.props.caption }}</figcaption>{% endif %}
+</figure>

@@ -1,0 +1,11 @@
+<section class="block block-documents">
+  {% if block.props.title %}<h2>{{ block.props.title }}</h2>{% endif %}
+  <ul>
+    {% for item in block.props.items %}
+      <li>
+        <span>{{ item.display_title | default: item.media_id }}</span>
+        <a class="btn btn--secondary" href="/media/{{ item.media_id }}" download>{{ item.action_label | default: 'Скачать' }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+</section>

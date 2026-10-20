@@ -1,0 +1,19 @@
+{
+  "color.primary": { "value": "#1f3a5f", "type": "color" },
+  "color.accent": { "value": "#c0662f", "type": "color" },
+  "color.text": { "value": "#22262c", "type": "color" },
+  "color.text-muted": { "value": "#5f6672", "type": "color" },
+  "color.surface": { "value": "#ffffff", "type": "color" },
+  "color.surface-muted": { "value": "#eef1f5", "type": "color" },
+  "color.border": { "value": "#cfd6df", "type": "color" },
+  "font.body": { "value": "Georgia, 'Times New Roman', serif", "type": "text" },
+  "font.heading": { "value": "'PT Sans', system-ui, sans-serif", "type": "text" },
+  "space.s": { "value": "1rem", "type": "length" },
+  "space.m": { "value": "1.75rem", "type": "length" },
+  "space.l": { "value": "3rem", "type": "length" },
+  "radius.s": { "value": "2px", "type": "length" },
+  "layout.container-max": { "value": "1140px", "type": "length" },
+  "layout.topbar-height": { "value": "40px", "type": "length" },
+  "bp.tablet": { "value": "760px", "type": "length" },
+  "bp.desktop": { "value": "1100px", "type": "length" }
+}

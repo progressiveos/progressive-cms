@@ -1,0 +1,46 @@
+{
+  "id": "progressive-cms-operator",
+  "version": "1.0.2",
+  "description": "Operate a deployed Progressive CMS instance: discovery, health, config, extensions, providers, maintenance, updates and diagnostics through the CLI golden path — without reading source code and without hand-editing the database.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "extension_contract": "^2.0",
+      "config_schema": "^1"
+    },
+    "minimum_capabilities": ["site.validate"],
+    "optional_capabilities": [
+      "extensions.manage",
+      "media.providers.manage",
+      "site.maintenance",
+      "audit.read"
+    ]
+  },
+  "recommended_scopes": ["site.validate", "content.read", "media.read", "publication.read"],
+  "optional_scopes": ["audit.read", "site.maintenance.bypass"],
+  "dangerous_optional_scopes": [
+    "extensions.manage",
+    "media.providers.manage",
+    "site.maintenance",
+    "users.manage",
+    "tokens.manage"
+  ],
+  "entry_workflow": [
+    "bootstrap/discovery (cms agent bootstrap --json; record environment, contracts, capabilities)",
+    "cms doctor — runtime, config, DB head/pending/drift, paths, secret store",
+    "cms capabilities --json — feature and provider inventory",
+    "config: resolve via --config / $PCMS_CONFIG_FILE / ./config/pcms.json (never guess a path)",
+    "health: GET /system/status + /system/metrics; investigate anything not fresh",
+    "extensions: cms extensions list --json; settings through GET/PUT /extensions/{id}/config + write-only secret slots",
+    "public extension routes: inspect deployed trusted-catalog membership; GET/PUT /api/v1/extensions/{id}/mount; no unmount endpoint",
+    "public extension mutations: JSON Content-Type, server-issued pcms_guest cookie, optional Idempotency-Key and same-origin checks",
+    "providers: registry via GET /media/providers; network/proxy from the manifest config_schema (no hardcoded proxies); POST /media/providers/{id}/test",
+    "maintenance: GET/PUT /maintenance — CLI requires --environment <env> --yes; every toggle is audited",
+    "updates: cms registry status/releases, then apply an explicit published version; poll /api/v1/registry/update-status; staged manifests use cms update check/apply",
+    "diagnostics: journalctl units, cms doctor again; typed error codes first, source reading last",
+    "emit the structured run report (agent-run-report-v1)"
+  ],
+  "safety_levels": ["READ", "PUBLIC_MUTATION", "SECURITY_ACTIVATION"],
+  "references": ["../references/common-operating-rules.md", "references/golden-path.md"]
+}

@@ -1,0 +1,13 @@
+<section class="block block-related">
+  {% if block.props.title %}<h2>{{ block.props.title }}</h2>{% endif %}
+  <ul>
+    {% for card in related_cards %}
+      <li class="card">
+        <a href="{{ card.href }}">{{ card.title }}</a>
+        {% if card.note %}<p>{{ card.note }}</p>{% endif %}
+      </li>
+    {% else %}
+      <li class="card">Related content will appear later.</li>
+    {% endfor %}
+  </ul>
+</section>

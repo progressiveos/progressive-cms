@@ -1,0 +1,3126 @@
+{
+  "mcp_protocol_version": "2024-11-05",
+  "tools": [
+    {
+      "name": "cms_list_theme_revisions",
+      "description": "List retained theme revisions for the current site; excludes pruned snapshots.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_cleanup_theme_revisions",
+      "description": "Preview old theme snapshots (default dry_run=true, theme.read); apply with dry_run=false, explicit revision_ids and expected_generation (theme.write). Keeps active, previous good, latest five and snapshots used within one day. At most 100 per batch. Pruning is irreversible; retry pending file removal with the same IDs.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dry_run": {
+            "type": "boolean",
+            "default": true
+          },
+          "keep_last": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "default": 5
+          },
+          "older_than_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36500,
+            "default": 1
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "revision_ids": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f-]{36}$"
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_get_server_info",
+      "description": "Server identity and subsystem contract versions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_get_capabilities",
+      "description": "Capability report for the current actor: installed subsystems, allowed operation classes, contract versions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_get_current_actor",
+      "description": "Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows (spec §53).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_get_agent_bootstrap",
+      "description": "M16 agent bootstrap: target site, environment classification, actor + effective scopes, contract versions, capabilities, installed skills with compatibility, preview/domain readiness. Secret-free; call this before any workflow.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_resolve_external_identity",
+      "description": "Resolve an external source item (source_namespace + external_id) to its bound entry, with the human-edit reconciliation verdict (IN_SYNC / HUMAN_EDIT_CONFLICT / BASELINE_UNSET) — never overwrite on conflict (M16).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "source_hash": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "source_namespace",
+          "external_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_bind_external_identity",
+      "description": "Bind an external source item to an entry and/or refresh the agent sync baseline (last applied generation, source hash, run id). Idempotent for the same entry; conflicts on a different bound entry (M16).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "source_hash": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "last_agent_generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "run_id": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "source_namespace",
+          "external_id",
+          "entry_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_get_site_info",
+      "description": "Baseline site identity, route policy and domain bindings.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_list_content_types",
+      "description": "Registered content types (deterministic order).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_get_content_type",
+      "description": "Full content type schema — round-trippable payload contract.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_list_block_types",
+      "description": "Registered block types.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_get_block_schema",
+      "description": "Block schema: props, children policy, references.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_get_collection_capabilities",
+      "description": "Collection DSL capabilities (typed allowlist operations).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_get_theme_contract",
+      "description": "Theme contract snapshot: manifest, templates, placements (unavailable when no theme source is configured).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_list_navigation_sets",
+      "description": "Navigation sets.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "navigation.read"
+      }
+    },
+    {
+      "name": "cms_get_navigation_tree",
+      "description": "Materialized navigation tree by set id or key.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "set_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "set_ref"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "navigation.read"
+      }
+    },
+    {
+      "name": "cms_list_media_presets",
+      "description": "Registered media presets.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_search_query",
+      "description": "Public site search over the derived PostgreSQL full-text index (bounded, paginated; Search spec §23). Same site/locale scoping as REST.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "site": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "date_from": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "date_to": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "date"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "q",
+          "locale"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_search_admin",
+      "description": "Authorized admin search across the public index, draft titles, media metadata and navigation labels (Search spec §24).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "site": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "q",
+          "locale"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "search.admin"
+      }
+    },
+    {
+      "name": "cms_get_indexnow_settings",
+      "description": "IndexNow settings (site-level, DISABLED by default): enabled state, notify flags, CAS generation (IndexNow spec §29).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "seo.read"
+      }
+    },
+    {
+      "name": "cms_update_indexnow_settings",
+      "description": "Enable/disable IndexNow and its notify flags (CAS on expected_generation; enabling generates the verification key and queues at most ONE homepage notification — never a backfill).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "enabled",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "seo.site_settings"
+      }
+    },
+    {
+      "name": "cms_get_indexnow_status",
+      "description": "IndexNow delivery status: state, key file URL, pending count, last HTTP result, diagnostics. Never claims indexing.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "seo.read"
+      }
+    },
+    {
+      "name": "cms_check_indexnow",
+      "description": "Local IndexNow checks + enqueue the single homepage verification notification (delivered asynchronously by the worker).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "seo.site_settings"
+      }
+    },
+    {
+      "name": "cms_rotate_indexnow_key",
+      "description": "Rotate the IndexNow verification key (queued jobs resolve the key at send time; audit recorded).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "seo.site_settings"
+      }
+    },
+    {
+      "name": "cms_get_analytics_settings",
+      "description": "Analytics & tagging settings with CAS generation: enabled providers, ids, network rules (Analytics spec §10).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "analytics.read"
+      }
+    },
+    {
+      "name": "cms_update_analytics_settings",
+      "description": "Save analytics & tagging settings (CAS on expected_generation; strict validation, typed provider configs only — arbitrary script/HTML is impossible by contract).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "settings": {
+            "type": "object"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "settings",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "analytics.manage"
+      }
+    },
+    {
+      "name": "cms_list_analytics_providers",
+      "description": "Registered analytics tag providers: ids, titles, strict config schemas, privacy categories.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "analytics.read"
+      }
+    },
+    {
+      "name": "cms_analytics_doctor",
+      "description": "Analytics installation diagnostics: config validity, render-plan probe, slot presence, CSP compatibility, duplication warnings.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "analytics.read"
+      }
+    },
+    {
+      "name": "cms_get_search_status",
+      "description": "Search index health: document count, index version vs expected, last event, reindex progress (Search spec §26).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "search.diagnostics"
+      }
+    },
+    {
+      "name": "cms_get_search_capabilities",
+      "description": "Machine-readable search capabilities: entity types, filters, sorts, hard limits.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "cms_validate_search_document",
+      "description": "Re-derive one entity's public search document and return structural issues without exposing content (Search spec §31).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "entity_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "search.admin"
+      }
+    },
+    {
+      "name": "cms_reindex_search",
+      "description": "Start (or resume) a full shadow-epoch reindex; returns run progress fields (Search spec §19/§20).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resume": {
+            "type": "boolean"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "search.reindex"
+      }
+    },
+    {
+      "name": "cms_list_forms",
+      "description": "List form definitions with their current schema version (Forms spec §36).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "forms.read_definition"
+      }
+    },
+    {
+      "name": "cms_get_form_definition",
+      "description": "One form definition: stable identity, field set and server-validation rules of the current version (Forms spec §4–§8).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "form_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "forms.read_definition"
+      }
+    },
+    {
+      "name": "cms_list_quizzes",
+      "description": "List quiz definitions with their current schema version (Forms spec §36).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "quizzes.read_definition"
+      }
+    },
+    {
+      "name": "cms_get_quiz_definition",
+      "description": "One quiz definition: steps, questions, declarative branching/scoring rules and outcomes (Forms spec §9–§15).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "quiz_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "quiz_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "quizzes.read_definition"
+      }
+    },
+    {
+      "name": "cms_get_quiz_public_schema",
+      "description": "Sanitized public quiz schema (steps/questions only — no scoring weights or branch targets) for rendering clients (Forms spec §36).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "quiz_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "quiz_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "quizzes.read_definition"
+      }
+    },
+    {
+      "name": "cms_list_submissions",
+      "description": "Bounded, cursor-paginated form submission history (Forms spec §36; interactions.read).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "SPAM",
+              "ARCHIVED"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "interactions.read"
+      }
+    },
+    {
+      "name": "cms_get_submission",
+      "description": "One form submission with normalized payload and consent snapshot (interactions.read; PII).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "submission_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "submission_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "interactions.read"
+      }
+    },
+    {
+      "name": "cms_list_quiz_runs",
+      "description": "Bounded quiz run history with server-computed score/outcome (interactions.read).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "quiz_definition_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "STARTED",
+              "COMPLETED",
+              "ABANDONED",
+              "EXPIRED"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "interactions.read"
+      }
+    },
+    {
+      "name": "cms_get_quiz_run",
+      "description": "One quiz run: lifecycle, score/outcome and all server-recorded answers (interactions.read).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "run_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "interactions.read"
+      }
+    },
+    {
+      "name": "cms_list_leads",
+      "description": "Bounded lead list — PII, permission-gated (leads.read).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "VIEWED",
+              "PROCESSED",
+              "ARCHIVED",
+              "SPAM"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "leads.read"
+      }
+    },
+    {
+      "name": "cms_update_lead_status",
+      "description": "Lead lifecycle transition; emits LeadStatusChanged atomically (leads.manage).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lead_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "VIEWED",
+              "PROCESSED",
+              "ARCHIVED",
+              "SPAM"
+            ]
+          }
+        },
+        "required": [
+          "lead_id",
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "leads.manage"
+      }
+    },
+    {
+      "name": "cms_export_interactions",
+      "description": "Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (Forms spec §29; interactions.export / leads.export).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "submissions",
+              "quiz_runs",
+              "leads"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ]
+          },
+          "form_definition_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "entity"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "interactions.export"
+      }
+    },
+    {
+      "name": "cms_search_media",
+      "description": "Bounded media search with typed filters (text, kind). Follow next_cursor until has_more=false for a full catalog.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "kind": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_get_media",
+      "description": "Full media asset view: versions and variants.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "media_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_get_media_usage",
+      "description": "Inbound references and source titles. Review before media cleanup.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "media_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_archive_media",
+      "description": "Archive an unused media asset after explicit confirmation. Usage is checked first; referenced assets are refused. Requires media.read and media.archive.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "media_id",
+          "confirmed"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.archive"
+      }
+    },
+    {
+      "name": "cms_list_seo_entries",
+      "description": "Active Content Tree page for a full SEO audit. Skip folders; follow next_cursor to exhaustion and validate each entry with cms_validate_seo.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.read"
+      }
+    },
+    {
+      "name": "cms_validate_seo",
+      "description": "SEO validation report for one entry: issues, severities and resolved metadata. Requires seo.validate.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "entry_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "seo.validate"
+      }
+    },
+    {
+      "name": "cms_change_entry_route",
+      "description": "Explicit canonical route change, recording the old URL as a 301 redirect. Requires navigation.edit and explicit confirmation. Conflicts are never forced.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "to_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "entry_id",
+          "to_path",
+          "confirmed"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "navigation.edit"
+      }
+    },
+    {
+      "name": "cms_get_seo_schema",
+      "description": "SEO document schema descriptor and diagnostic codes.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "seo.read"
+      }
+    },
+    {
+      "name": "cms_check_route_available",
+      "description": "Route availability check (typed issues; never reserves).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "site.validate"
+      }
+    },
+    {
+      "name": "cms_list_revisions",
+      "description": "Revision history of an entity (bounded).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.read"
+      }
+    },
+    {
+      "name": "cms_get_changeset",
+      "description": "ChangeSet with its items.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changeset_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "changeset_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.read"
+      }
+    },
+    {
+      "name": "cms_list_changesets",
+      "description": "Recent ChangeSets (bounded).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.read"
+      }
+    },
+    {
+      "name": "cms_list_publication_calendar",
+      "description": "Publication calendar window.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.read"
+      }
+    },
+    {
+      "name": "cms_create_draft",
+      "description": "Create an entry + first working revision atomically. Payload: {fields, blocks} per the content type schema. parent_entry_id may be a folder (kind=folder rows in /discovery/content/tree are structural only: they cannot be sealed, published, routed, previewed, SEO-documented or duplicated).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "parent_entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "type": "object"
+              },
+              "blocks": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            }
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "content_type",
+          "payload"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.create"
+      }
+    },
+    {
+      "name": "cms_update_draft",
+      "description": "Autosave a working revision; requires the current edit_generation (CAS).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "type": "object"
+              },
+              "blocks": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            }
+          },
+          "expected_edit_generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "revision_id",
+          "payload",
+          "expected_edit_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_validate_revision",
+      "description": "Validate a revision against publish-level rules; returns structured issues.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "revision_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_seal_revision",
+      "description": "Seal a working revision (publish-level validation runs inside the domain).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "expected_edit_generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "revision_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "revision.seal"
+      }
+    },
+    {
+      "name": "cms_cleanup_entry_revisions",
+      "description": "Bulk cleanup (iterative-editing case): delete all SEALED revisions of an entry except the currently published one. The working revision is always kept; refuses entries without a published revision (409 REVISION_CLEANUP_NO_PUBLISHED). Requires content.edit.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_delete_revision",
+      "description": "Delete a WORKING or SEALED revision (cleanup of drafts/garbage). The currently published revision is rejected (REVISION_PUBLISHED) — unpublish or publish another revision first. Audited, irreversible.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "revision_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_create_changeset",
+      "description": "Create a ChangeSet (coordinated release container).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.plan"
+      }
+    },
+    {
+      "name": "cms_add_changeset_item",
+      "description": "Add a candidate (sealed revision + optional route operation) to a ChangeSet with its CAS generation.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changeset_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "intent": {
+            "enum": [
+              "PUBLISH",
+              "UNPUBLISH"
+            ]
+          },
+          "target_revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "route_operation": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "set",
+                  "retire",
+                  "none"
+                ]
+              },
+              "site_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f-]{36}$"
+              },
+              "path": {
+                "type": "string"
+              },
+              "frees_path": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "changeset_id",
+          "entity_type",
+          "entity_id",
+          "intent",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.plan"
+      }
+    },
+    {
+      "name": "cms_preflight_changeset",
+      "description": "Validate the whole release without applying it.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changeset_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "changeset_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.plan"
+      }
+    },
+    {
+      "name": "cms_apply_changeset",
+      "description": "Apply the release: every public pointer/route move in ONE transaction. Requires publication.publish.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changeset_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "changeset_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.publish"
+      }
+    },
+    {
+      "name": "cms_create_plan",
+      "description": "Create a publication plan (timezone-aware batch scheduling).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changeset_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "failure_policy": {
+            "enum": [
+              "continue",
+              "pause_batch",
+              "pause_plan"
+            ]
+          }
+        },
+        "required": [
+          "changeset_id",
+          "timezone"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.plan"
+      }
+    },
+    {
+      "name": "cms_preview_plan",
+      "description": "Dry-run the batch schedule (nothing persisted).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "spec": {
+            "type": "object"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "changeset_item_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f-]{36}$"
+                },
+                "publish_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "unpublish_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "changeset_item_id"
+              ],
+              "minProperties": 2
+            }
+          }
+        },
+        "required": [
+          "plan_id",
+          "spec"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "publication.plan"
+      }
+    },
+    {
+      "name": "cms_schedule_plan",
+      "description": "Materialize timestamps and enqueue idempotent publish jobs.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "spec": {
+            "type": "object"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "changeset_item_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f-]{36}$"
+                },
+                "publish_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "unpublish_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "changeset_item_id"
+              ],
+              "minProperties": 2
+            }
+          }
+        },
+        "required": [
+          "plan_id",
+          "spec"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.schedule"
+      }
+    },
+    {
+      "name": "cms_publish_now",
+      "description": "Cancel the pending schedule and publish exactly once. Requires publication.publish.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "item_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "plan_id",
+          "item_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.publish"
+      }
+    },
+    {
+      "name": "cms_publish_revision",
+      "description": "Direct single-entity publish with generation CAS. Requires publication.publish — never granted to default agent scopes.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "target_revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "target_revision_id",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "publication.publish"
+      }
+    },
+    {
+      "name": "cms_validate_theme",
+      "description": "Validate the configured theme source against the theme contract.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.validate"
+      }
+    },
+    {
+      "name": "cms_create_preview",
+      "description": "Create a signed, expiring preview reference for a revision or changeset.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "revision"
+                    ]
+                  },
+                  "entity_type": {
+                    "type": "string"
+                  },
+                  "entity_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f-]{36}$"
+                  },
+                  "revision_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f-]{36}$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "entity_type",
+                  "entity_id",
+                  "revision_id"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "changeset"
+                    ]
+                  },
+                  "changeset_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f-]{36}$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "changeset_id"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "preview.create"
+      }
+    },
+    {
+      "name": "cms_submit_bundle",
+      "description": "Publication Bundle: validate or atomically apply a coordinated content batch (mode: validate|apply). Strict all-or-nothing; supports ref:<id> intra-bundle references.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "validate",
+              "apply"
+            ]
+          },
+          "bundle": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "mode",
+          "bundle"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.create"
+      }
+    },
+    {
+      "name": "cms_update_media_metadata",
+      "description": "Update descriptive media metadata (title/alt/caption).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "alt_default": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "caption_default": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "media_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.write"
+      }
+    },
+    {
+      "name": "cms_archive_entry",
+      "description": "Archive an entry (idempotent; never a hard delete).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "entry_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.archive"
+      }
+    },
+    {
+      "name": "cms_list_connectors",
+      "description": "Registered integration connector catalog with typed contracts.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.read"
+      }
+    },
+    {
+      "name": "cms_get_connector_schema",
+      "description": "Connector config schema, secret requirements and supported actions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connector_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "connector_type"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.read"
+      }
+    },
+    {
+      "name": "cms_list_integration_instances",
+      "description": "Configured connections (secret refs are names, never values).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connector_type": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.read"
+      }
+    },
+    {
+      "name": "cms_create_integration_instance",
+      "description": "Configure a connection (integrations.configure; secret refs additionally integrations.secrets.manage).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "connector_type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object"
+          },
+          "secret_refs": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "connector_type",
+          "name",
+          "config"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.configure"
+      }
+    },
+    {
+      "name": "cms_update_integration_instance",
+      "description": "Update a configured connection.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "instance_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.configure"
+      }
+    },
+    {
+      "name": "cms_test_integration_instance",
+      "description": "Run the safe connector-specific connection probe (audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "instance_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.test"
+      }
+    },
+    {
+      "name": "cms_list_integration_bindings",
+      "description": "Event-to-action bindings with bounded conditions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.read"
+      }
+    },
+    {
+      "name": "cms_create_integration_binding",
+      "description": "Bind a domain event type to configured actions.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "binding"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.configure"
+      }
+    },
+    {
+      "name": "cms_update_integration_binding",
+      "description": "Update a binding (enable/disable, conditions, actions, policy).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "binding_id",
+          "patch"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.configure"
+      }
+    },
+    {
+      "name": "cms_list_integration_deliveries",
+      "description": "Outbound delivery history with reliability states.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.deliveries.read"
+      }
+    },
+    {
+      "name": "cms_get_integration_delivery",
+      "description": "One delivery with its complete attempt history.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delivery_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "delivery_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.deliveries.read"
+      }
+    },
+    {
+      "name": "cms_retry_integration_delivery",
+      "description": "Manual retry of a failed delivery (permission-gated, audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delivery_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "delivery_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "integrations.retry"
+      }
+    },
+    {
+      "name": "cms_list_inbound_events",
+      "description": "Inbound provider events (metadata only; raw payloads protected).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "integrations.inbound.read"
+      }
+    },
+    {
+      "name": "cms_get_contract_versions",
+      "description": "Independent contract versions: cms, config, extension, REST, MCP, theme, blocks, search.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_get_extension_capabilities",
+      "description": "Effective capability provisions (key, version, provider).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_list_extensions",
+      "description": "Deployed extensions with lifecycle state, capabilities and compatibility.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_get_extension_compatibility",
+      "description": "Machine-readable compatibility issues for one extension.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_get_update_preflight",
+      "description": "Read-only update preflight against the configured target release manifest.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_list_deprecations",
+      "description": "Deprecation records with replacement and planned removal metadata.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_extension_install",
+      "description": "Activate an already-deployed trusted extension artifact (extensions.manage; audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_extension_enable",
+      "description": "Enable an installed extension after its preflight (audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_extension_disable",
+      "description": "Disable an extension; impact preflight blocks active dependents (audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_extension_uninstall",
+      "description": "Remove executable extension state; destructive data policies need the confirmation (audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": {
+            "type": "string"
+          },
+          "confirmation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_list_payment_providers",
+      "description": "Registered payment provider types with secret requirements.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.read"
+      }
+    },
+    {
+      "name": "cms_list_payment_provider_instances",
+      "description": "Configured provider instances (secret refs are names, never values).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.read"
+      }
+    },
+    {
+      "name": "cms_get_payment_provider_capabilities",
+      "description": "Capability report: cancel/refund/provider idempotency/status sync.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_type"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.read"
+      }
+    },
+    {
+      "name": "cms_create_payment",
+      "description": "Create a payment; idempotency_key is the retry identity (payments.create).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider_instance_id": {
+            "type": "string"
+          },
+          "subject_type": {
+            "type": "string"
+          },
+          "subject_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "provider_instance_id",
+          "subject_type",
+          "subject_id",
+          "amount",
+          "currency",
+          "idempotency_key"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "payments.create"
+      }
+    },
+    {
+      "name": "cms_list_payments",
+      "description": "Payment list with bounded filters.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "subject_type": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.read"
+      }
+    },
+    {
+      "name": "cms_get_payment",
+      "description": "One payment with normalized/provider status and amounts.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.read"
+      }
+    },
+    {
+      "name": "cms_cancel_payment",
+      "description": "Cancel a CREATED/PENDING payment (payments.cancel).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "payments.cancel"
+      }
+    },
+    {
+      "name": "cms_refund_payment",
+      "description": "Privileged refund, partial or full (payments.refund; audited).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payment_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "payments.refund"
+      }
+    },
+    {
+      "name": "cms_list_payment_events",
+      "description": "Append-only payment timeline (payments.events.read).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "payment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "payments.events.read"
+      }
+    },
+    {
+      "name": "cms_list_media_providers",
+      "description": "List installed, enabled media acquisition providers (stock/generation) with configured state. No credential material.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_search_stock_media",
+      "description": "Provider-neutral stock image search. Returns candidates with opaque candidate_ref handles (import these; never construct URLs).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "provider_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "orientation": {
+            "enum": [
+              "landscape",
+              "portrait",
+              "square"
+            ]
+          },
+          "min_width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          },
+          "min_height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.stock.search"
+      }
+    },
+    {
+      "name": "cms_import_stock_candidate",
+      "description": "Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. Duplicate-safe per provider asset.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "candidate_ref": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "candidate_ref"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.stock.import"
+      }
+    },
+    {
+      "name": "cms_generate_media",
+      "description": "Generate ONE image (cost-bearing; requires media.generate). Agent contract: read cms_get_media_provider_capabilities for models/sizes first, call cms_estimate_media_generation for the price, then generate with aspect+resolution from the model's size options (never raw pixels). count is clamped to 1 for agents. Poll cms_get_media_generation until ready — every candidate already carries media_id in the library; accept is optional replay.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "provider_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "negative_prompt": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "aspect": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "resolution": {
+            "enum": [
+              "0.5k",
+              "1k",
+              "2k",
+              "4k"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reference_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "maxItems": 16
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.generate"
+      }
+    },
+    {
+      "name": "cms_get_media_generation",
+      "description": "Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed. Never reference preview URLs; use media_id.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "generation_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "generation_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.generate"
+      }
+    },
+    {
+      "name": "cms_get_media_provider_capabilities",
+      "description": "Models configured on a generation provider with their contracts: size options (aspect+pixels), resolution tiers, limits, negative/seed support, reference-image caps and published prices. Read this BEFORE generating.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "provider_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.read"
+      }
+    },
+    {
+      "name": "cms_estimate_media_generation",
+      "description": "Approximate generation cost for model+aspect+resolution+count BEFORE paying. Token-priced or unpublished-price models return an explicit refusal instead of a number.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "aspect": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "resolution": {
+            "enum": [
+              "0.5k",
+              "1k",
+              "2k",
+              "4k"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "media.generate"
+      }
+    },
+    {
+      "name": "cms_validate_redirect_import",
+      "description": "Dry-run a legacy-URL redirect batch before importing (site migrations, SEO). Per-row report (invalid path, reserved, collision with a live route, duplicates, self-redirects, open-redirect targets) plus redirect-graph issues (loops, chains) checked against EXISTING history. Writes nothing. Workflow: validate first, show the owner the report, only then apply. Rows: source (old path), target (new site path or stable entry id; omit for 410 gone), status_code (301 default; 410 = permanently gone), reason.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "site": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                },
+                "status_code": {
+                  "type": "integer",
+                  "enum": [
+                    301,
+                    302,
+                    307,
+                    308,
+                    410
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "routing.redirects.import"
+      }
+    },
+    {
+      "name": "cms_apply_redirect_import",
+      "description": "Validate and apply a legacy-URL redirect batch atomically (any row or redirect-graph error aborts the whole batch). Sources must not shadow live routes; absolute/javascript targets are refused; loops and >3-hop chains across the batch AND existing history are refused. Requests go to old URLs from sitemaps, external links and search indexes afterwards resolve 301/410.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "site": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "target": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                },
+                "status_code": {
+                  "type": "integer",
+                  "enum": [
+                    301,
+                    302,
+                    307,
+                    308,
+                    410
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "routing.redirects.import"
+      }
+    },
+    {
+      "name": "cms_import_media_url",
+      "description": "Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks, sha256 dedupe — an already-imported file returns the existing media_id with duplicate_blob true, so repeated references to the same source image cost nothing — and variants generated on accept. Returns media_id; reference it in content instead of the source URL.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.import"
+      }
+    },
+    {
+      "name": "cms_accept_generated_media",
+      "description": "Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true).",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "generation_id": {
+            "type": "string"
+          },
+          "candidate_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          }
+        },
+        "required": [
+          "generation_id",
+          "candidate_index"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.generate"
+      }
+    },
+    {
+      "name": "cms_list_site_domains",
+      "description": "Domain bindings of a site (?site= key, default site). Requires domains.manage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "site": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "domains.manage"
+      }
+    },
+    {
+      "name": "cms_add_site_domain",
+      "description": "Add a domain binding (hostname normalized/validated; first binding becomes primary; single-primary invariant). Requires domains.manage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "is_primary": {
+            "type": "boolean"
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheme_policy": {
+            "enum": [
+              "https",
+              "http"
+            ]
+          },
+          "canonical_redirect_policy": {
+            "enum": [
+              "redirect",
+              "serve"
+            ]
+          },
+          "site": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostname"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "domains.manage"
+      }
+    },
+    {
+      "name": "cms_set_primary_domain",
+      "description": "Atomic canonical-primary switch for a domain binding; sitemap/canonical pick it up immediately (no restart). Requires domains.manage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostname"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "domains.manage"
+      }
+    },
+    {
+      "name": "cms_remove_site_domain",
+      "description": "Remove a domain binding (the last one is undeletable; removing the primary promotes the first remaining). Requires domains.manage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostname"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "domains.manage"
+      }
+    },
+    {
+      "name": "cms_reidentify_entry_locale",
+      "description": "Identity repair: move an entry and its working revisions to a policy-allowed identity locale in one transaction. Entry id, routes, publication pointers, payloads and edit generations untouched; sealed history immutable. Refuses locales outside the site policy and translation-group members. Requires content.edit.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "locale"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "content.edit"
+      }
+    },
+    {
+      "name": "cms_list_registry_releases",
+      "description": "Engine releases the registry serves (latest first), with sha256 and notes. Requires extensions.manage.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "extensions.manage"
+      }
+    },
+    {
+      "name": "cms_registry_apply_update",
+      "description": "Apply a registry release through the standard orchestrator (version must be strictly newer than the running one; backup → install → migrate → restart → doctor). Requires extensions.manage. If the connection drops mid-apply the server-side run continues.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "extensions.manage"
+      }
+    }
+  ]
+}

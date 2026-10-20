@@ -1,0 +1,282 @@
+{
+  "contentTypes": [
+    {
+      "key": "page",
+      "version": 1,
+      "title": "Страница",
+      "description": "Обычная структурная страница сайта",
+      "bodyPolicy": "block_document",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "menu_title": { "id": "menu_title", "type": "string" },
+        "h1": { "id": "h1", "type": "string" },
+        "slug_hint": { "id": "slug_hint", "type": "slug" },
+        "intro": { "id": "intro", "type": "text" },
+        "body": { "id": "body", "type": "block_document" }
+      }
+    },
+    {
+      "key": "service",
+      "version": 1,
+      "title": "Услуга",
+      "description": "Услуга с ценой, составом и связями",
+      "bodyPolicy": "block_document",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "featured": { "id": "featured", "type": "boolean", "filterable": true, "sortable": true },
+        "menu_order": {
+          "id": "menu_order",
+          "type": "integer",
+          "filterable": true,
+          "sortable": true
+        },
+        "price": { "id": "price", "type": "money" },
+        "features": {
+          "id": "features",
+          "type": "repeater",
+          "item": {
+            "fields": {
+              "feature_title": { "id": "feature_title", "type": "string" },
+              "feature_text": { "id": "feature_text", "type": "text" }
+            }
+          }
+        },
+        "related_services": {
+          "id": "related_services",
+          "type": "relation_list",
+          "accepts": ["service"]
+        }
+      }
+    },
+    {
+      "key": "case",
+      "version": 1,
+      "title": "Кейс",
+      "description": "Портфолио: выполненный проект",
+      "bodyPolicy": "rich_text",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "client": { "id": "client", "type": "string" },
+        "completed_on": { "id": "completed_on", "type": "date" },
+        "hero_image": { "id": "hero_image", "type": "media" },
+        "gallery": { "id": "gallery", "type": "media_list" },
+        "body": { "id": "body", "type": "rich_text" }
+      }
+    },
+    {
+      "key": "news",
+      "version": 1,
+      "title": "Новость",
+      "description": "С новостной ленты",
+      "bodyPolicy": "rich_text",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "published_at": {
+          "id": "published_at",
+          "type": "datetime",
+          "filterable": true,
+          "sortable": true
+        },
+        "teaser": { "id": "teaser", "type": "text" },
+        "body": { "id": "body", "type": "rich_text" }
+      }
+    },
+    {
+      "key": "article",
+      "version": 1,
+      "title": "Статья",
+      "description": "Экспертная статья с тегами",
+      "bodyPolicy": "rich_text",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "author": { "id": "author", "type": "string" },
+        "tags": { "id": "tags", "type": "list", "item": { "id": "tag", "type": "string" } },
+        "body": { "id": "body", "type": "rich_text" }
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "page.minimum-valid",
+      "contentType": "page",
+      "expect": "valid",
+      "level": "draft",
+      "fields": { "title": "О компании" }
+    },
+    {
+      "name": "page.full",
+      "contentType": "page",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "О компании",
+        "menu_title": "О нас",
+        "h1": "О компании «Пример»",
+        "slug_hint": "o-kompanii",
+        "intro": "Коротко о компании и её истории.",
+        "body": {
+          "schema_version": 1,
+          "blocks": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e7f",
+              "type": "text",
+              "schema_version": 1,
+              "variant": null,
+              "props": { "rich_text": { "schema_version": 2, "type": "document", "content": [] } },
+              "children": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "page.long-title",
+      "contentType": "page",
+      "expect": "valid",
+      "level": "draft",
+      "fields": {
+        "title": "Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — Очень длинный заголовок страницы — конец"
+      }
+    },
+    {
+      "name": "page.publish-missing-title",
+      "contentType": "page",
+      "expect": "invalid",
+      "level": "publish",
+      "expectedCode": "FIELD_REQUIRED",
+      "fields": { "menu_title": "Без заголовка" }
+    },
+    {
+      "name": "service.minimum-valid",
+      "contentType": "service",
+      "expect": "valid",
+      "level": "draft",
+      "fields": { "title": "Аудит" }
+    },
+    {
+      "name": "service.full",
+      "contentType": "service",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "Аудит маркетинга",
+        "featured": true,
+        "menu_order": 1,
+        "price": { "amount": "125000.00", "currency": "RUB" },
+        "features": [
+          {
+            "itemId": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e70",
+            "feature_title": "Аналитика",
+            "feature_text": "Смотрим цифры"
+          },
+          {
+            "itemId": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e71",
+            "feature_title": "Стратегия",
+            "feature_text": null
+          }
+        ],
+        "related_services": ["11111111-2222-7333-8444-555555555551"]
+      }
+    },
+    {
+      "name": "service.float-money-invalid",
+      "contentType": "service",
+      "expect": "invalid",
+      "level": "draft",
+      "expectedCode": "TYPE_MISMATCH",
+      "fields": { "title": "Аудит", "price": 125000.0 }
+    },
+    {
+      "name": "service.slug-relation-invalid",
+      "contentType": "service",
+      "expect": "invalid",
+      "level": "draft",
+      "expectedCode": "RELATION_REF_INVALID",
+      "fields": { "title": "Аудит", "related_services": ["audit-dlya-vsekh"] }
+    },
+    {
+      "name": "case.full",
+      "contentType": "case",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "Редизайн корпоративного сайта",
+        "client": "ООО «Пример»",
+        "completed_on": "2026-06-30",
+        "hero_image": "11111111-2222-7333-8444-555555555552",
+        "gallery": ["11111111-2222-7333-8444-555555555552", "11111111-2222-7333-8444-555555555553"],
+        "body": {
+          "schema_version": 2,
+          "type": "document",
+          "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "Задача и решение." }] }
+          ]
+        }
+      }
+    },
+    {
+      "name": "case.empty-optionals",
+      "contentType": "case",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "Минимальный кейс",
+        "client": null,
+        "completed_on": null,
+        "hero_image": null,
+        "gallery": [],
+        "body": { "schema_version": 2, "type": "document", "content": [] }
+      }
+    },
+    {
+      "name": "news.full",
+      "contentType": "news",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "Мы открыли филиал",
+        "published_at": "2026-09-01T10:00:00+03:00",
+        "teaser": "Теперь мы и в Казани.",
+        "body": { "schema_version": 2, "type": "document", "content": [] }
+      }
+    },
+    {
+      "name": "news.bad-datetime",
+      "contentType": "news",
+      "expect": "invalid",
+      "level": "draft",
+      "expectedCode": "DATETIME_MALFORMED",
+      "fields": { "title": "Новость", "published_at": "01.09.2026 10:00" }
+    },
+    {
+      "name": "article.full",
+      "contentType": "article",
+      "expect": "valid",
+      "level": "publish",
+      "fields": {
+        "title": "Как выбрать CMS",
+        "author": "И. Иванов",
+        "tags": ["cms", "инфраструктура"],
+        "body": {
+          "schema_version": 2,
+          "type": "document",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{ "type": "text", "text": "Критерии выбора.", "marks": ["strong"] }]
+            },
+            { "type": "heading", "level": 2, "content": [{ "type": "text", "text": "Список" }] }
+          ]
+        }
+      }
+    },
+    {
+      "name": "article.long-tag-invalid",
+      "contentType": "article",
+      "expect": "invalid",
+      "level": "draft",
+      "expectedCode": "TYPE_MISMATCH",
+      "fields": { "title": "Статья", "tags": [42] }
+    }
+  ]
+}

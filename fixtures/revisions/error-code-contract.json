@@ -1,0 +1,18 @@
+{
+  "domain": "revisions",
+  "rule": "append-only: minor releases may append codes; never rename, remove or reinterpret",
+  "codes": [
+    "MEDIA_NOT_READY",
+    "REVISION_ALREADY_WORKING",
+    "REVISION_DIFF_ADAPTER_MISSING",
+    "REVISION_ENTITY_CONFLICT",
+    "REVISION_ENTITY_MISMATCH",
+    "REVISION_ENTITY_UNKNOWN",
+    "REVISION_NOT_FOUND",
+    "REVISION_NOT_SEALED",
+    "REVISION_NOT_WORKING",
+    "REVISION_PAYLOAD_NOT_SERIALIZABLE",
+    "REVISION_STALE",
+    "REVISION_VALIDATION_FAILED"
+  ]
+}

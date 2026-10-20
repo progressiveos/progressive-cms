@@ -1,0 +1,11 @@
+{
+  "id": "018f1000-0000-7000-8000-000000000005",
+  "aggregate": "quiz_run",
+  "aggregate_id": "018f1000-0000-7000-8000-0000000000cf",
+  "event_type": "QuizAbandoned",
+  "payload": {
+    "quiz_run_id": "018f1000-0000-7000-8000-0000000000cf",
+    "quiz_definition_id": "partner-qualification",
+    "quiz_schema_version": 1
+  }
+}

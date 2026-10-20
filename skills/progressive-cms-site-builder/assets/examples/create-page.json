@@ -1,0 +1,54 @@
+{
+  "content_type": "company_page",
+  "template_key": "company-page",
+  "payload": {
+    "fields": {
+      "title": "Services",
+      "slug_hint": "services",
+      "body": {
+        "schema_version": 1,
+        "blocks": []
+      }
+    },
+    "blocks": {
+      "schema_version": 1,
+      "blocks": [
+        {
+          "id": "01980000-0000-7000-8000-0000000000c1",
+          "type": "heading",
+          "schema_version": 1,
+          "variant": null,
+          "props": {
+            "level": 2,
+            "text": "Our approach"
+          },
+          "children": []
+        },
+        {
+          "id": "01980000-0000-7000-8000-0000000000c2",
+          "type": "text",
+          "schema_version": 1,
+          "variant": null,
+          "props": {
+            "rich_text": {
+              "type": "document",
+              "schema_version": 2,
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "This is nested RichText v2 inside Block Document v1."
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,407 @@
+{
+  "contract": "seo-social-structured-data-v1",
+  "spec": "Progressive_CMS_SEO_Social_Structured_Data_v1_Spec.md §72",
+  "description": "Reference SEO corpus: every v1 semantic scenario as plain composition input. Media-derived URLs are provider-shaped stand-ins (resolved by ports at composition); no SEO code computes URLs.",
+  "site": {
+    "origin": "https://example.ru",
+    "identity": {
+      "site_name": "Пример",
+      "alternate_site_name": "Example Corp",
+      "legal_name": "ООО «Пример»",
+      "organization_type": "LocalBusiness",
+      "favicon": {
+        "asset_id": "0195fdc0-0000-7000-8000-00000000f001"
+      },
+      "logo": {
+        "asset_id": "0195fdc0-0000-7000-8000-00000000f002"
+      },
+      "default_social_image": {
+        "asset_id": "0195fdc0-0000-7000-8000-00000000f003"
+      },
+      "phone": "+7 495 000-00-00",
+      "email": "hi@example.ru",
+      "address": {
+        "locality": "Москва",
+        "country": "RU"
+      },
+      "social_profiles": ["https://t.me/example", "https://vk.com/example"],
+      "title_pattern": "{page_title} — {site_name}",
+      "article_content_types": ["news", "post"],
+      "local_business": {
+        "subtype": "ProfessionalService",
+        "opening_hours": "Mo-Fr 09:00-19:00",
+        "geo": {
+          "latitude": 55.751244,
+          "longitude": 37.618423
+        }
+      }
+    },
+    "home_entry_id": "0195fdc0-0000-7000-8000-000000000001"
+  },
+  "entries": [
+    {
+      "scenario": "homepage-organization",
+      "entryId": "0195fdc0-0000-7000-8000-000000000001",
+      "path": "/",
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": null,
+        "intro": "Комплексные digital-услуги для бизнеса.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Пример",
+        "titleSource": "site_name",
+        "canonical": "https://example.ru/",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage"]
+      }
+    },
+    {
+      "scenario": "generic-page",
+      "entryId": "0195fdc0-0000-7000-8000-000000000002",
+      "path": "/about/",
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": "О компании",
+        "intro": "Коротко о компании и команде.",
+        "hero_image": null
+      },
+      "breadcrumb": [
+        {
+          "name": "Главная",
+          "url": "https://example.ru/"
+        },
+        {
+          "name": "О компании",
+          "url": null
+        }
+      ],
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "О компании — Пример",
+        "titleSource": "page_title",
+        "canonical": "https://example.ru/about/",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage", "BreadcrumbList"]
+      }
+    },
+    {
+      "scenario": "service-page",
+      "entryId": "0195fdc0-0000-7000-8000-000000000003",
+      "path": "/services/audit/",
+      "contentType": "service",
+      "document": {
+        "seo_title": "Аудит безопасности инфраструктуры",
+        "meta_description": "Аудит и укрепление инфраструктуры: детальный план работ."
+      },
+      "facts": {
+        "page_title": "Аудит",
+        "intro": "Вводный текст услуги.",
+        "hero_image": {
+          "asset_id": "0195fdc0-0000-7000-8000-00000000f004"
+        }
+      },
+      "breadcrumb": [
+        {
+          "name": "Главная",
+          "url": "https://example.ru/"
+        },
+        {
+          "name": "Услуги",
+          "url": "https://example.ru/services/"
+        },
+        {
+          "name": "Аудит",
+          "url": "https://example.ru/services/audit/"
+        }
+      ],
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Аудит безопасности инфраструктуры — Пример",
+        "titleSource": "seo_title",
+        "canonical": "https://example.ru/services/audit/",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage", "BreadcrumbList"]
+      }
+    },
+    {
+      "scenario": "article",
+      "entryId": "0195fdc0-0000-7000-8000-000000000004",
+      "path": "/blog/process/",
+      "contentType": "post",
+      "document": {
+        "structured_data_type_hint": "blog_posting"
+      },
+      "facts": {
+        "page_title": "Как мы работаем",
+        "intro": "О нашем процессе.",
+        "hero_image": {
+          "asset_id": "0195fdc0-0000-7000-8000-00000000f004"
+        }
+      },
+      "breadcrumb": [
+        {
+          "name": "Главная",
+          "url": "https://example.ru/"
+        },
+        {
+          "name": "Блог",
+          "url": "https://example.ru/blog/"
+        },
+        {
+          "name": "Как мы работаем",
+          "url": null
+        }
+      ],
+      "article": {
+        "type": "blog_posting",
+        "headline": "Как мы работаем",
+        "date_published": "2026-08-20T09:00:00+03:00",
+        "date_modified": "2026-09-01T12:00:00+03:00",
+        "author": {
+          "name": "Мария Петрова"
+        }
+      },
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Как мы работаем — Пример",
+        "canonical": "https://example.ru/blog/process/",
+        "ogType": "article",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage", "BreadcrumbList", "BlogPosting"]
+      }
+    },
+    {
+      "scenario": "news-article",
+      "entryId": "0195fdc0-0000-7000-8000-000000000005",
+      "path": "/news/launch/",
+      "contentType": "news",
+      "document": {
+        "structured_data_type_hint": "news_article"
+      },
+      "facts": {
+        "page_title": "Запуск продукта",
+        "intro": "Мы запустили продукт.",
+        "hero_image": null
+      },
+      "breadcrumb": [
+        {
+          "name": "Главная",
+          "url": "https://example.ru/"
+        },
+        {
+          "name": "Новости",
+          "url": "https://example.ru/news/"
+        },
+        {
+          "name": "Запуск продукта",
+          "url": null
+        }
+      ],
+      "article": {
+        "type": "news_article",
+        "headline": "Запуск продукта",
+        "date_published": "2026-09-15T08:00:00+03:00",
+        "date_modified": null,
+        "author": null
+      },
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Запуск продукта — Пример",
+        "canonical": "https://example.ru/news/launch/",
+        "ogType": "article",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage", "BreadcrumbList", "NewsArticle"]
+      }
+    },
+    {
+      "scenario": "video-page",
+      "entryId": "0195fdc0-0000-7000-8000-000000000006",
+      "path": "/video/demo/",
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": "Демо-видео",
+        "intro": "Обзор возможностей.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": {
+        "name": "Демо-видео",
+        "description": "Обзор возможностей платформы",
+        "thumbnail_url": "https://cdn.example.ru/media/a/x/v1/social-x.jpeg",
+        "upload_date": "2026-08-30T12:00:00+03:00",
+        "duration": "PT2M15S",
+        "embed_url": "https://www.youtube.com/embed/Demo12345"
+      },
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Демо-видео — Пример",
+        "canonical": "https://example.ru/video/demo/",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage", "VideoObject"]
+      }
+    },
+    {
+      "scenario": "no-hero-fallback",
+      "entryId": "0195fdc0-0000-7000-8000-000000000007",
+      "path": "/contacts/",
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": "Контакты",
+        "intro": "Свяжитесь с нами.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Контакты — Пример",
+        "canonical": "https://example.ru/contacts/",
+        "socialImageSource": "site_default_social_image",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage"]
+      }
+    },
+    {
+      "scenario": "noindex-page",
+      "entryId": "0195fdc0-0000-7000-8000-000000000008",
+      "path": "/internal/thanks/",
+      "contentType": "page",
+      "document": {
+        "robots_policy": {
+          "index": false,
+          "follow": true
+        }
+      },
+      "facts": {
+        "page_title": "Спасибо",
+        "intro": "Заявка получена.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "title": "Спасибо — Пример",
+        "canonical": "https://example.ru/internal/thanks/",
+        "robots": "noindex",
+        "inSitemap": false,
+        "exclusionReason": "noindex",
+        "graphTypes": ["WebSite", "LocalBusiness"]
+      }
+    },
+    {
+      "scenario": "canonical-override",
+      "entryId": "0195fdc0-0000-7000-8000-000000000009",
+      "path": "/print/price/",
+      "contentType": "page",
+      "document": {
+        "canonical_override": "https://example.ru/price/"
+      },
+      "facts": {
+        "page_title": "Печатные цены",
+        "intro": "Устаревшая страница прайса.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "canonical": "https://example.ru/price/",
+        "canonicalSource": "canonical_override",
+        "ogType": "website",
+        "inSitemap": false,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage"],
+        "exclusionReason": "canonical_override_consolidation"
+      }
+    },
+    {
+      "scenario": "redirected-old-url",
+      "entryId": "0195fdc0-0000-7000-8000-00000000000a",
+      "path": "/old-about/",
+      "redirect": {
+        "statusCode": 301,
+        "location": "/about/"
+      },
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": "О компании (старый адрес)",
+        "intro": "Старый адрес страницы.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "isRedirectSource": true,
+        "inSitemap": false,
+        "exclusionReason": "redirect_source"
+      }
+    },
+    {
+      "scenario": "multilingual-readiness",
+      "entryId": "0195fdc0-0000-7000-8000-00000000000b",
+      "path": "/en/services/",
+      "contentType": "service",
+      "document": {},
+      "facts": {
+        "page_title": "Services",
+        "intro": "What we do for business.",
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "en-US",
+      "expectations": {
+        "title": "Services — Пример",
+        "canonical": "https://example.ru/en/services/",
+        "ogLocale": "en-US",
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage"]
+      }
+    },
+    {
+      "scenario": "missing-metadata-warnings",
+      "entryId": "0195fdc0-0000-7000-8000-00000000000c",
+      "path": "/draft-note/",
+      "contentType": "page",
+      "document": {},
+      "facts": {
+        "page_title": null,
+        "intro": null,
+        "hero_image": null
+      },
+      "breadcrumb": null,
+      "video": null,
+      "locale": "ru-RU",
+      "expectations": {
+        "canonical": "https://example.ru/draft-note/",
+        "title": "Пример",
+        "titleSource": "site_name",
+        "diagnostics": ["SEO_DESCRIPTION_MISSING"],
+        "ogType": "website",
+        "inSitemap": true,
+        "graphTypes": ["WebSite", "LocalBusiness", "WebPage"]
+      }
+    }
+  ]
+}

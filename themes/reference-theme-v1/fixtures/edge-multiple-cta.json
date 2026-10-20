@@ -1,0 +1,99 @@
+{
+  "name": "edge-multiple-cta",
+  "entry": {
+    "templateKey": "page-default",
+    "contentTypeKey": "page",
+    "contentTypeVersion": 1,
+    "title": "Несколько CTA",
+    "fields": {
+      "title": "Несколько CTA"
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d63c",
+        "type": "cta",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Первый CTA",
+          "primary_action": {
+            "type": "phone",
+            "phone": "+7 900 000-00-01"
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d63d",
+        "type": "cta",
+        "schemaVersion": 1,
+        "variant": "accent",
+        "props": {
+          "title": "Второй CTA",
+          "primary_action": {
+            "type": "email",
+            "email": "a@b.example"
+          }
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": []
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": ["Первый CTA", "Второй CTA", "block-cta--accent"]
+}

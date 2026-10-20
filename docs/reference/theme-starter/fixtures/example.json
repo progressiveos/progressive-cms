@@ -1,0 +1,11 @@
+{
+  "entry": {
+    "title": "Example company",
+    "fields": {
+      "intro": "A synthetic public template example"
+    }
+  },
+  "body_html": "",
+  "blocks_html": "",
+  "breadcrumbs": null
+}

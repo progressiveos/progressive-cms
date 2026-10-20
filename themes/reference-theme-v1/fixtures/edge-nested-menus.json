@@ -1,0 +1,105 @@
+{
+  "name": "edge-nested-menus",
+  "entry": {
+    "templateKey": "page-default",
+    "contentTypeKey": "page",
+    "contentTypeVersion": 1,
+    "title": "Вложенные меню",
+    "fields": {
+      "title": "Вложенные меню"
+    },
+    "blocks": []
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "group",
+          "title": "Услуги",
+          "items": [
+            {
+              "type": "group",
+              "title": "Бизнесу",
+              "items": [
+                {
+                  "type": "internal_entry",
+                  "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+                  "title": "Аудит",
+                  "href": "/audit",
+                  "items": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "external_url",
+          "title": "Блог",
+          "href": "https://blog.acme.example",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "group",
+          "title": "Услуги",
+          "items": [
+            {
+              "type": "internal_entry",
+              "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+              "title": "Аудит",
+              "href": "/audit",
+              "items": []
+            }
+          ]
+        },
+        {
+          "type": "separator"
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Политика конфиденциальности",
+          "href": "/privacy",
+          "items": []
+        }
+      ]
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": ["Услуги", "Политика конфиденциальности"]
+}

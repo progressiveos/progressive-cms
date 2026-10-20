@@ -1,0 +1,15 @@
+<footer class="site-footer">
+  <div class="container">
+    <nav aria-label="Навигация в подвале">
+      <ul>
+        {% for item in nav['footer.primary'].items %}<li><a href="{{ item.href }}">{{ item.title }}</a></li>{% endfor %}
+      </ul>
+    </nav>
+    <nav aria-label="Юридическая информация">
+      <ul>
+        {% for item in nav['footer.legal'].items %}<li><a href="{{ item.href }}">{{ item.title }}</a></li>{% endfor %}
+      </ul>
+    </nav>
+    <p>© {{ site.site_name }}</p>
+  </div>
+</footer>

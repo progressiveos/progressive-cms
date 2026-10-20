@@ -1,0 +1,519 @@
+/* Warm workspace shell: sidebar, topbar,
+ * maintenance banner, responsive behavior. Login lives in login.css. */
+
+.pcms-shell {
+  display: grid;
+  grid-template-columns: var(--pcms-admin-sidebar-w) minmax(0, 1fr);
+  height: 100dvh;
+  background: var(--pcms-admin-bg-canvas);
+  color: var(--pcms-admin-text-primary);
+  transition: grid-template-columns var(--pcms-admin-duration-normal)
+    var(--pcms-admin-ease-standard);
+}
+
+.pcms-shell--compact {
+  grid-template-columns: var(--pcms-admin-sidebar-w-compact) minmax(0, 1fr);
+}
+
+/* --- Sidebar --- */
+
+.pcms-sidebar {
+  background: var(--pcms-admin-bg-sidebar);
+  border-right: 1px solid var(--pcms-admin-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pcms-sidebar__inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.pcms-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-3);
+  padding: var(--pcms-admin-space-4);
+  text-decoration: none;
+  color: var(--pcms-admin-text-primary);
+  flex-shrink: 0;
+}
+
+.pcms-sidebar__mark {
+  inline-size: 30px;
+  block-size: auto;
+  flex-shrink: 0;
+}
+
+.pcms-sidebar__wordmark {
+  font-weight: 500;
+  font-size: var(--pcms-admin-text-md);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Site title under the wordmark (owner 2026-10-08): disambiguates which
+ * site this console controls when several admin tabs are open. */
+.pcms-sidebar__brand-text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.pcms-sidebar__sitename {
+  font-size: var(--pcms-admin-text-2xs);
+  color: var(--pcms-admin-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-inline-size: 180px;
+}
+
+/* Brand row: logo link + medium "open site" eye, kept as separate controls
+ * (owner 2026-10-08) — the eye opens the public site in a new tab. */
+.pcms-sidebar__brand-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+  padding-inline: var(--pcms-admin-space-4) var(--pcms-admin-space-3);
+  padding-block: var(--pcms-admin-space-4);
+  flex-shrink: 0;
+}
+
+.pcms-sidebar__brand-row .pcms-sidebar__brand {
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.pcms-sidebar__eye {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 30px;
+  flex-shrink: 0;
+  border-radius: var(--pcms-admin-radius-sm);
+  color: var(--pcms-admin-text-muted);
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.pcms-sidebar__eye:hover {
+  color: var(--pcms-admin-text-primary);
+  background: var(--pcms-admin-bg-hover);
+}
+
+.pcms-sidebar__eye-icon {
+  font-size: 15px; /* medium: between the nav 13px and the topbar 18px glyphs */
+}
+
+.pcms-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--pcms-admin-space-2) var(--pcms-admin-space-3) var(--pcms-admin-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-4);
+  min-height: 0;
+}
+
+.pcms-sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pcms-sidebar__group-title {
+  font-size: var(--pcms-admin-text-2xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--pcms-admin-text-muted);
+  padding: var(--pcms-admin-space-2) var(--pcms-admin-space-2) var(--pcms-admin-space-1);
+  white-space: nowrap;
+}
+
+.pcms-nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-3);
+  height: 38px;
+  padding: 0 var(--pcms-admin-space-2);
+  border-radius: var(--pcms-admin-radius-sm);
+  color: var(--pcms-admin-text-primary);
+  text-decoration: none;
+  font-size: var(--pcms-admin-text-sm);
+  font-weight: 500;
+  position: relative;
+  transition: background var(--pcms-admin-duration-fast) var(--pcms-admin-ease-standard);
+}
+
+.pcms-nav__link:hover {
+  background: var(--pcms-admin-bg-hover);
+}
+
+.pcms-nav__icon {
+  color: var(--pcms-admin-text-secondary);
+  inline-size: 20px;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.pcms-nav__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pcms-nav__link[data-active="true"] {
+  background: var(--pcms-admin-bg-active);
+  color: var(--pcms-admin-text-primary);
+  box-shadow: none;
+}
+
+/* Compact sidebar: icons only */
+.pcms-shell--compact .pcms-sidebar__wordmark,
+.pcms-shell--compact .pcms-sidebar__sitename,
+.pcms-shell--compact .pcms-sidebar__group-title,
+.pcms-shell--compact .pcms-nav__label {
+  display: none;
+}
+
+.pcms-shell--compact .pcms-sidebar__brand {
+  justify-content: center;
+  padding-inline: var(--pcms-admin-space-2);
+}
+
+.pcms-shell--compact .pcms-sidebar__brand-row {
+  justify-content: center;
+  padding-inline: var(--pcms-admin-space-2);
+}
+
+.pcms-shell--compact .pcms-sidebar__eye {
+  display: none; /* icons-only sidebar stays logo-only; the topbar keeps site access */
+}
+
+.pcms-shell--compact .pcms-nav__link {
+  justify-content: center;
+  padding: 0;
+}
+
+.pcms-shell--compact .pcms-sidebar__footer {
+  justify-content: center;
+}
+
+.pcms-sidebar__footer {
+  display: flex;
+  padding: var(--pcms-admin-space-2) var(--pcms-admin-space-3);
+  border-top: 1px solid var(--pcms-admin-border);
+  flex-shrink: 0;
+}
+
+/* --- Shell body / topbar --- */
+
+.pcms-shell__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pcms-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-3);
+  height: var(--pcms-admin-topbar-h);
+  padding: 0 var(--pcms-admin-space-4);
+  background: var(--pcms-admin-bg-canvas);
+  border-bottom: 1px solid var(--pcms-admin-border);
+  flex-shrink: 0;
+}
+
+.pcms-topbar__burger {
+  display: none;
+}
+
+.pcms-topbar__spacer {
+  flex: 1;
+}
+
+.pcms-topbar__control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+  height: 36px;
+  padding: 0 var(--pcms-admin-space-2);
+  border-radius: var(--pcms-admin-radius-sm);
+  color: var(--pcms-admin-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--pcms-admin-duration-fast) var(--pcms-admin-ease-standard);
+}
+
+.pcms-topbar__control:hover {
+  background: var(--pcms-admin-bg-hover);
+  color: var(--pcms-admin-text-primary);
+}
+
+.pcms-maintenance__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+  font-size: var(--pcms-admin-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pcms-maintenance__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 999px;
+  background: var(--pcms-admin-success);
+}
+
+.pcms-maintenance__icon {
+  color: var(--pcms-admin-warning);
+}
+
+.pcms-maintenance__icon--warn {
+  color: var(--pcms-admin-warning);
+}
+
+.pcms-maintenance__status--on {
+  color: var(--pcms-admin-warning);
+}
+
+.pcms-maintenance__popover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-2);
+  padding: var(--pcms-admin-space-2);
+}
+
+.pcms-maintenance__details {
+  font-size: var(--pcms-admin-text-sm);
+  color: var(--pcms-admin-action-primary);
+}
+
+/* Locale segmented control */
+.pcms-locale {
+  display: inline-flex;
+  border: 1px solid var(--pcms-admin-border-strong);
+  border-radius: var(--pcms-admin-radius-pill);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.pcms-locale__option {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--pcms-admin-text-xs);
+  font-weight: 500;
+  color: var(--pcms-admin-text-secondary);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pcms-locale__option[aria-pressed="true"] {
+  background: var(--pcms-admin-action-primary);
+  color: var(--pcms-admin-text-on-brand);
+}
+
+.pcms-menu__item--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pcms-admin-space-3);
+}
+
+/* --- Maintenance banner --- */
+
+.pcms-maintenance-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-3);
+  min-height: 38px;
+  padding: var(--pcms-admin-space-2) var(--pcms-admin-space-4);
+  background: var(--pcms-admin-warning-soft);
+  border-bottom: 1px solid var(--pcms-admin-warning);
+  color: var(--pcms-admin-text-primary);
+  font-size: var(--pcms-admin-text-sm);
+}
+
+.pcms-maintenance-banner__icon {
+  color: var(--pcms-admin-warning);
+  flex-shrink: 0;
+}
+
+.pcms-maintenance-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pcms-maintenance-banner__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-3);
+  flex-shrink: 0;
+}
+
+.pcms-maintenance-banner__actions a,
+.pcms-maintenance-banner__actions button {
+  font: inherit;
+  font-size: var(--pcms-admin-text-sm);
+  font-weight: 500;
+  color: var(--pcms-admin-action-primary);
+  background: none;
+  border: none;
+  border-radius: var(--pcms-admin-radius-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
+.pcms-maintenance-banner__actions a:hover,
+.pcms-maintenance-banner__actions button:hover {
+  background-color: var(--pcms-admin-accent-soft);
+}
+
+/* --- Main workspace --- */
+
+.pcms-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--pcms-admin-space-5) clamp(1rem, 3vw, 3rem);
+  min-height: 0;
+}
+
+.pcms-main:focus {
+  outline: none;
+}
+
+/* --- Responsive (spec §32) --- */
+
+@media (max-width: 1180px) {
+  .pcms-shell {
+    grid-template-columns: var(--pcms-admin-sidebar-w-compact) minmax(0, 1fr);
+  }
+
+  .pcms-shell .pcms-sidebar__wordmark,
+  .pcms-shell .pcms-sidebar__group-title,
+  .pcms-shell .pcms-nav__label {
+    display: none;
+  }
+
+  .pcms-shell .pcms-sidebar__brand {
+    justify-content: center;
+    padding-inline: var(--pcms-admin-space-2);
+  }
+
+  .pcms-shell .pcms-nav__link {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .pcms-shell .pcms-sidebar__footer {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .pcms-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pcms-topbar__burger {
+    display: inline-flex;
+  }
+
+  .pcms-crumbs {
+    display: none;
+  }
+
+  .pcms-sidebar {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    inline-size: min(80vw, 280px);
+    z-index: 55;
+    transform: translateX(-100%);
+    transition: transform var(--pcms-admin-duration-normal) var(--pcms-admin-ease-standard);
+    box-shadow: var(--pcms-admin-shadow-3);
+  }
+
+  .pcms-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .pcms-mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--pcms-admin-overlay);
+    z-index: 54;
+  }
+
+  /* compact preference is irrelevant under 900px — labels come back */
+  .pcms-shell .pcms-sidebar__wordmark,
+  .pcms-shell .pcms-sidebar__group-title,
+  .pcms-shell .pcms-nav__label {
+    display: block;
+  }
+
+  .pcms-shell .pcms-nav__link {
+    justify-content: flex-start;
+    padding: 0 var(--pcms-admin-space-2);
+  }
+
+  .pcms-main {
+    padding: var(--pcms-admin-space-3);
+  }
+}
+
+@media (max-width: 40rem) {
+  .pcms-topbar {
+    gap: var(--pcms-admin-space-1);
+    padding-inline: var(--pcms-admin-space-2);
+  }
+
+  .pcms-topbar .pcms-btn,
+  .pcms-topbar__control {
+    padding-inline: var(--pcms-admin-space-2);
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .pcms-maintenance__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.pcms-copyright {
+  color: var(--pcms-admin-text-muted);
+  font-size: var(--pcms-admin-text-xs);
+}
+
+/* Shell footer bar: always at the bottom of the workspace panel — the
+   scrolling content column ends above it, so the copyright never sticks to
+   the end of the page content. */
+.pcms-shell__body > .pcms-copyright {
+  flex-shrink: 0;
+  padding: var(--pcms-admin-space-2) var(--pcms-admin-space-4);
+  padding-bottom: max(var(--pcms-admin-space-2), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--pcms-admin-border);
+  background: var(--pcms-admin-bg-canvas);
+}

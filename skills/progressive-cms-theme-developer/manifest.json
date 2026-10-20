@@ -1,0 +1,60 @@
+{
+  "id": "progressive-cms-theme-developer",
+  "version": "1.3.0",
+  "description": "Adapt a design/static template into a maintainable Progressive CMS Theme via the Git working tree, CLI and machine discovery. No Core patches; activation is a separate elevated permission.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "theme_contract": "^1.0.0",
+      "block_document": "1",
+      "rest_api": "^1.0.0",
+      "pcpub": "1",
+      "pcmd": "1"
+    },
+    "minimum_capabilities": ["theme.read", "theme.write", "site.validate"],
+    "optional_capabilities": ["theme.preview", "content_schema.propose", "navigation.read"]
+  },
+  "recommended_scopes": [
+    "theme.read",
+    "theme.write",
+    "theme.validate",
+    "theme.preview",
+    "content_schema.read",
+    "site.validate",
+    "navigation.read",
+    "media.read"
+  ],
+  "optional_scopes": ["content_schema.propose"],
+  "dangerous_optional_scopes": ["theme.activate", "content_schema.apply", "extensions.manage"],
+  "entry_workflow": [
+    "bootstrap/discovery (site, environment, actor, contracts, capabilities)",
+    "read Theme Contract version and active/reference manifest",
+    "discover content types",
+    "discover blocks/actions",
+    "discover navigation placements",
+    "discover media presets",
+    "read the theme settings schema",
+    "inspect the design reference (static HTML/CSS/JS/Figma export)",
+    "map presentation to Theme and semantic content to the Content Model",
+    "implement Theme source in the Git working tree",
+    "replace hardcoded content with CMS bindings",
+    "implement all required block renderers",
+    "define design tokens and typed settings",
+    "create/update fixtures",
+    "cms theme validate --json",
+    "cms site validate --json",
+    "build the candidate theme preview",
+    "run Playwright responsive/accessibility checks",
+    "update THEME.md and CHANGELOG.md",
+    "activate only with explicit theme.activate permission and task approval",
+    "emit the structured run report (agent-run-report-v1)"
+  ],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "SECURITY_ACTIVATION"],
+  "references": [
+    "../references/common-operating-rules.md",
+    "references/design-mapping.md",
+    "references/schema-escalation.md",
+    "references/figma-to-theme.md",
+    "references/active-theme-update.md"
+  ]
+}

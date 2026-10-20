@@ -1,0 +1,12 @@
+---
+pcmd_version: 1
+operation: create
+external_id: sub-01
+content_type: service
+fields:
+  title: "Связанная запись"
+  intro: "ref:main"
+---
+:::block text@1
+rich_text: "Ссылается на главную запись через ref:main."
+:::

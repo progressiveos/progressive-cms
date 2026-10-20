@@ -1,0 +1,34 @@
+<div class="topbar">
+  <div class="container">
+    <span>Работаем по всей России</span>
+    <a href="tel:{{ theme_settings.topbar_phone }}">{{ theme_settings.topbar_phone }}</a>
+  </div>
+</div>
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a class="site-logo" href="/" aria-label="{{ site.site_name }}">
+      <img src="/fixtures/reference-corporate/theme/assets/img/logo.svg" alt="Логотип {{ site.site_name }}" width="140" height="32">
+    </a>
+    <nav class="site-nav site-nav--primary" aria-label="Основная навигация">
+      <ul>
+        {% for item in nav['header.primary'].items %}
+          {% if item.type == 'group' %}
+            <li class="group"><span>{{ item.title }}</span>
+              <ul>{% for sub in item.items %}<li><a href="{{ sub.href }}">{{ sub.title }}</a></li>{% endfor %}</ul>
+            </li>
+          {% else %}
+            <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="corp-mobile-nav">Меню</button>
+  </div>
+  <nav id="corp-mobile-nav" class="mobile-nav container" data-open="false" aria-label="Мобильная навигация">
+    <ul>
+      {% for item in nav['header.mobile'].items %}
+        <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+</header>

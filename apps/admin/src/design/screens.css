@@ -1,0 +1,208 @@
+/* Screen-level helpers shared by Admin workspaces. */
+.pcms-screen {
+  max-width: 80rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.pcms-screen--wide {
+  max-width: none;
+}
+
+.pcms-columns {
+  display: grid;
+  gap: var(--pcms-admin-space-5);
+  align-items: start;
+}
+
+.pcms-columns--tree {
+  grid-template-columns: clamp(
+      var(--pcms-admin-tree-w-min),
+      var(--pcms-admin-tree-w),
+      var(--pcms-admin-tree-w-max)
+    ) minmax(0, 1fr);
+}
+
+@media (max-width: 64rem) {
+  .pcms-columns--tree {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pcms-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: var(--pcms-admin-space-4) 0;
+  min-width: 0;
+}
+
+/* Tree panel: own scroll, full height of the workspace row */
+.pcms-tree-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-3);
+  position: sticky;
+  top: 0;
+  max-height: calc(100dvh - var(--pcms-admin-topbar-h) - var(--pcms-admin-space-4) * 2);
+}
+
+.pcms-tree-panel .pcms-tree {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.pcms-tree-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-2);
+  flex-shrink: 0;
+}
+
+.pcms-tree-toolbar__title {
+  margin: 0;
+  font-size: var(--pcms-admin-text-lg);
+  font-weight: 700;
+}
+
+.pcms-tree-toolbar__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+}
+
+.pcms-tree-toolbar__search {
+  height: var(--pcms-admin-control-h-sm);
+  padding: 0 var(--pcms-admin-space-2);
+  font-size: var(--pcms-admin-text-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.pcms-switch--compact {
+  flex-shrink: 0;
+}
+
+.pcms-switch--compact span {
+  font-size: var(--pcms-admin-text-xs);
+}
+
+.pcms-tree-skeleton__row {
+  padding: var(--pcms-admin-space-2) 0;
+}
+
+.pcms-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  gap: 0 var(--pcms-admin-space-5);
+}
+
+.pcms-form-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.pcms-actions-row {
+  display: flex;
+  gap: var(--pcms-admin-space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Generation Studio (Image Generation v2, plan Ф4): two-column studio —
+   controls sidebar + preview/history area; tokens only. */
+.pcms-studio {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: var(--pcms-admin-space-4, 16px);
+  align-items: start;
+}
+.pcms-studio__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-3, 12px);
+}
+.pcms-studio__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-3, 12px);
+  min-width: 0;
+}
+.pcms-studio__chips,
+.pcms-studio__sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pcms-admin-space-2, 8px);
+}
+@media (max-width: 900px) {
+  .pcms-studio {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Studio references (img2img): thumbnail chips + picker grid buttons. */
+.pcms-studio__refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pcms-admin-space-2, 8px);
+}
+button.pcms-studio__ref {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid var(--pcms-admin-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--pcms-admin-radius, 8px);
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+}
+.pcms-studio__ref img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pcms-provider-models {
+  margin-top: var(--pcms-admin-space-2, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-2, 8px);
+  align-items: flex-start;
+}
+.pcms-inline {
+  display: flex;
+  gap: var(--pcms-admin-space-2, 8px);
+  align-items: center;
+}
+
+.pcms-screen > h1 {
+  margin-bottom: var(--pcms-admin-space-3);
+}
+
+.pcms-form-grid > .pcms-btn {
+  justify-self: start;
+  align-self: start;
+}
+
+.pcms-columns > *,
+.pcms-studio > *,
+.pcms-card-grid > * {
+  min-width: 0;
+}
+
+.pcms-form-grid--identity {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 60rem;
+}
+
+@media (max-width: 40rem) {
+  .pcms-form-grid--identity {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 64rem) {
+  .pcms-tree-panel {
+    position: static;
+    max-height: none;
+  }
+}

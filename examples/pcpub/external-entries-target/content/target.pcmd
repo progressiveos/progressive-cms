@@ -1,0 +1,13 @@
+---
+pcmd_version: 1
+operation: create
+external_id: target
+content_type: page
+fields:
+  title: Уже опубликованный DEV-материал
+route:
+  path: /blog/existing-article/
+---
+:::block text@1
+rich_text: "Цель для проверки external_entries."
+:::

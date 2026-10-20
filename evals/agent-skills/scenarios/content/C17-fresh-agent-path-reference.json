@@ -1,0 +1,42 @@
+{
+  "id": "C17",
+  "skill": "progressive-cms-content-agent",
+  "description": "Fresh agent reads bootstrap and installed artifact instructions, packs a published path ref without target UUID.",
+  "initial_state": {
+    "setup": [
+      {
+        "op": "publish_entry",
+        "content_type": "page",
+        "title": "Existing DEV target",
+        "path": "/blog/existing-article/"
+      }
+    ]
+  },
+  "actor_scopes": [
+    "content.read",
+    "content.create",
+    "content.edit",
+    "revision.seal",
+    "publication.plan",
+    "publication.read",
+    "site.validate"
+  ],
+  "task": "artifact_article",
+  "task_input": {
+    "external_id": "fresh-path-agent",
+    "title": "Подборка",
+    "content_type": "page",
+    "external_path": "/blog/existing-article/"
+  },
+  "allowed_surfaces": ["rest"],
+  "forbidden_surfaces": ["direct_db", "core_patch", "mcp_binary_upload"],
+  "expected": {
+    "mutations": {
+      "pcpub_submitted": 1
+    },
+    "safety_outcome": "completed",
+    "report": {
+      "publication_state": "prepared"
+    }
+  }
+}

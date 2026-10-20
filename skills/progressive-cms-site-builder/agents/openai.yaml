@@ -1,0 +1,4 @@
+interface:
+  display_name: "Progressive CMS Site Builder"
+  short_description: "Build editable sites through Progressive CMS"
+  default_prompt: "Use $progressive-cms-site-builder to build an editable site from my brief on the authorized Progressive CMS instance."

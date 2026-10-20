@@ -1,0 +1,21 @@
+<section class="block block-calculator" data-calculator data-formula="{{ block.props.formula }}" data-digits="{{ block.props.outputs.first.digits | default: 2 }}" data-unit="{{ block.props.outputs.first.unit }}">
+  {% if block.props.title %}<h2>{{ block.props.title }}</h2>{% endif %}
+  <form>
+    {% for input in block.props.inputs %}
+      <label>
+        {{ input.label }}
+        {% if input.type == 'select' %}
+          <select name="{{ input.key }}">
+            {% for option in input.options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
+          </select>
+        {% elsif input.type == 'boolean' %}
+          <input type="checkbox" name="{{ input.key }}" {% if input.default %}checked{% endif %}>
+        {% else %}
+          <input type="number" name="{{ input.key }}" {% if input.min != nil %}min="{{ input.min }}"{% endif %} {% if input.max != nil %}max="{{ input.max }}"{% endif %} {% if input.step %}step="{{ input.step }}"{% endif %} value="{{ input.default | default: 0 }}">
+        {% endif %}
+      </label>
+    {% endfor %}
+    <p class="calc-output" aria-live="polite">—</p>
+    <noscript>The calculator requires JavaScript.</noscript>
+  </form>
+</section>

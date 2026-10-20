@@ -1,0 +1,68 @@
+{
+  "description": "MODX-era corporate site migration fixture (PCMS-NAV-T026; Navigation spec §61/§26). Original URLs are preserved exactly as canonical routes; renamed pages keep their old URLs as permanent redirects; dead pages return 410. Zero broken canonical fixtures.",
+  "site": {
+    "key": "acme-legacy",
+    "title": "ACME Legacy Corp",
+    "domain": "acme-legacy.example",
+    "policy": "legacy-html"
+  },
+  "entries": [
+    {
+      "id": "01900000-0000-7000-8000-0000000000a0",
+      "role": "home",
+      "modxUrl": "/",
+      "canonicalPath": "/",
+      "expectedCanonicalUrl": "https://acme-legacy.example/"
+    },
+    {
+      "id": "01900000-0000-7000-8000-000000000001",
+      "role": "page",
+      "modxUrl": "/about.html",
+      "canonicalPath": "/about.html",
+      "expectedCanonicalUrl": "https://acme-legacy.example/about.html"
+    },
+    {
+      "id": "01900000-0000-7000-8000-000000000002",
+      "role": "page",
+      "modxUrl": "/services/audit.html",
+      "canonicalPath": "/services/audit.html",
+      "expectedCanonicalUrl": "https://acme-legacy.example/services/audit.html"
+    },
+    {
+      "id": "01900000-0000-7000-8000-000000000003",
+      "role": "page",
+      "modxUrl": "/services/consulting.html",
+      "canonicalPath": "/services/consulting.html",
+      "expectedCanonicalUrl": "https://acme-legacy.example/services/consulting.html"
+    },
+    {
+      "id": "01900000-0000-7000-8000-000000000004",
+      "role": "renamed-page",
+      "modxUrl": "/news/2024/rebranding.html",
+      "canonicalPath": "/news/rebranding-2024.html",
+      "expectedCanonicalUrl": "https://acme-legacy.example/news/rebranding-2024.html",
+      "expectedRedirect": {
+        "source": "/news/2024/rebranding.html",
+        "statusCode": 301,
+        "location": "/news/rebranding-2024.html"
+      }
+    },
+    {
+      "id": "01900000-0000-7000-8000-000000000005",
+      "role": "new-content",
+      "modxUrl": null,
+      "canonicalPath": "/services/modernizatsiya/",
+      "expectedCanonicalUrl": "https://acme-legacy.example/services/modernizatsiya/",
+      "note": "created after migration on the extensionless trailing-slash baseline; the site policy keeps allowing the legacy .html routes alongside"
+    }
+  ],
+  "redirects": [
+    { "source": "/kontakty.html", "target": "/about.html", "statusCode": 301 },
+    {
+      "source": "/news/2024/rebranding.html",
+      "target": "/news/rebranding-2024.html",
+      "statusCode": 301
+    },
+    { "source": "/old-section/dead-page.html", "target": null, "statusCode": 410 }
+  ]
+}

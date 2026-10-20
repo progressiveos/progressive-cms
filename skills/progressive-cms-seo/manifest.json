@@ -1,0 +1,59 @@
+{
+  "id": "progressive-cms-seo",
+  "version": "1.0.1",
+  "description": "Audit and improve the technical and on-page SEO of an existing Progressive CMS site for Google and Yandex, with complete applicable checks, public rendering evidence and no ranking guarantees.",
+  "recommended_scopes": [
+    "content.read",
+    "seo.read",
+    "seo.validate",
+    "theme.read",
+    "publication.read",
+    "navigation.read",
+    "media.read",
+    "site.validate"
+  ],
+  "optional_scopes": [
+    "content.edit",
+    "content.create",
+    "revision.seal",
+    "publication.publish",
+    "seo.edit",
+    "seo.site_settings",
+    "seo.canonical_override",
+    "theme.write",
+    "theme.activate",
+    "theme.validate",
+    "navigation.edit",
+    "navigation.publish",
+    "media.write",
+    "preview.create",
+    "search.diagnostics",
+    "domains.manage",
+    "routing.redirects.import",
+    "publication.plan"
+  ],
+  "entry_workflow": [
+    "Confirm target, canonical host, permissions and actual CMS contracts; refresh official engine sources.",
+    "Build a URL ledger from CMS, sitemap, links and known URLs, preserving uncrawled remainder.",
+    "Fix crawl/indexing/canonical blockers and shared template/head causes before per-page data.",
+    "Cover all applicable metadata, headings, links, media, structured-data and performance criteria.",
+    "Recheck affected public URLs and external provider evidence; report unresolved scope/capability limits."
+  ],
+  "references": [
+    "SKILL.md",
+    "references/audit.md",
+    "references/pcms-workflow.md",
+    "references/sources.md",
+    "references/api-operations.json",
+    "assets/acceptance.md"
+  ],
+  "requires": {
+    "cms": ">=1.0.0-rc.27 <2.0.0-0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "theme_contract": "^1.0"
+    }
+  },
+  "dangerous_optional_scopes": [],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "PUBLIC_MUTATION"]
+}

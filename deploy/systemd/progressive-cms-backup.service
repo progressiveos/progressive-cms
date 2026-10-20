@@ -1,0 +1,17 @@
+# Progressive CMS backup service.
+
+[Unit]
+Description=Progressive CMS backup set (backup-site.sh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=progressive-cms
+Group=progressive-cms
+ExecStart=/usr/local/lib/pcms/backup-site.sh
+# Only the backup volume is writable; everything else stays read-only.
+ProtectSystem=strict
+ReadWritePaths=/var/backups/progressive-cms
+NoNewPrivileges=true
+PrivateTmp=true

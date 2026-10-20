@@ -1,0 +1,16 @@
+{
+  "id": "progressive-cms-theme-developer",
+  "version": "1.0.0",
+  "description": "Design adaptation through the Git working tree and public contracts.",
+  "requires": {
+    "contracts": { "theme_contract": "^1.0.0", "block_document": "1" },
+    "minimum_capabilities": ["theme.read"],
+    "optional_capabilities": ["theme.preview"]
+  },
+  "recommended_scopes": ["theme.read", "theme.write"],
+  "optional_scopes": ["content_schema.propose"],
+  "dangerous_optional_scopes": ["theme.activate"],
+  "entry_workflow": ["bootstrap", "map design", "implement", "validate", "report"],
+  "safety_levels": ["READ", "DRAFT_WRITE", "SECURITY_ACTIVATION"],
+  "references": ["references/design-mapping.md"]
+}

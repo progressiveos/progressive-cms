@@ -1,0 +1,20 @@
+{% if breadcrumbs and breadcrumbs.items != empty %}
+<nav class="breadcrumbs" aria-label="Breadcrumbs">
+  <ol>
+    {% for crumb in breadcrumbs.items %}
+      {% comment %}
+        A crumb without an href is a real trail step that is not a link (a
+        group heading, or an ancestor without a published route). Rendering
+        `<a href="">` would navigate to the current URL.
+      {% endcomment %}
+      {% if forloop.last %}
+        <li aria-current="page">{{ crumb.title }}</li>
+      {% elsif crumb.href != empty %}
+        <li><a href="{{ crumb.href }}">{{ crumb.title }}</a></li>
+      {% else %}
+        <li>{{ crumb.title }}</li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+{% endif %}

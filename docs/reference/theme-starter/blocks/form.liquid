@@ -1,0 +1,62 @@
+{% assign form = forms[block.props.form_definition_id] %}
+{% if form %}
+<form class="block block-form" data-pcms-form action="{{ form.submission_url }}" method="post" novalidate>
+  <h2 class="block-form__title">{{ form.title }}</h2>
+  {% for field in form.fields %}
+    <div class="form-field form-field--{{ field.type }}" data-field="{{ field.key }}">
+      {% if field.type == "hidden_controlled" %}
+        <input type="hidden" name="{{ field.key }}" value="{{ field.value }}">
+      {% elsif field.type == "consent" or field.type == "checkbox" %}
+        <label class="form-check">
+          <input type="checkbox" name="{{ field.key }}" value="true" data-label="{{ field.label }}"
+                 {% if field.required %}required{% endif %}>
+          <span>{{ field.label }}</span>{% if field.type == "consent" and field.consent_text %}<span class="form-consent">{{ field.consent_text }}</span>{% endif %}
+        </label>
+      {% else %}
+        <label class="form-label" for="pcms-f-{{ field.key }}">{{ field.label }}{% if field.required %} <span class="form-required" aria-hidden="true">*</span>{% endif %}</label>
+        {% if field.type == "textarea" %}
+          <textarea class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}"
+                    {% if field.required %}required{% endif %}{% if field.max_length %} maxlength="{{ field.max_length }}"{% endif %}></textarea>
+        {% elsif field.type == "select" %}
+          <select class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}"{% if field.required %} required{% endif %}>
+            <option value=""></option>
+            {% for option in field.options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}
+          </select>
+        {% elsif field.type == "radio" %}
+          {% for option in field.options %}
+            <label class="form-check"><input type="radio" name="{{ field.key }}" value="{{ option.value }}"><span>{{ option.label }}</span></label>
+          {% endfor %}
+        {% elsif field.type == "checkbox_group" %}
+          {% for option in field.options %}
+            <label class="form-check"><input type="checkbox" name="{{ field.key }}" value="{{ option.value }}"><span>{{ option.label }}</span></label>
+          {% endfor %}
+        {% elsif field.type == "number" %}
+          <input class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}" type="number"
+                 {% if field.required %}required{% endif %}{% if field.min %} min="{{ field.min }}"{% endif %}{% if field.max %} max="{{ field.max }}"{% endif %}>
+        {% elsif field.type == "email" %}
+          <input class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}" type="email"
+                 {% if field.required %}required{% endif %}{% if field.max_length %} maxlength="{{ field.max_length }}"{% endif %}>
+        {% elsif field.type == "phone" %}
+          <input class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}" type="tel"
+                 {% if field.required %}required{% endif %}>
+        {% else %}
+          <input class="form-input" id="pcms-f-{{ field.key }}" name="{{ field.key }}" type="text"
+                 {% if field.required %}required{% endif %}{% if field.max_length %} maxlength="{{ field.max_length }}"{% endif %}>
+        {% endif %}
+      {% endif %}
+      {% if field.help %}<p class="form-help">{{ field.help }}</p>{% endif %}
+      <p class="form-error" data-error-for="{{ field.key }}" role="alert" hidden></p>
+    </div>
+  {% endfor %}
+  {% if form.honeypot_field %}
+    <div class="form-hp" aria-hidden="true">
+      <label>Do not fill in this field<input type="text" name="{{ form.honeypot_field }}" tabindex="-1" autocomplete="off"></label>
+    </div>
+  {% endif %}
+  <button class="button button--primary" type="submit">{{ form.submit_label }}</button>
+  <p class="form-status" data-form-status hidden></p>
+  <noscript><p class="form-help">This example requires JavaScript to submit the JSON request. Please enable JavaScript or use another contact channel.</p></noscript>
+</form>
+{% else %}
+<div class="block block-form block-form--unavailable" data-form-definition="{{ block.props.form_definition_id }}"></div>
+{% endif %}

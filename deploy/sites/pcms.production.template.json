@@ -1,0 +1,62 @@
+{
+  "nodeEnv": "production",
+  "registry": {
+    "baseUrl": "https://my.p-cms.ru"
+  },
+  "http": {
+    "host": "__HTTP_HOST__",
+    "port": 3000,
+    "trustedProxies": ["127.0.0.1", "__TRUSTED_PROXY_EDGE__"]
+  },
+  "db": {
+    "host": "__DB_ADDRESS__",
+    "port": 5432,
+    "database": "__DB_NAME__",
+    "user": "__DB_USER__",
+    "passwordSecretRef": "db.password",
+    "sslMode": "disable",
+    "migrationsDir": "/opt/progressive-cms/current/db/migrations",
+    "pool": {
+      "webMax": 10,
+      "workerMax": 5,
+      "connectionTimeoutMilliseconds": 5000,
+      "idleTimeoutMilliseconds": 30000
+    }
+  },
+  "log": {
+    "level": "info"
+  },
+  "secrets": {
+    "db.password": {
+      "file": "/etc/progressive-cms/secrets/db.password"
+    },
+    "preview.secret": {
+      "file": "/etc/progressive-cms/secrets/preview.secret"
+    },
+    "integrations.runtimeSecretsEncryptionKey": {
+      "file": "/etc/progressive-cms/secrets/integrations-runtime.secret"
+    }
+  },
+  "media": {
+    "storageDir": "/var/lib/progressive-cms/media",
+    "quarantineDir": "/var/lib/progressive-cms/state/tmp/media-quarantine"
+  },
+  "pcpub": {
+    "quarantineDir": "/var/lib/progressive-cms/state/tmp/pcpub-quarantine"
+  },
+  "themes": {
+    "renderDir": "/var/lib/progressive-cms/themes/reference-theme-v1"
+  },
+  "publication": {
+    "previewSecretRef": "preview.secret"
+  },
+  "integrations": {
+    "runtimeSecretsEncryptionKeySecretRef": "integrations.runtimeSecretsEncryptionKey"
+  },
+  "admin": {
+    "distDir": "/opt/progressive-cms/current/apps/admin/dist"
+  },
+  "seo": {
+    "environment": "production"
+  }
+}

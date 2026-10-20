@@ -1,0 +1,124 @@
+{
+  "name": "corporate-home",
+  "entry": {
+    "templateKey": "page-default",
+    "contentTypeKey": "page",
+    "contentTypeVersion": 1,
+    "title": "Инжиниринг для бизнеса",
+    "fields": {
+      "title": "Инжиниринг для бизнеса",
+      "intro": "20 лет на рынке промышленных решений."
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d650",
+        "type": "list",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "items": [
+            {
+              "title": "Проектирование"
+            },
+            {
+              "title": "Монтаж"
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d651",
+        "type": "cta",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Запросить КП",
+          "primary_action": {
+            "type": "phone",
+            "phone": "+7 900 000-00-00"
+          }
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Проекты",
+          "href": "/projects",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Контакты",
+          "href": "/contacts",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": [
+        {
+          "type": "external_url",
+          "title": "Telegram",
+          "href": "https://t.me/acme",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.legal",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Правовая информация",
+          "href": "/legal",
+          "items": []
+        }
+      ]
+    }
+  ],
+  "globals": {},
+  "expectContains": ["Инжиниринг для бизнеса", "topbar", "+7 900 000-00-00", "site-header__inner"]
+}

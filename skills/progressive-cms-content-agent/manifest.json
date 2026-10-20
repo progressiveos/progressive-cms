@@ -1,0 +1,99 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.5.0",
+  "description": "Safely create, update, validate, preview and publish/schedule Progressive CMS content through public machine contracts (REST/MCP/CLI/.pcpub). Discovery-first; CLI for long deterministic workflows; .pcpub artifact mode for bulk/offline authoring; no direct DB; no Core patches.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "mcp": "2024-11-05",
+      "block_document": "1",
+      "bundle": "1",
+      "pcpub": "1",
+      "pcmd": "1"
+    },
+    "minimum_capabilities": ["content.read", "publication.read"],
+    "optional_capabilities": [
+      "preview.create",
+      "publication.schedule",
+      "publication.publish",
+      "media.import",
+      "navigation.edit",
+      "media.stock.search",
+      "media.stock.import"
+    ]
+  },
+  "recommended_scopes": [
+    "content.read",
+    "content.create",
+    "content.edit",
+    "media.read",
+    "media.write",
+    "seo.read",
+    "seo.edit",
+    "preview.create",
+    "revision.seal",
+    "publication.plan",
+    "publication.read",
+    "site.validate",
+    "forms.read_definition",
+    "quizzes.read_definition",
+    "research.search",
+    "research.fetch",
+    "media.stock.search",
+    "media.stock.import"
+  ],
+  "optional_scopes": [
+    "content.archive",
+    "media.generate",
+    "media.import",
+    "navigation.edit",
+    "navigation.read",
+    "publication.publish",
+    "publication.schedule",
+    "routing.redirects.import",
+    "site.maintenance.bypass"
+  ],
+  "dangerous_optional_scopes": [
+    "publication.publish",
+    "publication.unpublish",
+    "site.maintenance.bypass"
+  ],
+  "entry_workflow": [
+    "agent bootstrap (site, environment, actor, contracts, capabilities, skills)",
+    "verify target site/environment",
+    "verify actor/scopes; stop before any action whose scope is missing",
+    "skill compatibility check against reported contracts",
+    "artifact refs by path: require capabilities.pcpub.external_entries.supported and pcpub_versions containing 2; otherwise use existing discovery/UUID workflow",
+    "content type discovery",
+    "fetch only the required block schemas",
+    "read current target state (tree/routes/publications snapshot)",
+    "media acquisition discovery (providers; stock search/import, opt-in generation)",
+    "media discovery, reuse, upload/import",
+    "external research (skill: progressive-cms-web-research) — search, select 3-8 sources, fetch with --out, keep provenance",
+    "build draft payload (IDs only, no paths/URLs)",
+    "set SEO/social metadata (facts only)",
+    "validate the draft revision",
+    "resolve every blocking validation issue",
+    "preview resolved SEO/structured data",
+    "create signed public preview",
+    "seal the revision",
+    "add to ChangeSet / submit Publication Bundle (stable idempotency key)",
+    "build the Publication Plan",
+    "schedule/publish only with explicit scope and task permission",
+    "verify the public/scheduled result",
+    "emit the structured run report (agent-run-report-v1)"
+  ],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "SCHEDULE", "PUBLIC_MUTATION"],
+  "references": [
+    "../references/common-operating-rules.md",
+    "references/migration-engines.md",
+    "references/canonical-workflow.md",
+    "references/media.md",
+    "references/bulk-publication.md",
+    "references/seo.md",
+    "references/routes.md",
+    "references/artifact-mode.md",
+    "../progressive-cms-web-research/SKILL.md"
+  ]
+}

@@ -1,0 +1,567 @@
+{
+  "info": {
+    "title": "Runware API - Z-Image-Turbo",
+    "x-air-id": "runware:z-image@turbo",
+    "x-model-id": "alibaba-z-image-turbo",
+    "x-pricing": {
+      "currency": "USD",
+      "measured": [
+        {
+          "configuration": "1024×1024",
+          "price": 0.0032
+        },
+        {
+          "configuration": "512×512",
+          "price": 0.0013
+        },
+        {
+          "configuration": "2048×2048",
+          "price": 0.0141
+        }
+      ]
+    }
+  },
+  "components": {
+    "schemas": {
+      "RequestBody": {
+        "items": {
+          "properties": {
+            "model": {
+              "type": "string",
+              "const": "runware:z-image@turbo"
+            },
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "seedImage": {
+                  "title": "Seed Image",
+                  "description": "Image used as a starting point for the generation (UUID, URL, Data URI, or Base64).",
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "format": "uuid"
+                    },
+                    {
+                      "format": "uri"
+                    },
+                    {
+                      "pattern": "^data:image\\/[a-zA-Z]+;base64,[a-zA-Z0-9+/=]+$"
+                    },
+                    {
+                      "pattern": "^[a-zA-Z0-9+/=]+$"
+                    }
+                  ]
+                },
+                "maskImage": {
+                  "title": "Mask Image",
+                  "description": "Image used to specify which areas of the input image should be edited (UUID, URL, Data URI, or Base64). White marks the area to edit, black is preserved.",
+                  "type": "string",
+                  "anyOf": [
+                    {
+                      "format": "uuid"
+                    },
+                    {
+                      "format": "uri"
+                    },
+                    {
+                      "pattern": "^data:image\\/[a-zA-Z]+;base64,[a-zA-Z0-9+/=]+$"
+                    },
+                    {
+                      "pattern": "^[a-zA-Z0-9+/=]+$"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "positivePrompt": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 10000
+            },
+            "negativePrompt": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 3000
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 128,
+              "maximum": 2048,
+              "multipleOf": 16
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 128,
+              "maximum": 2048,
+              "multipleOf": 16
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854776000
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 8,
+              "maximum": 50
+            },
+            "scheduler": {
+              "type": "string",
+              "enum": [
+                "DDIM",
+                "DDIMScheduler",
+                "DDPMScheduler",
+                "DEISMultistepScheduler",
+                "Default",
+                "DPM++",
+                "DPM++ 2M",
+                "DPM++ 2M Beta",
+                "DPM++ 2M Exponential",
+                "DPM++ 2M Karras",
+                "DPM++ 2M SDE",
+                "DPM++ 2M SDE Beta",
+                "DPM++ 2M SDE Exponential",
+                "DPM++ 2M SDE Karras",
+                "DPM++ 2M SDE Uniform",
+                "DPM++ 2M Uniform",
+                "DPM++ 3M",
+                "DPM++ 3M Beta",
+                "DPM++ 3M Exponential",
+                "DPM++ 3M Karras",
+                "DPM++ 3M SDE Uniform",
+                "DPM++ 3M Uniform",
+                "DPM++ Beta",
+                "DPM++ Exponential",
+                "DPM++ Karras",
+                "DPM++ SDE",
+                "DPM++ SDE Beta",
+                "DPM++ SDE Exponential",
+                "DPM++ SDE Karras",
+                "DPM++ Uniform",
+                "DPM++ Uniform Beta",
+                "DPM++ Uniform Exponential",
+                "DPM++ Uniform Karras",
+                "DPMSolverMultistepInverse",
+                "DPMSolverMultistepScheduler",
+                "DPMSolverSinglestepScheduler",
+                "EDMDPMSolverMultistepScheduler",
+                "EDMEulerScheduler",
+                "Euler",
+                "Euler a",
+                "Euler Beta",
+                "Euler Exponential",
+                "Euler Karras",
+                "EulerAncestralDiscreteScheduler",
+                "EulerDiscreteScheduler",
+                "FlowMatchEulerDiscreteScheduler",
+                "Heun",
+                "HeunDiscreteScheduler",
+                "Heun Karras",
+                "IPNDMScheduler",
+                "IPNDM Uniform",
+                "IPNDM Uniform Beta",
+                "IPNDM Uniform Exponential",
+                "IPNDM Uniform Karras",
+                "KDPM2AncestralDiscreteScheduler",
+                "KDPM2DiscreteScheduler",
+                "LCM",
+                "LCMScheduler",
+                "LMS",
+                "LMSDiscreteScheduler",
+                "LMS Karras",
+                "PNDMScheduler",
+                "TCDScheduler",
+                "UniPC",
+                "UniPC 2M",
+                "UniPC 2M Karras",
+                "UniPC 2M Uniform",
+                "UniPC 3M",
+                "UniPC 3M Karras",
+                "UniPC 3M Uniform",
+                "UniPC Karras",
+                "UniPC Uniform",
+                "UniPC Uniform Beta",
+                "UniPC Uniform Exponential",
+                "UniPC Uniform Karras"
+              ]
+            },
+            "CFGScale": {
+              "type": "number",
+              "multipleOf": 0.01,
+              "minimum": 0,
+              "maximum": 20
+            },
+            "strength": {
+              "type": "number",
+              "multipleOf": 0.01,
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.8
+            },
+            "maskMargin": {
+              "type": "integer",
+              "minimum": 32,
+              "maximum": 128
+            },
+            "acceleratorOptions": {
+              "type": "object",
+              "properties": {
+                "cacheEndStep": {
+                  "title": "Cache End Step",
+                  "description": "Absolute step number to end caching. Must be greater than `cacheStartStep` and less than or equal to `steps`.",
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "cacheEndStepPercentage": {
+                  "title": "Cache End Step Percentage",
+                  "description": "Percentage of steps to end caching. Alternative to `cacheEndStep`. Must be greater than `cacheStartStepPercentage`.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "cacheMaxConsecutiveSteps": {
+                  "title": "Cache Max Consecutive Steps",
+                  "description": "Limits the maximum number of consecutive steps that can use cached computations before forcing a fresh computation.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5,
+                  "default": 3
+                },
+                "cacheStartStep": {
+                  "title": "Cache Start Step",
+                  "description": "Absolute step number to start caching. Must be less than `cacheEndStep`.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "cacheStartStepPercentage": {
+                  "title": "Cache Start Step Percentage",
+                  "description": "Percentage of steps to start caching. Alternative to `cacheStartStep`. Must be less than `cacheEndStepPercentage`.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 99
+                },
+                "fbCache": {
+                  "title": "FB Cache",
+                  "description": "First Block Cache (FBCache) acceleration. Reuses feature block computations across steps.",
+                  "type": "boolean"
+                },
+                "fbCacheThreshold": {
+                  "title": "FB Cache Threshold",
+                  "description": "Controls the sensitivity threshold for determining when to reuse cached computations. Lower values reuse more aggressively.",
+                  "type": "number",
+                  "multipleOf": 0.01,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.25
+                },
+                "teaCache": {
+                  "title": "TeaCache",
+                  "description": "TeaCache acceleration for transformer-based models. Estimates step differences to skip redundant computations.",
+                  "type": "boolean"
+                },
+                "teaCacheDistance": {
+                  "title": "TeaCache Distance",
+                  "description": "Controls the aggressiveness of the TeaCache feature. Lower values prioritize quality, higher values prioritize speed.",
+                  "type": "number",
+                  "multipleOf": 0.01,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.5
+                },
+                "dbCache": {
+                  "title": "DB Cache",
+                  "description": "DB Cache (CacheDiT) acceleration. Caches and reuses intermediate transformer block outputs to skip redundant computations.",
+                  "type": "boolean"
+                },
+                "dbCacheThreshold": {
+                  "title": "DB Cache Threshold",
+                  "description": "Controls the sensitivity threshold for DB Cache. Lower values reuse cached blocks more aggressively, higher values prioritize quality.",
+                  "type": "number",
+                  "multipleOf": 0.01,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.25
+                },
+                "dbCacheSkipInterval": {
+                  "title": "DB Cache Skip Interval",
+                  "description": "Controls how many steps to skip between cache refreshes. Higher values skip more steps for faster generation at the cost of quality.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 5
+                }
+              },
+              "additionalProperties": false
+            },
+            "outpaint": {
+              "type": "object",
+              "properties": {
+                "top": {
+                  "title": "Outpaint Top",
+                  "description": "Number of pixels to extend to the top.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "multipleOf": 64
+                },
+                "bottom": {
+                  "title": "Outpaint Bottom",
+                  "description": "Number of pixels to extend to the bottom.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "multipleOf": 64
+                },
+                "left": {
+                  "title": "Outpaint Left",
+                  "description": "Number of pixels to extend to the left.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "multipleOf": 64
+                },
+                "right": {
+                  "title": "Outpaint Right",
+                  "description": "Number of pixels to extend to the right.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "multipleOf": 64
+                },
+                "blur": {
+                  "title": "Outpaint Blur",
+                  "description": "Amount of blur to apply to the mask edge.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 32
+                }
+              },
+              "additionalProperties": false
+            },
+            "lora": {
+              "type": "array"
+            },
+            "controlNet": {
+              "type": "array"
+            },
+            "ultralytics": {
+              "type": "object",
+              "properties": {
+                "CFGScale": {
+                  "title": "CFG Scale",
+                  "description": "Face refinement guidance scale.",
+                  "type": "number",
+                  "multipleOf": 0.1,
+                  "minimum": 0,
+                  "maximum": 50,
+                  "default": 8
+                },
+                "confidence": {
+                  "title": "Confidence",
+                  "description": "Confidence threshold for detection.",
+                  "type": "number",
+                  "multipleOf": 0.01,
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.9
+                },
+                "inpaintSize": {
+                  "type": "integer",
+                  "title": "Inpaint Size",
+                  "description": "Image size (in pixels) to use for each inpainting region. YOLO detects faces, crops the region, and scales it to this size before running diffusion. Set so most faces land in the 2–4× range of their original pixel size. Going beyond 8× may degrade identity resemblance.",
+                  "default": 1024,
+                  "minimum": 128,
+                  "maximum": 2048
+                },
+                "maskBlur": {
+                  "title": "Mask Blur",
+                  "description": "Mask feathering amount. Higher values create softer transitions between the enhanced face region and surrounding areas.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "default": 5
+                },
+                "maskPadding": {
+                  "title": "Mask Padding",
+                  "description": "Padding around detected face in pixels. Expands the refinement area to include surrounding context like hair and neck.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20,
+                  "default": 5
+                },
+                "negativePrompt": {
+                  "title": "Negative Prompt",
+                  "description": "Negative prompt for detection.",
+                  "type": "string"
+                },
+                "positivePrompt": {
+                  "title": "Positive Prompt",
+                  "description": "Positive prompt for detection.",
+                  "type": "string"
+                },
+                "steps": {
+                  "title": "Steps",
+                  "description": "Number of face refinement steps.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "default": 20
+                },
+                "strength": {
+                  "title": "Strength",
+                  "description": "Refinement strength. Lower values preserve more of the original, higher values allow more aggressive reconstruction.",
+                  "type": "number",
+                  "multipleOf": 0.01,
+                  "exclusiveMinimum": 0,
+                  "maximum": 1,
+                  "default": 0.3
+                }
+              },
+              "additionalProperties": false
+            },
+            "taskType": {
+              "type": "string",
+              "const": "imageInference"
+            },
+            "taskUUID": {
+              "type": "string"
+            },
+            "webhookURL": {
+              "type": "string"
+            },
+            "includeCost": {
+              "type": "boolean"
+            },
+            "numberResults": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "maximum": 20
+            },
+            "uploadEndpoint": {
+              "type": "string"
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 60
+            },
+            "outputType": {
+              "type": "string",
+              "enum": ["URL", "base64Data", "dataURI"],
+              "default": "URL"
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["JPG", "PNG", "WEBP"],
+              "default": "JPG"
+            },
+            "outputQuality": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 99,
+              "default": 95
+            },
+            "deliveryMethod": {
+              "type": "string",
+              "default": "sync"
+            },
+            "safety": {
+              "type": "object",
+              "properties": {
+                "checkContent": {
+                  "title": "Check Content",
+                  "description": "Enable or disable content safety checking. Increases total generation time.",
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "advancedFeatures": {
+              "type": "object",
+              "properties": {
+                "watermark": {
+                  "title": "Watermark",
+                  "description": "Configuration object for adding watermarks to generated videos. Watermarks can be applied using either text or image content with customizable positioning and appearance. You must provide either `text` or `image` content for the watermark, but not both.\n\n**Text watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"text\": \"© 2025 Company\",\n    \"displayPosition\": \"bottom-right\",\n    \"opacity\": 0.6,\n    \"fontColor\": \"#ffffff\",\n    \"bgColor\": \"#000000\"\n  }\n}\n```\n\n**Image watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"image\": \"c64351d5-4c59-42f7-95e1-eace013eddab\",\n    \"displayPosition\": \"top-left\",\n    \"opacity\": 0.6\n  }\n}\n```\n\n**Tiled watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"text\": \"PREVIEW\",\n    \"tiled\": true,\n    \"opacity\": 0.4,\n    \"fontColor\": \"#cccccc\"\n  }\n}\n```\n\n[Read full documentation](https://runware.ai/docs/models/alibaba-z-image-turbo#watermark)",
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "title": "Watermark Text",
+                      "description": "Watermark text.",
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 32
+                    },
+                    "image": {
+                      "title": "Watermark Image",
+                      "description": "Watermark image (UUID, URL, Data URI, or Base64).",
+                      "type": "string",
+                      "anyOf": [
+                        {
+                          "format": "uuid"
+                        },
+                        {
+                          "format": "uri"
+                        },
+                        {
+                          "pattern": "^data:image\\/[a-zA-Z]+;base64,[a-zA-Z0-9+/=]+$"
+                        },
+                        {
+                          "pattern": "^[a-zA-Z0-9+/=]+$"
+                        }
+                      ]
+                    },
+                    "displayPosition": {
+                      "title": "Display Position",
+                      "description": "Watermark position.",
+                      "type": "string",
+                      "enum": [
+                        "top-left",
+                        "top-center",
+                        "top-right",
+                        "center-left",
+                        "center-center",
+                        "center-right",
+                        "bottom-left",
+                        "bottom-center",
+                        "bottom-right",
+                        "tiled"
+                      ]
+                    },
+                    "opacity": {
+                      "title": "Watermark Opacity",
+                      "description": "Watermark opacity.",
+                      "type": "number",
+                      "multipleOf": 0.01,
+                      "minimum": 0.1,
+                      "maximum": 1
+                    },
+                    "fontColor": {
+                      "title": "Font Color",
+                      "description": "Text color in hex format.",
+                      "type": "string",
+                      "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    },
+                    "bgColor": {
+                      "title": "Background Color",
+                      "description": "Background color in hex format.",
+                      "type": "string",
+                      "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    }
+                  },
+                  "oneOf": [
+                    {
+                      "required": ["text"]
+                    },
+                    {
+                      "required": ["image"]
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["positivePrompt", "width", "height", "taskType", "taskUUID", "model"]
+        }
+      }
+    }
+  }
+}

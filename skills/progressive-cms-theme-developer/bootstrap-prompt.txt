@@ -1,0 +1,4 @@
+Read and follow the installed Progressive CMS Skill
+`progressive-cms-theme-developer`.
+Use public Theme contracts and machine discovery.
+Implement the supplied design task in the provided Git working tree.

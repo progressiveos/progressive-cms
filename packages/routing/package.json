@@ -1,0 +1,13 @@
+{
+  "name": "@pcms/routing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "turndown": "^7.2.4"
+  },
+  "license": "Apache-2.0"
+}

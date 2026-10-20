@@ -1,0 +1,248 @@
+{
+  "name": "service-full",
+  "entry": {
+    "templateKey": "service-default",
+    "contentTypeKey": "service",
+    "contentTypeVersion": 1,
+    "title": "Аудит ИТ-инфраструктуры",
+    "fields": {
+      "title": "Аудит ИТ-инфраструктуры",
+      "intro": "Комплексная проверка.",
+      "price": "150 000.00 ₽",
+      "features": [
+        {
+          "feature_title": "Отчёт",
+          "feature_text": "80 страниц"
+        },
+        {
+          "feature_title": "Презентация",
+          "feature_text": "для совета директоров"
+        }
+      ],
+      "hero_image": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01"
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d61e",
+        "type": "calculator",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Калькулятор стоимости",
+          "inputs": [
+            {
+              "key": "area",
+              "label": "Area, m²",
+              "type": "number",
+              "min": 10,
+              "max": 100000,
+              "default": 100
+            },
+            {
+              "key": "kind",
+              "label": "Object type",
+              "type": "select",
+              "options": [
+                {
+                  "value": 1,
+                  "label": "Office"
+                },
+                {
+                  "value": 1.5,
+                  "label": "Warehouse"
+                }
+              ]
+            },
+            {
+              "key": "urgent",
+              "label": "Urgent",
+              "type": "boolean",
+              "default": false
+            }
+          ],
+          "formula": "area*kind*(1+urgent*0.2)",
+          "outputs": [
+            {
+              "label": "Стоимость",
+              "unit": "₽",
+              "digits": 2
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d61f",
+        "type": "gallery",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "items": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e32",
+              "media_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01",
+              "caption": "Снимок 1"
+            },
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e33",
+              "media_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02"
+            }
+          ],
+          "layout_hint": "grid",
+          "lightbox_enabled": true,
+          "caption": "Примеры работ"
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d622",
+        "type": "cta",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "title": "Заказать аудит",
+          "variant": "wide",
+          "primary_action": {
+            "type": "email",
+            "email": "sales@acme.example"
+          },
+          "secondary_action": {
+            "type": "external_url",
+            "url": "https://t.me/acme",
+            "anchor": "Telegram"
+          }
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {
+    "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01": {
+      "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01",
+      "alt": "Фото 1",
+      "width": 4000,
+      "height": 3000,
+      "derivatives": [
+        {
+          "preset": "hero",
+          "url": "/media/1-hero.avif",
+          "width": 1600,
+          "height": 900
+        },
+        {
+          "preset": "card",
+          "url": "/media/1-card.webp",
+          "width": 800,
+          "height": 600
+        },
+        {
+          "preset": "thumbnail",
+          "url": "/media/1-thumb.webp",
+          "width": 96,
+          "height": 96
+        },
+        {
+          "preset": "gallery",
+          "url": "/media/1-gallery.webp",
+          "width": 1200,
+          "height": 900
+        },
+        {
+          "preset": "social-display",
+          "url": "/media/1-social.webp",
+          "width": 1200,
+          "height": 630
+        }
+      ]
+    },
+    "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02": {
+      "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e02",
+      "alt": "Фото 2",
+      "width": 4000,
+      "height": 3000,
+      "derivatives": [
+        {
+          "preset": "card",
+          "url": "/media/2-card.webp",
+          "width": 800,
+          "height": 600
+        },
+        {
+          "preset": "gallery",
+          "url": "/media/2-gallery.webp",
+          "width": 1200,
+          "height": 900
+        },
+        {
+          "preset": "thumbnail",
+          "url": "/media/2-thumb.webp",
+          "width": 96,
+          "height": 96
+        }
+      ]
+    }
+  },
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": []
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": [
+    "Калькулятор стоимости",
+    "data-calculator",
+    "data-formula=\"area*kind*(1+urgent*0.2)\"",
+    "Заказать аудит",
+    "Примеры работ",
+    "150 000.00 ₽"
+  ]
+}

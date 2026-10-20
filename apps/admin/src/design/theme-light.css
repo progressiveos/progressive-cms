@@ -1,0 +1,62 @@
+/* Warm editorial workspace — light theme (semantic layer).
+ * Applied via [data-pcms-theme="light"] on <html>; :root is the default so
+ * first paint before the bootstrap attribute is already correct.
+ */
+:root,
+[data-pcms-theme="light"] {
+  --pcms-admin-control-thumb: #f2eee5;
+
+  color-scheme: light;
+
+  --pcms-admin-bg-canvas: #f6f3ec;
+  --pcms-admin-bg-sidebar: #eeeae1;
+  --pcms-admin-bg-surface: #fcfaf5;
+  --pcms-admin-bg-subtle: #eeeae2;
+  --pcms-admin-bg-elevated: #fcfaf5;
+  --pcms-admin-bg-hover: #e8e3d8;
+  --pcms-admin-bg-active: #e4e8da;
+
+  --pcms-admin-overlay: rgb(12 17 29 / 0.5);
+  --pcms-admin-border: #ded8cd;
+  --pcms-admin-border-strong: #b9b2a5;
+
+  --pcms-admin-text-primary: #302e28;
+  --pcms-admin-text-secondary: #666257;
+  --pcms-admin-text-muted: #777064;
+  --pcms-admin-text-on-brand: #ffffff;
+
+  --pcms-admin-action-primary: #586340;
+  --pcms-admin-action-primary-hover: #465132;
+  --pcms-admin-accent-soft: #e4e8da;
+  --pcms-admin-focus: #586340;
+  --pcms-admin-focus-ring:
+    0 0 0 2px var(--pcms-admin-bg-surface), 0 0 0 4px var(--pcms-admin-focus);
+
+  --pcms-admin-shadow-1: none;
+  --pcms-admin-shadow-2: 0 4px 16px rgb(46 38 25 / 0.08);
+  --pcms-admin-shadow-3: 0 16px 40px rgb(46 38 25 / 0.14);
+
+  /* Status soft backgrounds (foreground pairs contrast-checked in both themes) */
+  --pcms-admin-success-soft: #e6f6ef;
+  --pcms-admin-warning-soft: #fdf3e2;
+  --pcms-admin-danger-soft: #fdecee;
+  --pcms-admin-info-soft: #e9f1fd;
+
+  /* Domain soft tiles (icon tiles, active nav) */
+  --pcms-admin-domain-content-soft: #edf3ff;
+  --pcms-admin-domain-media-soft: #e8f8fd;
+  --pcms-admin-domain-navigation-soft: #f3edff;
+  --pcms-admin-domain-publication-soft: #e8f8f2;
+  --pcms-admin-domain-search-soft: #eaf1fe;
+  --pcms-admin-domain-interactions-soft: #e6f7f5;
+  --pcms-admin-domain-integrations-soft: #fdf1e7;
+  --pcms-admin-domain-payments-soft: #e7f6ef;
+  --pcms-admin-domain-theme-soft: #f9edfd;
+  --pcms-admin-domain-access-soft: #eef0fe;
+  --pcms-admin-domain-audit-soft: #fbeef3;
+  --pcms-admin-domain-system-soft: #eef1f5;
+
+  /* Scrollbar: a step below the canvas, barely noticeable until needed */
+  --pcms-admin-scrollbar-thumb: #d3cbbf;
+  --pcms-admin-scrollbar-thumb-hover: #bdb4a6;
+}

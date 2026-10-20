@@ -1,0 +1,252 @@
+{
+  "$id": "https://progressive-cms.dev/schemas/safety-scope-map-v1.json",
+  "title": "Progressive CMS agent skill safety-level/scope map (PCMS-SKILL-T012)",
+  "description": "Maps each skill operation to its safety level and the ACTUAL permission registry keys (packages/auth/src/permissions.ts). The registry — not this file — is the enforcement; the test suite fails if a listed permission is not registered.",
+  "version": "1.0.0",
+  "operations": [
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "bootstrap/discovery",
+      "safety_level": "READ",
+      "required_permissions": ["content.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "content type / block schema discovery",
+      "safety_level": "READ",
+      "required_permissions": ["content.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "current-state snapshot (tree/routes/publications)",
+      "safety_level": "READ",
+      "required_permissions": ["content.read", "publication.read"],
+      "optional_permissions": ["navigation.read"]
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "media discovery/reuse",
+      "safety_level": "READ",
+      "required_permissions": ["media.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "external identity resolve",
+      "safety_level": "READ",
+      "required_permissions": ["content.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "create draft / working revision",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["content.create"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "update draft payload (CAS)",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["content.edit"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "media upload",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["media.write"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "media remote import",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["media.write", "media.import"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "SEO metadata write",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["seo.read", "seo.edit"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "external identity bind/baseline",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["content.edit"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "validate draft revision",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["content.read"],
+      "optional_permissions": ["seo.validate"]
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "SEO/structured-data preview",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["seo.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "signed public preview",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["preview.create"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "seal revision",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["revision.seal"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "changeset build + preflight",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["content.edit", "publication.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "bundle submit (validate)",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["content.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "publication plan create",
+      "safety_level": "SCHEDULE",
+      "required_permissions": ["publication.plan"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "publication plan schedule",
+      "safety_level": "SCHEDULE",
+      "required_permissions": ["publication.schedule"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "bundle submit (apply, publication.mode=now)",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": ["content.create", "publication.publish"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "changeset apply",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": ["content.edit", "publication.publish"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "publish sealed revision",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": ["publication.publish"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "entry archive",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": ["content.archive"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "navigation structure edit",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": ["navigation.edit"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-content-agent",
+      "operation": "work under maintenance mode",
+      "safety_level": "PUBLIC_MUTATION",
+      "required_permissions": [],
+      "optional_permissions": ["site.maintenance.bypass"]
+    },
+
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "bootstrap/discovery",
+      "safety_level": "READ",
+      "required_permissions": ["theme.read"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "content/nav/media/schema discovery",
+      "safety_level": "READ",
+      "required_permissions": [
+        "theme.read",
+        "content_schema.read",
+        "navigation.read",
+        "media.read"
+      ],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "theme source editing (Git working tree)",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["theme.write"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "schema proposal (write-up only)",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": [],
+      "optional_permissions": ["content_schema.propose"]
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "theme validate / site validate",
+      "safety_level": "DRAFT_WRITE",
+      "required_permissions": ["theme.validate", "site.validate"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "candidate theme preview",
+      "safety_level": "PREVIEW",
+      "required_permissions": ["theme.preview"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "theme activation",
+      "safety_level": "SECURITY_ACTIVATION",
+      "required_permissions": ["theme.activate"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "apply content schema change",
+      "safety_level": "SECURITY_ACTIVATION",
+      "required_permissions": ["content_schema.apply"],
+      "optional_permissions": []
+    },
+    {
+      "skill": "progressive-cms-theme-developer",
+      "operation": "extension management",
+      "safety_level": "SECURITY_ACTIVATION",
+      "required_permissions": ["extensions.manage"],
+      "optional_permissions": []
+    }
+  ]
+}

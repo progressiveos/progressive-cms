@@ -1,0 +1,11 @@
+<div class="block block-table">
+  <table>
+    {% if block.props.caption %}<caption>{{ block.props.caption }}</caption>{% endif %}
+    <thead><tr>{% for col in block.props.columns %}<th scope="col">{{ col.title }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in block.props.rows %}
+        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

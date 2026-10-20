@@ -1,0 +1,44 @@
+{
+  "contract": "forms-quizzes-leads-v1",
+  "spec": "Progressive_CMS_Forms_Quizzes_Leads_v1_Spec.md §37/§43",
+  "rule": "Minor releases may append codes; renaming, removing or reinterpreting a code is a breaking change. Transport status mapping is central (packages/api errors.ts): *_NOT_FOUND→404, *_CONFLICT/_TAKEN→409, *_TOO_LARGE→413, *_RATE_LIMITED→429, *_INVALID/_UNSUPPORTED/…→422, *_DENIED→403.",
+  "specMandatedCodes": [
+    "FORM_VALUES_INVALID",
+    "FORM_CONSENT_REQUIRED",
+    "QUIZ_RUN_NOT_FOUND",
+    "QUIZ_ANSWER_INVALID",
+    "LEAD_NOT_FOUND",
+    "INTERACTION_EXPORT_INVALID"
+  ],
+  "formsCodes": [
+    "FORM_DEFINITION_INVALID",
+    "FORM_DEFINITION_NOT_FOUND",
+    "FORM_DEFINITION_VERSION_EXISTS",
+    "FORM_KEY_TAKEN",
+    "FORM_FIELD_UNSUPPORTED",
+    "FORM_VALUES_INVALID",
+    "FORM_CONSENT_REQUIRED",
+    "FORM_TOO_LARGE",
+    "FORM_RATE_LIMITED",
+    "FORM_ORIGIN_DENIED",
+    "FORM_SUBMISSION_NOT_FOUND"
+  ],
+  "quizCodes": [
+    "QUIZ_KEY_TAKEN",
+    "QUIZ_DEFINITION_INVALID",
+    "QUIZ_DEFINITION_NOT_FOUND",
+    "QUIZ_DEFINITION_VERSION_EXISTS",
+    "QUIZ_QUESTION_UNSUPPORTED",
+    "QUIZ_BRANCHING_INVALID",
+    "QUIZ_SCORING_INVALID",
+    "QUIZ_RUN_NOT_FOUND",
+    "QUIZ_RUN_EXPIRED",
+    "QUIZ_RUN_STATE_INVALID",
+    "QUIZ_ANSWER_INVALID",
+    "QUIZ_TOO_LARGE",
+    "QUIZ_RATE_LIMITED",
+    "PRIVACY_BLOCKED_CONFLICT"
+  ],
+  "leadsCodes": ["LEAD_NOT_FOUND", "LEAD_STATUS_INVALID"],
+  "exportCodes": ["INTERACTION_EXPORT_INVALID"]
+}

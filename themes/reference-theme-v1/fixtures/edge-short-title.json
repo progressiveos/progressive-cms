@@ -1,0 +1,70 @@
+{
+  "name": "edge-short-title",
+  "entry": {
+    "templateKey": "page-default",
+    "contentTypeKey": "page",
+    "contentTypeVersion": 1,
+    "title": "ОК",
+    "fields": {
+      "title": "ОК"
+    },
+    "blocks": []
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": []
+    },
+    {
+      "placement": "footer.primary",
+      "items": []
+    },
+    {
+      "placement": "footer.legal",
+      "items": []
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": ["ОК"]
+}

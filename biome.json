@@ -1,0 +1,62 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/build",
+      "!packages/operations/assets",
+      "!**/node_modules",
+      "!**/test-results",
+      "!evals/agent-skills/.work",
+      "!**/playwright-report",
+      "!fixtures/mcp/tool-contract-v1.json",
+      "!fixtures/api/openapi-v1.json",
+      "!**/public/vendor",
+      "!apps/admin/public/brand",
+      "!_src_docs",
+      "!docs/init-package/themes",
+      "!docs/init-package/showcase",
+      "!extensions/catalog.ts",
+      "!extensions/catalog.ui-test.generated.ts",
+      "!apps/admin/src/extension/contributions.generated.ts",
+      "!extensions/progressive-admin-fixture",
+      "!extensions/progressive-platform-fixture",
+      "!extensions/progressive-media-*",
+      "!extensions/progressive-payments-*",
+      "!extensions/progressive-prompt-enhancer",
+      "!extensions/progressive-site-migration",
+      "!extensions/progressive-web-research"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/blocks/src/first-party.ts", "packages/themes/src/manifest/schema.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noThenProperty": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

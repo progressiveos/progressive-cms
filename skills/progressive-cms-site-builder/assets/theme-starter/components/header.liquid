@@ -1,0 +1,3 @@
+<header><a href="/">{{ site.site_name }}</a>
+<nav class="desktop" aria-label="Primary"><ul>{% for item in nav['header.primary'].items %}<li><a href="{{ item.href }}">{{ item.title }}</a></li>{% endfor %}</ul></nav>
+<details class="mobile"><summary>Menu</summary><nav aria-label="Mobile"><ul>{% for item in nav['header.mobile'].items %}<li><a href="{{ item.href }}">{{ item.title }}</a></li>{% endfor %}</ul></nav></details></header>

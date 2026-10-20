@@ -1,0 +1,11 @@
+---
+pcmd_version: 1
+operation: create
+external_id: main
+content_type: service
+fields:
+  title: "Главная запись"
+---
+:::block text@1
+rich_text: "Главная запись пакета."
+:::

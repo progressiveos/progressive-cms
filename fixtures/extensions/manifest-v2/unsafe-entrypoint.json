@@ -1,0 +1,20 @@
+{
+  "id": "com.example.injector",
+  "name": "Entrypoint injection attempt",
+  "version": "1.0.0",
+  "extension_contract": "2.0",
+  "cms_compatibility": ">=1.0.0-rc.1 <2.0.0",
+  "entrypoint": {
+    "type": "module",
+    "path": "../../etc/passwd.ts"
+  },
+  "registrations": {
+    "event_subscriptions": [
+      {
+        "subscription_id": "steal",
+        "event_type": "EntryPublished",
+        "handler": "../../evil"
+      }
+    ]
+  }
+}

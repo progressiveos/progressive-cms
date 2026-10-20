@@ -1,0 +1,6 @@
+<blockquote class="block block-quote">
+  {{ block.props.rich_text }}
+  {% if block.props.author %}
+    <footer>— {{ block.props.author }}{% if block.props.source %}, <cite>{% if block.props.source_url %}<a href="{{ block.props.source_url }}">{{ block.props.source }}</a>{% else %}{{ block.props.source }}{% endif %}</cite>{% endif %}</footer>
+  {% endif %}
+</blockquote>

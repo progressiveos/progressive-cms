@@ -1,0 +1,12 @@
+<div class="block block-timeline">
+  {% if block.props.title %}<h2>{{ block.props.title }}</h2>{% endif %}
+  <ul>
+    {% for item in block.props.items %}
+      <li>
+        {% if item.date %}<time datetime="{{ item.date }}">{{ item.date }}</time>{% elsif item.date_text %}<span>{{ item.date_text }}</span>{% endif %}
+        <strong>{{ item.title }}</strong>
+        {{ item.text }}
+      </li>
+    {% endfor %}
+  </ul>
+</div>

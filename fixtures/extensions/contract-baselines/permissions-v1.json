@@ -1,0 +1,424 @@
+{
+  "permissions": [
+    {
+      "key": "content.read",
+      "since": "1.0",
+      "summary": "Read content entries and drafts"
+    },
+    {
+      "key": "content.create",
+      "since": "1.0",
+      "summary": "Create content entries"
+    },
+    {
+      "key": "content.edit",
+      "since": "1.0",
+      "summary": "Edit content entries"
+    },
+    {
+      "key": "content.archive",
+      "since": "1.0",
+      "summary": "Archive content entries"
+    },
+    {
+      "key": "preview.create",
+      "since": "1.0",
+      "summary": "Create previews of unpublished content"
+    },
+    {
+      "key": "content_schema.read",
+      "since": "1.0",
+      "summary": "Read content type definitions"
+    },
+    {
+      "key": "content_schema.propose",
+      "since": "1.0",
+      "summary": "Propose content type schema changes"
+    },
+    {
+      "key": "content_schema.apply",
+      "since": "1.0",
+      "summary": "Apply content type schema changes"
+    },
+    {
+      "key": "media.read",
+      "since": "1.0",
+      "summary": "Read media assets"
+    },
+    {
+      "key": "media.write",
+      "since": "1.0",
+      "summary": "Upload and edit media assets"
+    },
+    {
+      "key": "media.replace",
+      "since": "1.0",
+      "summary": "Replace media asset binaries"
+    },
+    {
+      "key": "media.archive",
+      "since": "1.0",
+      "summary": "Archive media assets"
+    },
+    {
+      "key": "media.import",
+      "since": "1.0",
+      "summary": "Import media from external sources"
+    },
+    {
+      "key": "media.providers.manage",
+      "since": "1.0",
+      "summary": "Configure and test media acquisition providers"
+    },
+    {
+      "key": "media.stock.search",
+      "since": "1.0",
+      "summary": "Search stock media providers"
+    },
+    {
+      "key": "media.stock.import",
+      "since": "1.0",
+      "summary": "Import stock media candidates into the library"
+    },
+    {
+      "key": "media.generate",
+      "since": "1.0",
+      "summary": "Run image generation and accept candidates"
+    },
+    {
+      "key": "research.search",
+      "since": "1.0",
+      "summary": "Search the external Web through the configured research provider"
+    },
+    {
+      "key": "research.fetch",
+      "since": "1.0",
+      "summary": "Fetch public Web pages through the safe research fetcher"
+    },
+    {
+      "key": "research.manage",
+      "since": "1.0",
+      "summary": "Configure the Web Research provider, network policy and limits"
+    },
+    {
+      "key": "navigation.read",
+      "since": "1.0",
+      "summary": "Read navigation sets"
+    },
+    {
+      "key": "navigation.edit",
+      "since": "1.0",
+      "summary": "Edit navigation sets"
+    },
+    {
+      "key": "navigation.publish",
+      "since": "1.0",
+      "summary": "Publish navigation sets"
+    },
+    {
+      "key": "routing.redirects.import",
+      "since": "1.0",
+      "summary": "Bulk-import legacy URL redirects for site migrations"
+    },
+    {
+      "key": "skills.manage",
+      "since": "1.0",
+      "summary": "Install, enable/disable and remove community skill packages"
+    },
+    {
+      "key": "analytics.read",
+      "since": "1.0",
+      "summary": "Read analytics & tagging settings and doctor reports"
+    },
+    {
+      "key": "analytics.manage",
+      "since": "1.0",
+      "summary": "Configure analytics providers (providers are typed; no code surfaces)"
+    },
+    {
+      "key": "analytics.network.manage",
+      "since": "1.0",
+      "summary": "Edit external tag network origin permissions"
+    },
+    {
+      "key": "seo.read",
+      "since": "1.0",
+      "summary": "Read SEO metadata"
+    },
+    {
+      "key": "seo.edit",
+      "since": "1.0",
+      "summary": "Edit SEO metadata"
+    },
+    {
+      "key": "seo.validate",
+      "since": "1.0",
+      "summary": "Run SEO validation"
+    },
+    {
+      "key": "seo.canonical_override",
+      "since": "1.0",
+      "summary": "Override canonical URLs"
+    },
+    {
+      "key": "seo.site_settings",
+      "since": "1.0",
+      "summary": "Manage site-wide SEO settings"
+    },
+    {
+      "key": "publication.read",
+      "since": "1.0",
+      "summary": "Read revisions and publication state"
+    },
+    {
+      "key": "revision.seal",
+      "since": "1.0",
+      "summary": "Seal revisions"
+    },
+    {
+      "key": "publication.plan",
+      "since": "1.0",
+      "summary": "Create publication plans/ChangeSets"
+    },
+    {
+      "key": "publication.schedule",
+      "since": "1.0",
+      "summary": "Schedule publications"
+    },
+    {
+      "key": "publication.publish",
+      "since": "1.0",
+      "summary": "Publish revisions to the live site"
+    },
+    {
+      "key": "publication.unpublish",
+      "since": "1.0",
+      "summary": "Unpublish live content"
+    },
+    {
+      "key": "publication.rollback",
+      "since": "1.0",
+      "summary": "Roll back publications"
+    },
+    {
+      "key": "theme.read",
+      "since": "1.0",
+      "summary": "Read theme sources and configuration"
+    },
+    {
+      "key": "theme.write",
+      "since": "1.0",
+      "summary": "Edit theme sources and configuration"
+    },
+    {
+      "key": "theme.validate",
+      "since": "1.0",
+      "summary": "Validate themes"
+    },
+    {
+      "key": "theme.preview",
+      "since": "1.0",
+      "summary": "Render theme previews"
+    },
+    {
+      "key": "theme.activate",
+      "since": "1.0",
+      "summary": "Activate a theme for the site"
+    },
+    {
+      "key": "users.read",
+      "since": "1.0",
+      "summary": "List and inspect admin users"
+    },
+    {
+      "key": "users.manage",
+      "since": "1.0",
+      "summary": "Create, invite, disable and reset users"
+    },
+    {
+      "key": "roles.read",
+      "since": "1.0",
+      "summary": "List roles and their permissions"
+    },
+    {
+      "key": "roles.manage",
+      "since": "1.0",
+      "summary": "Assign roles and manage custom roles"
+    },
+    {
+      "key": "tokens.manage",
+      "since": "1.0",
+      "summary": "Manage service accounts and access tokens"
+    },
+    {
+      "key": "extensions.manage",
+      "since": "1.0",
+      "summary": "Install, update and remove extensions"
+    },
+    {
+      "key": "site.configure",
+      "since": "1.0",
+      "summary": "Change site settings"
+    },
+    {
+      "key": "site.validate",
+      "since": "1.0",
+      "summary": "Run site-wide validation"
+    },
+    {
+      "key": "site.maintenance",
+      "since": "1.0",
+      "summary": "Toggle maintenance mode and edit its settings"
+    },
+    {
+      "key": "site.maintenance.bypass",
+      "since": "1.0",
+      "summary": "View the real site while maintenance mode is enabled"
+    },
+    {
+      "key": "domains.manage",
+      "since": "1.0",
+      "summary": "Manage site domains"
+    },
+    {
+      "key": "embed.trusted",
+      "since": "1.0",
+      "summary": "Embed trusted external content"
+    },
+    {
+      "key": "audit.read",
+      "since": "1.0",
+      "summary": "Read audit and security events"
+    },
+    {
+      "key": "search.admin",
+      "since": "1.0",
+      "summary": "Use authorized admin search across content, media and navigation"
+    },
+    {
+      "key": "search.reindex",
+      "since": "1.0",
+      "summary": "Start and resume full search index rebuilds"
+    },
+    {
+      "key": "search.diagnostics",
+      "since": "1.0",
+      "summary": "Read search index status and diagnostics"
+    },
+    {
+      "key": "forms.read_definition",
+      "since": "1.0",
+      "summary": "Read form definitions"
+    },
+    {
+      "key": "forms.manage_definition",
+      "since": "1.0",
+      "summary": "Create and edit form definitions"
+    },
+    {
+      "key": "quizzes.read_definition",
+      "since": "1.0",
+      "summary": "Read quiz definitions"
+    },
+    {
+      "key": "quizzes.manage_definition",
+      "since": "1.0",
+      "summary": "Create and edit quiz definitions"
+    },
+    {
+      "key": "interactions.read",
+      "since": "1.0",
+      "summary": "Read interaction events"
+    },
+    {
+      "key": "interactions.manage",
+      "since": "1.0",
+      "summary": "Manage interaction records"
+    },
+    {
+      "key": "interactions.export",
+      "since": "1.0",
+      "summary": "Export interaction data"
+    },
+    {
+      "key": "leads.read",
+      "since": "1.0",
+      "summary": "Read lead records (PII)"
+    },
+    {
+      "key": "leads.manage",
+      "since": "1.0",
+      "summary": "Manage lead records"
+    },
+    {
+      "key": "leads.export",
+      "since": "1.0",
+      "summary": "Export lead data (PII)"
+    },
+    {
+      "key": "integrations.read",
+      "since": "1.0",
+      "summary": "Read integration catalog and status"
+    },
+    {
+      "key": "integrations.configure",
+      "since": "1.0",
+      "summary": "Configure integrations"
+    },
+    {
+      "key": "integrations.test",
+      "since": "1.0",
+      "summary": "Run integration test deliveries"
+    },
+    {
+      "key": "integrations.deliveries.read",
+      "since": "1.0",
+      "summary": "Read integration delivery logs"
+    },
+    {
+      "key": "integrations.retry",
+      "since": "1.0",
+      "summary": "Retry failed deliveries"
+    },
+    {
+      "key": "integrations.inbound.read",
+      "since": "1.0",
+      "summary": "Read inbound integration payloads"
+    },
+    {
+      "key": "integrations.secrets.manage",
+      "since": "1.0",
+      "summary": "Manage connector secrets"
+    },
+    {
+      "key": "payments.read",
+      "since": "1.0",
+      "summary": "Read payments"
+    },
+    {
+      "key": "payments.create",
+      "since": "1.0",
+      "summary": "Create payments"
+    },
+    {
+      "key": "payments.configure",
+      "since": "1.0",
+      "summary": "Configure payment providers"
+    },
+    {
+      "key": "payments.cancel",
+      "since": "1.0",
+      "summary": "Cancel payments"
+    },
+    {
+      "key": "payments.refund",
+      "since": "1.0",
+      "summary": "Refund payments"
+    },
+    {
+      "key": "payments.events.read",
+      "since": "1.0",
+      "summary": "Read payment events"
+    }
+  ]
+}

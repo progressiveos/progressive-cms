@@ -1,0 +1,2 @@
+{% for card in collections.news.items %}<article class="card">{% if card.image %}<img src="{{ card.image }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}<h2><a href="{{ card.href }}">{{ card.title }}</a></h2><p>{{ card.note }}</p></article>{% endfor %}
+{% for card in collections.projects.items %}<article class="card">{% if card.image %}<img src="{{ card.image }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}<h2><a href="{{ card.href }}">{{ card.title }}</a></h2><p>{{ card.note }}</p></article>{% endfor %}

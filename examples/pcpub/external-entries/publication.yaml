@@ -1,0 +1,7 @@
+changeset_title: Подборка материалов
+publication:
+  mode: none
+external_entries:
+  existing-article:
+    path: /blog/existing-article/
+    locale: default

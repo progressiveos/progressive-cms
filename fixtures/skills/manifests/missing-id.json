@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "description": "The required id field is absent.",
+  "entry_workflow": ["bootstrap"],
+  "safety_levels": ["READ"]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "com.example.extra",
+  "name": "Unknown field",
+  "version": "1.0.0",
+  "extension_contract": "2.0",
+  "cms_compatibility": ">=1.0.0-rc.1 <2.0.0",
+  "runtime_hacks": {
+    "patchCore": true
+  },
+  "entrypoint": {
+    "type": "module"
+  },
+  "registrations": {}
+}

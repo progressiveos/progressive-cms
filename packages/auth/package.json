@@ -1,0 +1,14 @@
+{
+  "name": "@pcms/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "argon2": "0.45.1",
+    "otpauth": "9.5.2"
+  },
+  "license": "Apache-2.0"
+}

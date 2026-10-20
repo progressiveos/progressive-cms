@@ -1,0 +1,20 @@
+#
+# Triggered by progressive-cms-restart.path when the application writes the
+# marker /run/progressive-cms/restart-requested. Runs as root (no User=):
+# the marker is removed FIRST, then both application units restart into the
+# activated release — rm-before-restart re-arms the path unit for the next
+# marker instead of looping on a stale file.
+#
+# No ProtectSystem=strict here on purpose: the unit must write /run (marker
+# removal); like progressive-cms-install.service, a root operational oneshot
+# stays confined only by its single narrow ExecStart.
+#
+# OPTIONAL machinery — see progressive-cms-restart.path for the install story.
+
+[Unit]
+Description=Progressive CMS restart bridge (restart app units, clear marker)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'rm -f /run/progressive-cms/restart-requested && systemctl restart progressive-cms-web.service progressive-cms-worker.service'
+PrivateTmp=true

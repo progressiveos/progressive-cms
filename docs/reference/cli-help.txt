@@ -1,0 +1,57 @@
+usage: cms <command> [args]
+API context: --site <site-key> --environment <env> (or PCMS_SITE_KEY/PCMS_ENVIRONMENT)
+
+Commands:
+  config validate [--json] [--config <path>]    validate the configuration file
+  extensions list|install|enable|disable|uninstall <id> [--check]  (M14)
+  contracts versions | deprecations list       contract discovery (M14)
+  update check|apply --manifest <file>         update preflight/orchestration (M14)
+  maintenance status|enable|disable            site maintenance mode (M15)
+  registry status|releases|apply --version <v>  registry releases + apply-update (needs PCMS_API_URL/TOKEN)
+  entries identity-locale <id> --locale <tag>   identity repair: move entry + working revisions to the locale (needs PCMS_API_URL/TOKEN)
+  revisions cleanup --entry <id>                delete all SEALED revisions except the published one (needs PCMS_API_URL/TOKEN)
+  domains list|add|primary|remove                domain bindings (needs PCMS_API_URL/TOKEN + domains.manage)
+  observations show|append --text <t>|clear [--config <p>]  agent observations file (rides the update report)
+  agent bootstrap [--json]                     agent discovery entry point (M16)
+  skills list|show <id>|check <id> [--json]    installed skill discovery + compatibility (M16)
+  db migrate [--check] [--json] [--config <p>]  apply pending migrations explicitly
+  schema list|show|validate [--file <defs>]     content schema diagnostics (M02)
+  theme validate <dir> [--json]                 theme contract validation (M03)
+  theme active [--json]                         actual theme served by the running API
+  theme update-active <package> --environment <env> --yes [--json]
+  site validate [--theme <dir>] [--content <f>] [--json]
+
+Local operator recovery (M08; audited, no HTTP surface):
+  user create-owner|reset-password|disable|disable-mfa [--email <e>] ...
+  session revoke-all --email <e>              revoke all sessions of a user
+  token revoke --token-id <uuid>              revoke a service-account token
+
+M09 generation (spec §57 exit codes; --json deterministic output):
+  content schema list|show <key> | validate <file> | import <bundle>
+  media list [--limit N | --all] [--cursor C] | get|usage|archive <id> [--yes]
+  seo validate <id> | --entry <id> | --all    SEO audit (API)
+  entries route change <id> --to-path <path> [--reason <text>] [--yes]
+  publication calendar|changesets|preflight|apply|publish-now|cancel
+  publication plan preview|schedule <id> --request <json-file>
+    mutating publication commands require --environment <env> --yes and
+    run against the CMS API (PCMS_API_URL + PCMS_API_TOKEN)
+  integrations connectors|instances|bindings|deliveries|inbound
+    integrations delivery <id> | retry <id> | instance-test <id>  (M13)
+  payments providers|instances|capabilities|list|get|events|cancel|refund (M13)
+  search query|status|reindex                 search operations (M11);
+  research search|fetch|status                external Web research via XMLStock + safe fetch (ADR-0015);
+    research fetch --out <file.md> keeps stdout compact (agent token economy)
+  forms|quizzes list|get <id>                 definition discovery (M12);
+  interactions submissions|runs|leads|export   interaction history (M12);
+    reindex requires --environment <env> --yes
+  bundle validate|pack|inspect|submit|status <args>  .pcpub content packages
+  migrate modx3|wordpress|tilda|bitrix <options>    source-site migration
+  redirects validate|apply --csv <file> [--yes]     atomic legacy URL import
+  figma pull --url <design-url> [--out-dir <dir>]
+  nav inspect|check | route inspect|check [options]
+  mail test [--to <address>] [--json]               configured mail transport
+  theme list|install|uninstall <args>               installed theme packages
+  doctor | info | capabilities                operator diagnostics
+  global flags: --json --profile <name> --config <path>
+  config file: --config wins; else $PCMS_CONFIG_FILE; else ./config/pcms.json
+    (server installs: export PCMS_CONFIG_FILE=/etc/progressive-cms/pcms.json)

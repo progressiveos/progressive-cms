@@ -1,0 +1,11 @@
+{
+  "domain": "jobs",
+  "rule": "append-only: minor releases may append codes; never rename, remove or reinterpret",
+  "codes": [
+    "JOB_ALREADY_COMPLETED",
+    "JOB_IDEMPOTENCY_CONFLICT",
+    "JOB_NOT_FOUND",
+    "JOB_STATE_INVALID",
+    "JOB_TYPE_UNKNOWN"
+  ]
+}

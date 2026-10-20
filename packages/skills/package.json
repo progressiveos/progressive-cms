@@ -1,0 +1,16 @@
+{
+  "name": "@pcms/skills",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@types/yauzl": "^3.4.0",
+    "ajv": "8.20.0",
+    "semver": "7.8.5",
+    "yauzl": "3.4.0"
+  },
+  "license": "Apache-2.0"
+}

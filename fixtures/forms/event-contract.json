@@ -1,0 +1,43 @@
+{
+  "comment": "M12→M13 canonical domain-event contract (Forms spec §27/§28; frozen, append-only). Consumers receive these through the M07 outbox envelope with at-least-once delivery and dedupe on event id. Payload keys are exhaustive — new optional keys require an append-only fixture update. Forbidden in payloads: form payload values and any PII (email, phone, name, ip, tokens).",
+  "envelope": {
+    "id": "stable uuid (delivery dedupe key)",
+    "aggregate": "form_submission | quiz_run | lead",
+    "aggregate_id": "same as payload main id",
+    "event_type": "one of event_types",
+    "payload": "JSON object matching the payload_keys below"
+  },
+  "event_types": {
+    "FormSubmitted": {
+      "aggregate": "form_submission",
+      "emitted": "after an ACCEPTED FormSubmission is persisted, same transaction",
+      "payload_keys": [
+        "submission_id",
+        "form_definition_id",
+        "form_schema_version",
+        "source_entry_id?"
+      ]
+    },
+    "QuizCompleted": {
+      "aggregate": "quiz_run",
+      "emitted": "after a QuizRun transitions to COMPLETED, same transaction",
+      "payload_keys": [
+        "quiz_run_id",
+        "quiz_definition_id",
+        "quiz_schema_version",
+        "outcome_id?",
+        "score?"
+      ]
+    },
+    "LeadCreated": {
+      "aggregate": "lead",
+      "emitted": "after a Lead row is created, same transaction as its source interaction",
+      "payload_keys": ["lead_id", "source_type", "source_id", "classification?"]
+    },
+    "LeadStatusChanged": {
+      "aggregate": "lead",
+      "emitted": "after a lead status transition via the privileged API",
+      "payload_keys": ["lead_id", "previous_status", "status"]
+    }
+  }
+}

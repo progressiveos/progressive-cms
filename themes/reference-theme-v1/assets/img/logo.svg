@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="32" viewBox="0 0 120 32" role="img" aria-label="Progressive Reference">
+  <rect x="1" y="4" width="24" height="24" rx="6" fill="#0f62fe"/>
+  <path d="M8 16l4 4 8-8" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="32" y="21" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#16181d">reference</text>
+</svg>

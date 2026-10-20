@@ -1,0 +1,24 @@
+{
+  "description": "Expand → migrate → contract reference corpus (PCMS-EXT-T015). SYNTHETIC fixture for the evolution model — versions here are illustrative, NOT published production releases. The example: the entry field 'summary' expands in 1.1.0 (old teaser + new summary both supported), migrates in 1.2.0 (data moved, teaser deprecated), and the old shape is contracted (removed) in the promised major 2.0.0.",
+  "items": [
+    {
+      "item": "entry.field.summary",
+      "expand_in": "1.1.0",
+      "migrate_in": "1.2.0",
+      "contract_in_major": 2,
+      "migration_tool": "cms content migrate summary-field",
+      "phases": {
+        "at_1_1_0": "expand",
+        "at_1_2_0": "migrate",
+        "at_1_5_0": "migrate",
+        "at_2_0_0": "contract"
+      },
+      "gates": {
+        "expand_in_minor_1_1_0": "pass",
+        "migrate_in_minor_1_2_0": "pass",
+        "contract_in_minor_1_5_0": "fail",
+        "contract_in_promised_major_2_0_0": "pass"
+      }
+    }
+  ]
+}

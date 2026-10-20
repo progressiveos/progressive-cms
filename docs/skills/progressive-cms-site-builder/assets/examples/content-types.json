@@ -1,0 +1,89 @@
+[
+  {
+    "key": "company_page",
+    "version": 1,
+    "title": "Company page",
+    "bodyPolicy": "block_document",
+    "fields": {
+      "title": {
+        "id": "title",
+        "type": "string",
+        "required": true
+      },
+      "slug_hint": {
+        "id": "slug_hint",
+        "type": "slug"
+      },
+      "intro": {
+        "id": "intro",
+        "type": "text"
+      },
+      "hero_image": {
+        "id": "hero_image",
+        "type": "media"
+      },
+      "body": {
+        "id": "body",
+        "type": "block_document"
+      }
+    }
+  },
+  {
+    "key": "company_news",
+    "version": 1,
+    "title": "Company news",
+    "bodyPolicy": "rich_text",
+    "fields": {
+      "title": {
+        "id": "title",
+        "type": "string",
+        "required": true
+      },
+      "slug_hint": {
+        "id": "slug_hint",
+        "type": "slug"
+      },
+      "intro": {
+        "id": "intro",
+        "type": "text"
+      },
+      "hero_image": {
+        "id": "hero_image",
+        "type": "media"
+      },
+      "body": {
+        "id": "body",
+        "type": "rich_text"
+      }
+    }
+  },
+  {
+    "key": "company_project",
+    "version": 1,
+    "title": "Company project",
+    "bodyPolicy": "rich_text",
+    "fields": {
+      "title": {
+        "id": "title",
+        "type": "string",
+        "required": true
+      },
+      "slug_hint": {
+        "id": "slug_hint",
+        "type": "slug"
+      },
+      "intro": {
+        "id": "intro",
+        "type": "text"
+      },
+      "hero_image": {
+        "id": "hero_image",
+        "type": "media"
+      },
+      "body": {
+        "id": "body",
+        "type": "rich_text"
+      }
+    }
+  }
+]

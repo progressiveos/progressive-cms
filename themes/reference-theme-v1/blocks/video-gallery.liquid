@@ -1,0 +1,17 @@
+<figure class="block block-video-gallery">
+  <ul class="block-video-gallery__grid" data-layout="{% if block.props.layout_hint %}{{ block.props.layout_hint }}{% else %}grid{% endif %}">
+    {% for item in block.props.items %}
+      <li>
+        {% assign vid = media[item.media_id] %}
+        {% if vid %}
+          <video controls preload="metadata" src="{{ vid.download.href }}"{% if item.poster_media_id and media[item.poster_media_id] %} poster="{{ media[item.poster_media_id].presets.gallery.src }}"{% endif %}></video>
+        {% else %}
+          <div class="block-video-gallery__missing">Video unavailable</div>
+        {% endif %}
+        {% if item.title %}<p class="block-video-gallery__title">{{ item.title }}</p>{% endif %}
+        {% if item.caption %}<p class="block-video-gallery__caption">{{ item.caption }}</p>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% if block.props.caption %}<figcaption>{{ block.props.caption }}</figcaption>{% endif %}
+</figure>

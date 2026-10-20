@@ -1,0 +1,14 @@
+---
+pcmd_version: 1
+operation: create
+external_id: sibling
+content_type: page
+fields:
+  title: Внутрипакетный материал
+route:
+  path: /content-agent-demo-sibling/
+---
+:::block image@1
+media_id: "bundle:assets/hero.png"
+alt_override: "Иллюстрация материала"
+:::

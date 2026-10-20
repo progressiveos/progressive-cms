@@ -1,0 +1,4 @@
+interface:
+  display_name: "Progressive CMS: 152-ФЗ"
+  short_description: "Техническая подготовка сайта к обработке ПД"
+  default_prompt: "Используй $progressive-cms-152fz, чтобы технически подготовить этот сайт к требованиям 152-ФЗ и отдельно перечислить действия владельца."

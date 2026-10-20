@@ -1,0 +1,22 @@
+<section class="block block-cta block-cta--{{ block.variant | default: 'inline' }}">
+  <div>
+    <h2>{{ block.props.title }}</h2>
+    {{ block.props.text }}
+  </div>
+  <p>
+    {% if block.props.primary_action %}
+      {% if block.props.primary_action.type == 'external_url' %}
+        <a class="btn" href="{{ block.props.primary_action.url }}" rel="noopener">{{ block.props.primary_action.anchor | default: 'Go' }}</a>
+      {% elsif block.props.primary_action.type == 'phone' %}
+        <a class="btn" href="tel:{{ block.props.primary_action.phone }}">{{ block.props.primary_action.phone }}</a>
+      {% elsif block.props.primary_action.type == 'email' %}
+        <a class="btn" href="mailto:{{ block.props.primary_action.email }}">{{ block.props.primary_action.email }}</a>
+      {% else %}
+        <a class="btn" href="#">{{ block.props.primary_action.anchor | default: 'Learn more' }}</a>
+      {% endif %}
+    {% endif %}
+    {% if block.props.secondary_action %}
+      <a class="btn btn--secondary" href="{{ block.props.secondary_action.url | default: '#' }}">{{ block.props.secondary_action.anchor | default: 'Secondary action' }}</a>
+    {% endif %}
+  </p>
+</section>

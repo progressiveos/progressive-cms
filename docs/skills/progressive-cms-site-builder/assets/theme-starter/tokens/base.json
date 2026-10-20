@@ -1,0 +1,10 @@
+{
+  "color.primary": {
+    "value": "#174b63",
+    "type": "color"
+  },
+  "space.m": {
+    "value": "1.5rem",
+    "type": "length"
+  }
+}

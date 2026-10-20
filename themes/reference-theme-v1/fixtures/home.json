@@ -1,0 +1,375 @@
+{
+  "name": "home",
+  "entry": {
+    "templateKey": "page-default",
+    "contentTypeKey": "page",
+    "contentTypeVersion": 1,
+    "title": "Акме — корпоративные услуги",
+    "fields": {
+      "title": "Акме — корпоративные услуги",
+      "intro": "Полный цикл: от аудита до внедрения."
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e11",
+        "type": "heading",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "level": 2,
+          "text": "Что мы делаем"
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e12",
+        "type": "text",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "rich_text": {
+            "schema_version": 2,
+            "type": "document",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Мы помогаем компаниям "
+                  },
+                  {
+                    "type": "text",
+                    "text": "расти",
+                    "marks": [
+                      {
+                        "type": "strong"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "text": " без потери качества."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e13",
+        "type": "image",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "media_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01",
+          "caption": "Офис Акме"
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e14",
+        "type": "list",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "items": [
+            {
+              "title": "Аудит",
+              "text": {
+                "schema_version": 2,
+                "type": "document",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "за 5 дней"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "title": "Внедрение"
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e15",
+        "type": "quote",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "rich_text": {
+            "schema_version": 2,
+            "type": "document",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Лучшая инвестиция года."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "author": "Иван Петров",
+        "source": "ACME Corp",
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e16",
+        "type": "callout",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "kind": "info",
+          "title": "Важно",
+          "body": {
+            "schema_version": 2,
+            "type": "document",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Первичная консультация бесплатна."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e17",
+        "type": "faq",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "items": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e18",
+              "question": "Сколько занимает старт?",
+              "answer": {
+                "schema_version": 2,
+                "type": "document",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Две недели."
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e19",
+        "type": "table",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "columns": [
+            {
+              "key": "plan",
+              "title": "План"
+            },
+            {
+              "key": "price",
+              "title": "Цена"
+            }
+          ],
+          "rows": [["Базовый", "100 000 ₽"], ["Про", "250 000 ₽"]]
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e20",
+        "type": "cta",
+        "schemaVersion": 1,
+        "variant": "inline",
+        "props": {
+          "title": "Готовы начать?",
+          "primary_action": {
+            "type": "phone",
+            "phone": "+7 900 000-00-00"
+          }
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {
+    "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01": {
+      "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e01",
+      "alt": "Офис компании Акме",
+      "width": 4000,
+      "height": 3000,
+      "derivatives": [
+        {
+          "preset": "hero",
+          "url": "/media/office-hero.avif",
+          "width": 1600,
+          "height": 900
+        },
+        {
+          "preset": "card",
+          "url": "/media/office-card.webp",
+          "width": 800,
+          "height": 600
+        },
+        {
+          "preset": "thumbnail",
+          "url": "/media/office-thumb.webp",
+          "width": 96,
+          "height": 96
+        },
+        {
+          "preset": "gallery",
+          "url": "/media/office-gallery.webp",
+          "width": 1200,
+          "height": 900
+        },
+        {
+          "preset": "social-display",
+          "url": "/media/office-social.webp",
+          "width": 1200,
+          "height": 630
+        }
+      ]
+    }
+  },
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        },
+        {
+          "type": "group",
+          "title": "Компания",
+          "items": [
+            {
+              "type": "internal_entry",
+              "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+              "title": "О нас",
+              "href": "/about",
+              "items": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "placement": "header.compact",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        },
+        {
+          "type": "separator"
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": [
+        {
+          "type": "action",
+          "title": "Записаться",
+          "action": {
+            "form_definition_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e21"
+          }
+        }
+      ]
+    },
+    {
+      "placement": "footer.primary",
+      "items": [
+        {
+          "type": "group",
+          "title": "Услуги",
+          "items": [
+            {
+              "type": "internal_entry",
+              "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+              "title": "Аудит",
+              "href": "/audit",
+              "items": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "placement": "footer.legal",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Политика конфиденциальности",
+          "href": "/privacy",
+          "items": []
+        }
+      ]
+    }
+  ],
+  "globals": {
+    "contacts": {
+      "phone": "+7 900 000-00-00"
+    }
+  },
+  "expectContains": [
+    "<h2>Что мы делаем</h2>",
+    "расти",
+    "Офис компании Акме",
+    "block-callout",
+    "Сколько занимает старт",
+    "<table>",
+    "Готовы начать?",
+    "tel:+7 900 000-00-00",
+    "site-nav--primary",
+    "Политика конфиденциальности"
+  ]
+}

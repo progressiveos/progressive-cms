@@ -1,0 +1,31 @@
+{
+  "id": "progressive-cms-web-research",
+  "version": "1.0.0",
+  "description": "Efficiently and safely use Progressive Web Research (XMLStock search + independent SSRF-safe fetch) as a clean model with no native web tools: one focused query, snippet-driven source selection, one fetch per URL, local research files, untrusted-content discipline.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "mcp": "2024-11-05"
+    },
+    "minimum_capabilities": [],
+    "optional_capabilities": ["research.search", "research.fetch"]
+  },
+  "recommended_scopes": ["research.search", "research.fetch"],
+  "optional_scopes": [],
+  "dangerous_optional_scopes": [],
+  "entry_workflow": [
+    "agent bootstrap (site, environment, actor, contracts, capabilities, skills)",
+    "verify research.search/research.fetch scopes; research.manage is NEVER needed by an agent",
+    "verify the progressive.web-research extension is deployed and enabled (cms research status)",
+    "formulate ONE focused query",
+    "cms research search --json; inspect rank/title/domain/snippet",
+    "select only promising URLs (typically 3-8; never fetch the whole SERP)",
+    "cms research fetch URL --out research/<n>.md --json, one URL at a time",
+    "read the local files, assess relevance/quality, keep provenance",
+    "re-search with a reformulated query only if evidence is missing",
+    "use findings in the content workflow (PCMD/.pcpub is a separate skill)"
+  ],
+  "safety_levels": ["READ"],
+  "references": ["../references/common-operating-rules.md"]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@pcms/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Application operation layer + REST /api/v1 transport (M09; API/MCP/CLI spec §2/§78)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pcms/auth": "0.0.0",
+    "@pcms/blocks": "0.0.0",
+    "@pcms/content": "0.0.0",
+    "@pcms/core": "0.0.0",
+    "@pcms/jobs": "0.0.0",
+    "@pcms/media": "0.0.0",
+    "@pcms/navigation": "0.0.0",
+    "@pcms/operations": "0.0.0",
+    "@pcms/publication": "0.0.0",
+    "@pcms/revisions": "0.0.0",
+    "@pcms/skills": "0.0.0",
+    "@pcms/routing": "0.0.0",
+    "@pcms/seo": "0.0.0",
+    "@pcms/themes": "0.0.0",
+    "fastify": "5.12.5",
+    "semver": "7.8.5"
+  },
+  "license": "Apache-2.0"
+}

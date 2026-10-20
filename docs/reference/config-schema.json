@@ -1,0 +1,469 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodeEnv", "db"],
+  "properties": {
+    "nodeEnv": {
+      "enum": ["development", "production", "test"]
+    },
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "shutdownTimeoutMilliseconds": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 120000
+        },
+        "trustedProxies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 32
+        },
+        "apiRateLimitPerMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "cookieSecure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "db": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "database", "user", "sslMode"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passwordSecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        },
+        "sslMode": {
+          "enum": ["disable", "require", "verify-full"]
+        },
+        "sslCaFile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "migrationsDir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pool": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "webMax": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "workerMax": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "connectionTimeoutMilliseconds": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 600000
+            },
+            "idleTimeoutMilliseconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 600000
+            }
+          }
+        }
+      }
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "enum": ["debug", "info", "warn", "error"]
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storageDir", "quarantineDir"],
+      "properties": {
+        "storageDir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quarantineDir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxUploadBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824
+        },
+        "maxVideoUploadBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824
+        },
+        "maxAudioUploadBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824
+        },
+        "disabledTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[-\\w.+]+/[-\\w.+]+$"
+          }
+        },
+        "maxImagePixels": {
+          "type": "integer",
+          "minimum": 1000000,
+          "maximum": 4000000000
+        },
+        "maxImageDimension": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 65536
+        }
+      }
+    },
+    "pcpub": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quarantineDir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxCompressedBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            },
+            "maxUncompressedBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967296
+            },
+            "maxDocuments": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maxAssets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maxAssetBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            }
+          }
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["env"],
+            "properties": {
+              "env": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file"],
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 600000
+        },
+        "claimBatchMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "leaseMilliseconds": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 3600000
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "backoffBaseMilliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "previewTokenTtlMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10080
+        },
+        "previewSecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "argon2": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "memoryKiB": {
+                  "type": "integer",
+                  "minimum": 8192,
+                  "maximum": 2097152
+                },
+                "timeCost": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "parallelism": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "idleTimeoutMinutes": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 10080
+            },
+            "absoluteTimeoutHours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720
+            }
+          }
+        },
+        "mfa": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "enum": ["OPTIONAL", "REQUIRED_PRIVILEGED", "REQUIRED_ALL"]
+            },
+            "stepUpWindowMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 240
+            },
+            "totpEncryptionKeySecretRef": {
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+            }
+          }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "typesFile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "themes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "renderDir": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "admin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "distDir": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "communityEnabled": {
+          "type": "boolean"
+        },
+        "communityDir": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "reportUpdates": {
+          "type": "boolean"
+        }
+      }
+    },
+    "seo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "enum": ["production", "staging", "development"]
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runtimeSecretsEncryptionKeySecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        }
+      }
+    },
+    "mail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "transport": {
+          "enum": ["smtp", "console"]
+        },
+        "from": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 320
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "mode": {
+          "enum": ["smtps", "starttls", "plain"]
+        },
+        "usernameSecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        },
+        "passwordSecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        },
+        "connectTimeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        }
+      }
+    }
+  }
+}

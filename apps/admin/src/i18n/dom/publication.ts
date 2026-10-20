@@ -1,0 +1,403 @@
+import { defineFragment } from "../fragment.js";
+
+// Swept domain fragment: publication. Populated by the i18n sweep (branch
+// work/admin-i18n-multilingual); RU strings are byte-identical to the
+// pre-sweep screen literals.
+export const publication = defineFragment(
+  {
+    // PublicationScreen: tabs/toolbar
+    "publication.sections_aria": "Разделы публикации",
+    "publication.tab_changesets": "Наборы изменений",
+    "publication.tab_calendar": "Календарь",
+    "publication.tab_ready": "Готово к публикации",
+    "publication.tab_history": "История",
+    "publication.tab_advanced": "Дополнительно",
+    "publication.tab_bundle": "Импорт пакета",
+    "publication.bundle_file": "Файл пакета (.pcpub)",
+    "publication.bundle_validate": "Проверить",
+    "publication.bundle_submit": "Загрузить",
+    "publication.bundle_preflight_ok": "Пакет корректен",
+    "publication.bundle_preflight_fail": "Пакет отклонён",
+    "publication.bundle_stage": "Стадия",
+    "publication.bundle_outcome": "Итог",
+    "publication.bundle_forbidden": "Недостаточно прав для импорта пакетов публикаций.",
+    "publication.new_changeset": "+ Новый набор",
+    "publication.advanced_hint":
+      "Пакет позволяет атомарно опубликовать несколько связанных изменений одновременно. Обычная публикация выполняется на вкладке «Готово к публикации».",
+    "publication.pending_hint": "Материалы, ожидающие публикации.",
+    "publication.pending_th_entry": "Материал",
+    "publication.pending_th_changed": "Изменено",
+    "publication.pending_th_actor": "Кто",
+    "publication.pending_th_status": "Статус",
+    "publication.live_published": "Опубликовано",
+    "publication.live_never_published": "Ещё не опубликовано",
+    "publication.working_unpublished_changes": "Есть неопубликованные изменения",
+    "publication.working_ready_to_publish": "Готово к публикации",
+    "publication.scheduled_for": "Запланировано на {at}",
+    "publication.preview_unavailable": "Предпросмотр пока недоступен",
+    "publication.preview_fix_issues": "Чтобы открыть предпросмотр «{title}», исправьте:",
+    "publication.open_entry": "Открыть материал",
+    "publication.preview_stale":
+      "Материал изменился, пока готовился предпросмотр. Обновите список и попробуйте снова.",
+    "publication.pending_load_failed": "Не удалось загрузить изменения",
+    "publication.pending_published": "Материал опубликован",
+    "publication.pending_schedule": "Запланировать",
+    "publication.pending_package_title": "Материал «{title}» — по расписанию",
+    "publication.pending_empty_title": "Все изменения опубликованы",
+    "publication.pending_empty_hint": "Новые черновики и правки появятся здесь.",
+    "publication.history_th_operation": "Операция",
+    "publication.history_th_date": "Дата",
+    "publication.history_th_actor": "Инициатор",
+    "publication.history_th_count": "Материалов",
+    "publication.history_th_result": "Результат",
+    "publication.history_package": "Пакет",
+    "publication.history_details": "Показать материалы",
+    "publication.history_entry": "Материал «{title}»",
+    "publication.history_published_first": "Опубликовано",
+    "publication.history_published_update": "Обновлено",
+    "publication.history_unpublished": "Снято с публикации",
+    "publication.history_rolled_back": "Откат",
+    "publication.history_empty_title": "Пока ничего не публиковалось",
+    "publication.history_empty_hint": "История публикаций появится после первой публикации.",
+
+    // PublicationScreen: changeset list and toolbar
+    "publication.changesets_load_failed": "Не удалось загрузить наборы изменений",
+    "publication.empty_list_title": "Наборов нет",
+    "publication.empty_list_hint": "Создайте набор и добавьте в него запечатанные материалы.",
+    "publication.empty_selection": "Выберите набор",
+    "publication.add_item": "+ Добавить элемент",
+    "publication.preflight_button": "Проверить",
+    "publication.schedule_button": "Запланировать",
+    "publication.publish_changeset": "Опубликовать набор",
+    "publication.changeset_created": "Набор создан",
+    "publication.changeset_cancelled": "Набор отменён",
+    "publication.changeset_published": "Набор опубликован",
+    "publication.item_added": "Элемент добавлен",
+    "publication.cancel_reason_default": "Отменено из Admin",
+    "publication.operation_failed": "Операция не выполнена: конфликт, права или состояние набора",
+
+    // PublicationScreen: changeset/intent states shown as badges
+    "publication.state_open": "OPEN",
+    "publication.state_ready": "READY",
+    "publication.state_applied": "APPLIED",
+    "publication.state_partially_scheduled": "PARTIALLY_SCHEDULED",
+    "publication.state_cancelled": "CANCELLED",
+    "publication.state_failed": "FAILED",
+    "publication.intent_publish": "PUBLISH",
+    "publication.intent_unpublish": "UNPUBLISH",
+
+    // PublicationScreen: preflight report
+    "publication.preflight_passed": "Предпроверка пройдена — набор готов к публикации",
+    "publication.preflight_issues_title": "Проблемы предпроверки:",
+    "publication.preflight_failed": "Ошибка предпроверки",
+    "publication.preflight_failed_code": "Ошибка предпроверки ({code})",
+
+    // PublicationScreen: grouped items
+    "publication.group_entry": "Материалы",
+    "publication.group_navigation": "Навигация",
+    "publication.group_global_content": "Глобальный контент",
+    "publication.group_theme_settings": "Настройки темы",
+    "publication.rev_short": "рев. {rev}…",
+
+    // PublicationScreen: publish-changeset confirm
+    "publication.publish_confirm_title": "Опубликовать набор?",
+    "publication.publish_confirm_body":
+      "Все элементы набора будут опубликованы атомарно: материалы, навигация и указатели публикаций изменятся одним коммитом. Отменить это действие будет нельзя.",
+
+    // PublicationScreen: create-changeset dialog
+    "publication.create_title": "Новый набор изменений",
+    "publication.create_submit": "Создать",
+    "publication.create_name_label": "Название",
+
+    // PublicationScreen: add-item dialog
+    "publication.add_item_title": "Добавить элемент в набор",
+    "publication.add_submit": "Добавить",
+    "publication.entity_type_label": "Тип сущности",
+    "publication.entity_entry": "Материал",
+    "publication.entity_navigation": "Навигация",
+    "publication.entity_global_content": "Глобальный контент",
+    "publication.entity_theme_settings": "Настройки темы",
+    "publication.entry_label": "Материал",
+    "publication.not_selected": "не выбран",
+    "publication.pick_button": "Выбрать…",
+    "publication.no_sealed_revisions":
+      "У материала нет запечатанных ревизий — сначала запечатайте черновик.",
+    "publication.sealed_revision_label": "Запечатанная ревизия",
+    "publication.entity_id_label": "Идентификатор сущности",
+    "publication.action_label": "Действие",
+    "publication.intent_option_publish": "Публиковать",
+    "publication.expected_generation_label": "Ожидаемое поколение публикации",
+    "publication.expected_generation_hint": "CAS-защита: конфликт будет обнаружен на предпроверке",
+    "publication.picker_title": "Материал для набора",
+
+    // PublicationScreen: plan builder dialog
+    "publication.schedule_dialog_title": "Расписание: {title}",
+    "publication.start_date_label": "Дата старта",
+    "publication.start_time_label": "Время старта",
+    "publication.batch_size_label": "Размер батча",
+    "publication.interval_label": "Интервал",
+    "publication.unit_minutes": "минут",
+    "publication.unit_hours": "часов",
+    "publication.unit_days": "дней",
+    "publication.on_failure_label": "При сбое",
+    "publication.failure_continue": "Продолжать: публиковать остальные даже при сбое",
+    "publication.failure_pause_batch": "Остановить пакет при сбое",
+    "publication.failure_pause_plan": "Остановить весь план при сбое",
+    "publication.schedule_tz_hint": "Время местное, часовой пояс: {tz}.",
+    "publication.schedule_in_past": "Это время уже прошло — выберите будущие дату и время.",
+    "publication.schedule_invalid": "Не удалось запланировать: проверьте дату и время.",
+    "publication.show_exact_schedule": "Показать точное расписание",
+    "publication.commit_schedule": "Зафиксировать расписание",
+    "publication.exact_schedule_title": "Точное расписание (локальное время)",
+    "publication.schedule_preview_failed": "Не удалось построить предпросмотр расписания",
+    "publication.schedule_committed": "Расписание зафиксировано",
+    "publication.schedule_failed": "Не удалось запланировать публикацию ({code})",
+
+    // CalendarScreen: list/toolbar
+    "publication.calendar_load_failed": "Не удалось загрузить календарь публикаций",
+    "publication.operation_failed_short": "Операция не выполнена",
+    "publication.retry": "Повторить",
+    "publication.month_aria": "Месяц",
+    "publication.view_list": "Списком",
+    "publication.view_calendar": "Календарём",
+    "publication.timezone_hint":
+      "Время показано в локальном часовом поясе; в системе хранятся абсолютные метки.",
+    "publication.empty_month": "На этот месяц публикаций не запланировано",
+
+    // CalendarScreen: entry kinds and states shown as text/badges
+    "publication.kind_publish": "Публикация",
+    "publication.kind_unpublish": "Снятие",
+    "publication.kind_failed": "Ошибка",
+    "publication.kind_cancelled": "Отменено",
+    "publication.kind_paused": "Пауза",
+    "publication.state_scheduled": "SCHEDULED",
+    "publication.state_published": "PUBLISHED",
+    "publication.state_unpublished": "UNPUBLISHED",
+    "publication.state_paused": "PAUSED",
+    "publication.entry_tooltip": "{title} · {time}",
+
+    // CalendarScreen: list table
+    "publication.col_when": "Когда",
+    "publication.col_changeset": "Набор",
+    "publication.col_type": "Тип",
+    "publication.col_status": "Статус",
+    "publication.col_actions": "Действия",
+
+    // CalendarScreen: row actions and reschedule dialog
+    "publication.reschedule": "Перенести",
+    "publication.cancel_publication": "Отменить",
+    "publication.publish_cancelled": "Публикация отменена",
+    "publication.published_now": "Опубликовано немедленно",
+    "publication.publish_now": "Опубликовать сейчас",
+    "publication.rescheduled_done": "Публикация перенесена",
+    "publication.reschedule_title": "Перенести «{title}»",
+    "publication.new_datetime_label": "Новая дата и время",
+
+    // ContentScreen: create-entry dialog placeholder
+    "publication.create_title_placeholder": "Например: О компании",
+
+    // EntryWorkspace: SEO tab title and relations placeholder
+    "publication.tab_seo": "SEO",
+    "publication.relations_title": "Связи",
+    "publication.relations_hint":
+      "Связи редактируются в форме «Контент»; входящие ссылки появятся позже.",
+  },
+  {
+    // PublicationScreen: tabs/toolbar
+    "publication.sections_aria": "Publication sections",
+    "publication.tab_changesets": "Changesets",
+    "publication.tab_calendar": "Calendar",
+    "publication.new_changeset": "+ New changeset",
+    "publication.tab_ready": "Ready to publish",
+    "publication.tab_history": "History",
+    "publication.tab_advanced": "Advanced",
+    "publication.tab_bundle": "Import bundle",
+    "publication.bundle_file": "Bundle file (.pcpub)",
+    "publication.bundle_validate": "Validate",
+    "publication.bundle_submit": "Submit",
+    "publication.bundle_preflight_ok": "Bundle is valid",
+    "publication.bundle_preflight_fail": "Bundle rejected",
+    "publication.bundle_stage": "Stage",
+    "publication.bundle_outcome": "Outcome",
+    "publication.bundle_forbidden": "Insufficient permissions to import publication bundles.",
+    "publication.advanced_hint":
+      "A package publishes several related changes atomically. Routine publishing happens on the “Ready to publish” tab.",
+    "publication.pending_hint": "Entries waiting for publication.",
+    "publication.pending_th_entry": "Entry",
+    "publication.pending_th_changed": "Changed",
+    "publication.pending_th_actor": "By",
+    "publication.pending_th_status": "Status",
+    "publication.live_published": "Published",
+    "publication.live_never_published": "Not published yet",
+    "publication.working_unpublished_changes": "Has unpublished changes",
+    "publication.working_ready_to_publish": "Ready to publish",
+    "publication.scheduled_for": "Scheduled for {at}",
+    "publication.preview_unavailable": "Preview is not available yet",
+    "publication.preview_fix_issues": "To preview “{title}”, fix the following:",
+    "publication.open_entry": "Open entry",
+    "publication.preview_stale":
+      "The entry changed while the preview was being prepared. Refresh the list and try again.",
+    "publication.pending_load_failed": "Failed to load pending changes",
+    "publication.pending_published": "Entry published",
+    "publication.pending_schedule": "Schedule",
+    "publication.pending_package_title": "Entry “{title}” — scheduled",
+    "publication.pending_empty_title": "Everything is published",
+    "publication.pending_empty_hint": "New drafts and edits will appear here.",
+    "publication.history_th_operation": "Operation",
+    "publication.history_th_date": "Date",
+    "publication.history_th_actor": "Initiated by",
+    "publication.history_th_count": "Entries",
+    "publication.history_th_result": "Result",
+    "publication.history_package": "Package",
+    "publication.history_details": "Show entries",
+    "publication.history_entry": "Entry “{title}”",
+    "publication.history_published_first": "Published",
+    "publication.history_published_update": "Updated",
+    "publication.history_unpublished": "Unpublished",
+    "publication.history_rolled_back": "Rolled back",
+    "publication.history_empty_title": "Nothing published yet",
+    "publication.history_empty_hint": "The history appears after the first publication.",
+
+    // PublicationScreen: changeset list and toolbar
+    "publication.changesets_load_failed": "Failed to load changesets",
+    "publication.empty_list_title": "No changesets",
+    "publication.empty_list_hint": "Create a changeset and add sealed entries to it.",
+    "publication.empty_selection": "Select a changeset",
+    "publication.add_item": "+ Add item",
+    "publication.preflight_button": "Check",
+    "publication.schedule_button": "Schedule",
+    "publication.publish_changeset": "Publish changeset",
+    "publication.changeset_created": "Changeset created",
+    "publication.changeset_cancelled": "Changeset cancelled",
+    "publication.changeset_published": "Changeset published",
+    "publication.item_added": "Item added",
+    "publication.cancel_reason_default": "Cancelled from Admin",
+    "publication.operation_failed": "Operation failed: conflict, permissions, or changeset state",
+
+    // PublicationScreen: changeset/intent states shown as badges
+    "publication.state_open": "Open",
+    "publication.state_ready": "Ready",
+    "publication.state_applied": "Applied",
+    "publication.state_partially_scheduled": "Partially scheduled",
+    "publication.state_cancelled": "Cancelled",
+    "publication.state_failed": "Failed",
+    "publication.intent_publish": "Publish",
+    "publication.intent_unpublish": "Unpublish",
+
+    // PublicationScreen: preflight report
+    "publication.preflight_passed": "Preflight passed — the changeset is ready to publish",
+    "publication.preflight_issues_title": "Preflight issues:",
+    "publication.preflight_failed": "Preflight failed",
+    "publication.preflight_failed_code": "Preflight failed ({code})",
+
+    // PublicationScreen: grouped items
+    "publication.group_entry": "Entries",
+    "publication.group_navigation": "Navigation",
+    "publication.group_global_content": "Global content",
+    "publication.group_theme_settings": "Theme settings",
+    "publication.rev_short": "rev. {rev}…",
+
+    // PublicationScreen: publish-changeset confirm
+    "publication.publish_confirm_title": "Publish changeset?",
+    "publication.publish_confirm_body":
+      "All changeset items will be published atomically: entries, navigation and publication pointers change in a single commit. This action cannot be undone.",
+
+    // PublicationScreen: create-changeset dialog
+    "publication.create_title": "New changeset",
+    "publication.create_submit": "Create",
+    "publication.create_name_label": "Name",
+
+    // PublicationScreen: add-item dialog
+    "publication.add_item_title": "Add item to changeset",
+    "publication.add_submit": "Add",
+    "publication.entity_type_label": "Entity type",
+    "publication.entity_entry": "Entry",
+    "publication.entity_navigation": "Navigation",
+    "publication.entity_global_content": "Global content",
+    "publication.entity_theme_settings": "Theme settings",
+    "publication.entry_label": "Entry",
+    "publication.not_selected": "not selected",
+    "publication.pick_button": "Choose…",
+    "publication.no_sealed_revisions": "The entry has no sealed revisions — seal a draft first.",
+    "publication.sealed_revision_label": "Sealed revision",
+    "publication.entity_id_label": "Entity ID",
+    "publication.action_label": "Action",
+    "publication.intent_option_publish": "Publish",
+    "publication.expected_generation_label": "Expected publication generation",
+    "publication.expected_generation_hint":
+      "CAS protection: a conflict will be detected at preflight",
+    "publication.picker_title": "Entry for the changeset",
+
+    // PublicationScreen: plan builder dialog
+    "publication.schedule_dialog_title": "Schedule: {title}",
+    "publication.start_date_label": "Start date",
+    "publication.start_time_label": "Start time",
+    "publication.batch_size_label": "Batch size",
+    "publication.interval_label": "Interval",
+    "publication.unit_minutes": "minutes",
+    "publication.unit_hours": "hours",
+    "publication.unit_days": "days",
+    "publication.on_failure_label": "On failure",
+    "publication.failure_continue": "Continue: publish the rest even if one fails",
+    "publication.failure_pause_batch": "Pause the batch on failure",
+    "publication.failure_pause_plan": "Pause the whole plan on failure",
+    "publication.schedule_tz_hint": "Times are local, time zone: {tz}.",
+    "publication.schedule_in_past": "That time has already passed — pick a future date and time.",
+    "publication.schedule_invalid": "Could not schedule: check the date and time.",
+    "publication.show_exact_schedule": "Show exact schedule",
+    "publication.commit_schedule": "Commit schedule",
+    "publication.exact_schedule_title": "Exact schedule (local time)",
+    "publication.schedule_preview_failed": "Failed to build the schedule preview",
+    "publication.schedule_committed": "Schedule committed",
+    "publication.schedule_failed": "Failed to schedule the publication ({code})",
+
+    // CalendarScreen: list/toolbar
+    "publication.calendar_load_failed": "Failed to load the publication calendar",
+    "publication.operation_failed_short": "Operation failed",
+    "publication.retry": "Retry",
+    "publication.month_aria": "Month",
+    "publication.view_list": "List",
+    "publication.view_calendar": "Calendar",
+    "publication.timezone_hint":
+      "Times are shown in the local time zone; the system stores absolute timestamps.",
+    "publication.empty_month": "No publications scheduled for this month",
+
+    // CalendarScreen: entry kinds and states shown as text/badges
+    "publication.kind_publish": "Publish",
+    "publication.kind_unpublish": "Unpublish",
+    "publication.kind_failed": "Failed",
+    "publication.kind_cancelled": "Cancelled",
+    "publication.kind_paused": "Paused",
+    "publication.state_scheduled": "Scheduled",
+    "publication.state_published": "Published",
+    "publication.state_unpublished": "Unpublished",
+    "publication.state_paused": "Paused",
+    "publication.entry_tooltip": "{title} · {time}",
+
+    // CalendarScreen: list table
+    "publication.col_when": "When",
+    "publication.col_changeset": "Changeset",
+    "publication.col_type": "Type",
+    "publication.col_status": "Status",
+    "publication.col_actions": "Actions",
+
+    // CalendarScreen: row actions and reschedule dialog
+    "publication.reschedule": "Reschedule",
+    "publication.cancel_publication": "Cancel",
+    "publication.publish_cancelled": "Publication cancelled",
+    "publication.published_now": "Published immediately",
+    "publication.publish_now": "Publish now",
+    "publication.rescheduled_done": "Publication rescheduled",
+    "publication.reschedule_title": "Reschedule “{title}”",
+    "publication.new_datetime_label": "New date and time",
+
+    // ContentScreen: create-entry dialog placeholder
+    "publication.create_title_placeholder": "e.g. About us",
+
+    // EntryWorkspace: SEO tab title and relations placeholder
+    "publication.tab_seo": "SEO",
+    "publication.relations_title": "Relations",
+    "publication.relations_hint":
+      "Relations are edited in the Content form; incoming links will arrive later.",
+  },
+);

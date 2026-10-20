@@ -1,0 +1,158 @@
+{
+  "schema": "pcms-first-party-lock/1",
+  "packages": [
+    {
+      "id": "progressive.admin-fixture",
+      "dir": "extensions/progressive-admin-fixture",
+      "version": "1.0.5",
+      "content_sha256": "f55f20304502f8be9b3a131007098eaf838a1e95ea1c15978b78cae09c46fbfa",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-admin-fixture-1.0.5.tar.gz",
+        "sha256": "0cb8b754b7b0b00930d4ab7e9e5f2be3f09534d0def5adc3ef6c2bd5a46aea35"
+      },
+      "composition": "ui-test"
+    },
+    {
+      "id": "progressive-media.openrouter",
+      "dir": "extensions/progressive-media-openrouter",
+      "version": "1.0.4",
+      "content_sha256": "1ce7daeaa373aff4954963ed8ea4e5e7cee7d897f531041216a0a223be7187f8",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-media-openrouter-1.0.4.tar.gz",
+        "sha256": "86f6a9f91dfcf0a35e85e063e37282029806df43b55ddfdae43687bf706ecb66"
+      }
+    },
+    {
+      "id": "progressive-media.pexels",
+      "dir": "extensions/progressive-media-pexels",
+      "version": "1.0.4",
+      "content_sha256": "f0a33b8f9efdf67bfbee0b71fe554e20701f92c1fefd3d24209efa641ed15bb7",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-media-pexels-1.0.4.tar.gz",
+        "sha256": "ed5ee16c62834a27454742fa9a95ec4f856f035325d86951c34df8ad680308cd"
+      }
+    },
+    {
+      "id": "progressive-media.runware",
+      "dir": "extensions/progressive-media-runware",
+      "version": "1.0.4",
+      "content_sha256": "4d11782042a987356314c5db8e09c48281783f7edc30c6a7702b7b7f5dfc8e6a",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-media-runware-1.0.4.tar.gz",
+        "sha256": "cb7dd7ce18b38bf7bdae1d4687a9405aeda50cd3189bdbd463d978a1b168b3c7"
+      }
+    },
+    {
+      "id": "progressive-media.unsplash",
+      "dir": "extensions/progressive-media-unsplash",
+      "version": "1.0.4",
+      "content_sha256": "5bd0222fd087669a804137546db3feaa96d2f072533609a8f95f22d74ee75a01",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-media-unsplash-1.0.4.tar.gz",
+        "sha256": "ce79e621e1b593d4827ab56ee64df63383f31f0aad9262d93be1276af9b6b701"
+      }
+    },
+    {
+      "id": "progressive-payments.alipay",
+      "dir": "extensions/progressive-payments-alipay",
+      "version": "1.0.4",
+      "content_sha256": "187813ee414380b7d8550439552b382811474d59650802b70994a72c0765b094",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-alipay-1.0.4.tar.gz",
+        "sha256": "f7f0b17b95570eb7e59d0cbdc2869179d6186fca75f2f16829bfb925568f401d"
+      }
+    },
+    {
+      "id": "progressive-payments.paypal",
+      "dir": "extensions/progressive-payments-paypal",
+      "version": "1.0.4",
+      "content_sha256": "7a212677ccfcba4e17d0862aa8bfffd32376a184fe5f8fbcdc6d4ea58700b785",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-paypal-1.0.4.tar.gz",
+        "sha256": "13ac150cffd66fb0583503f0e37266844ac1dfec2a7f74d057caab74a78eb42a"
+      }
+    },
+    {
+      "id": "progressive-payments.stripe",
+      "dir": "extensions/progressive-payments-stripe",
+      "version": "1.0.4",
+      "content_sha256": "bb3a7880c578e75532ec30500a5dbdf1f7bb86c50f0c670707daace34ac29def",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-stripe-1.0.4.tar.gz",
+        "sha256": "92a909e5879b7b722d11643013c7002c2ba45a751bca24c21cb38ac9d2402058"
+      }
+    },
+    {
+      "id": "progressive-payments.tabby",
+      "dir": "extensions/progressive-payments-tabby",
+      "version": "1.0.4",
+      "content_sha256": "63592b22c31d81a40a1dd4792a13a5cb408fe007963acc6b45db615a23ebce18",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tabby-1.0.4.tar.gz",
+        "sha256": "5247f99662036d39a9160511693df5919fa91f5e3258eddce26faac5d9502559"
+      }
+    },
+    {
+      "id": "progressive-payments.tbank",
+      "dir": "extensions/progressive-payments-tbank",
+      "version": "1.0.4",
+      "content_sha256": "9547ae5a56ce5e7c6ade0cd11a73d303d2aeca848cc801b33775231f0cdd5be9",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tbank-1.0.4.tar.gz",
+        "sha256": "80ccb805eed3873b90ba6230d6a4f1745687194ce41844060b82bee1c3a36bc2"
+      }
+    },
+    {
+      "id": "progressive-payments.yookassa",
+      "dir": "extensions/progressive-payments-yookassa",
+      "version": "1.0.4",
+      "content_sha256": "076d71caf6e8e50e3d98a03db881bbf052bf8e48e6f7cc9c087fffd1993b589c",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-yookassa-1.0.4.tar.gz",
+        "sha256": "2f47752bb4dd28e4a8dab7d4d0f65700e13a2bd8ed957824cfd61f1e0440d31b"
+      }
+    },
+    {
+      "id": "progressive.platform-fixture",
+      "dir": "extensions/progressive-platform-fixture",
+      "version": "1.3.4",
+      "content_sha256": "3ff640ab8d26532a1b0f626516591e2caf1749f8fb9b5a74d2261243b9943ab7",
+      "permission_namespace": "platform",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive.platform-fixture-1.3.4.tar.gz",
+        "sha256": "0487ac0ab581b052bacb56d6faddcdd37f68a05fcd46364cfc79c044c8ef14ef"
+      },
+      "composition": "ui-test"
+    },
+    {
+      "id": "progressive.prompt-enhancer",
+      "dir": "extensions/progressive-prompt-enhancer",
+      "version": "1.0.4",
+      "content_sha256": "898c7821ffa4977319d38153e79883612108bd1efe3f1b5820580d0032847320",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-prompt-enhancer-1.0.4.tar.gz",
+        "sha256": "265198b4b0c684192893fb45ab90e1e08d7923be9b0bdb2ace63e7a25c864561"
+      }
+    },
+    {
+      "id": "progressive.site-migration",
+      "dir": "extensions/progressive-site-migration",
+      "version": "1.0.4",
+      "content_sha256": "82951dc350d5d41329947e62f1997f9d936fc611b01a170b2ea12b4de4d9918b",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-site-migration-1.0.4.tar.gz",
+        "sha256": "702342b20476f3f89abdfdd585bad306b3d265432353d4a352bf2698753997b5"
+      }
+    },
+    {
+      "id": "progressive.web-research",
+      "dir": "extensions/progressive-web-research",
+      "version": "1.0.4",
+      "content_sha256": "e207cc2f6a8ceb2bbb081f72dbb06ca6af865e87d2c4f0344e659a00c0a0c2f7",
+      "source": {
+        "tarball": "../progressive-cms-extensions/dist/progressive-web-research-1.0.4.tar.gz",
+        "sha256": "8256732798ca00f3c9a853a9e5f57c45f28a110d97e38f010adc9e8e09481fba"
+      }
+    }
+  ]
+}

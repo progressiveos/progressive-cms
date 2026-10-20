@@ -1,0 +1,13 @@
+{
+  "name": "@pcms/analytics",
+  "version": "0.1.170",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pcms/core": "*"
+  },
+  "license": "Apache-2.0"
+}

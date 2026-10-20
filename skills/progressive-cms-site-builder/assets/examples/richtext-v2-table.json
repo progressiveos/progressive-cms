@@ -1,0 +1,94 @@
+{
+  "type": "document",
+  "schema_version": 2,
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "A document remains editable after agent delivery."
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "caption": [
+        {
+          "type": "text",
+          "text": "Service response targets"
+        }
+      ],
+      "content": [
+        {
+          "type": "table_row",
+          "content": [
+            {
+              "type": "table_cell",
+              "header": "column",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Service"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "table_cell",
+              "header": "column",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Target"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table_row",
+          "content": [
+            {
+              "type": "table_cell",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Support"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "table_cell",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "One business day"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

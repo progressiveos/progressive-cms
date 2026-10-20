@@ -1,0 +1,83 @@
+/* Warm editorial workspace — dark theme (semantic layer).
+ * Dark is a first-class mode, not an inversion: neutral dark-grey surfaces
+ * (no hue cast), lifted borders, brighter status foregrounds (spec §18.1).
+ */
+[data-pcms-theme="dark"] {
+  --pcms-admin-control-thumb: #f2eee5;
+
+  color-scheme: dark;
+
+  --pcms-admin-bg-canvas: #211f1b;
+  --pcms-admin-bg-sidebar: #1c1a17;
+  --pcms-admin-bg-surface: #292620;
+  --pcms-admin-bg-subtle: #302d26;
+  --pcms-admin-bg-elevated: #37332b;
+  --pcms-admin-bg-hover: #353128;
+  --pcms-admin-bg-active: #3c4030;
+
+  --pcms-admin-overlay: rgb(0 0 0 / 0.66);
+  --pcms-admin-border: #444035;
+  --pcms-admin-border-strong: #625b4f;
+
+  --pcms-admin-text-primary: #eee9de;
+  --pcms-admin-text-secondary: #c0b9aa;
+  --pcms-admin-text-muted: #aaa18f;
+  --pcms-admin-text-on-brand: #211f1b;
+
+  --pcms-admin-action-primary: #bdc79f;
+  --pcms-admin-action-primary-hover: #d0d9b7;
+  --pcms-admin-accent-soft: #333c29;
+  --pcms-admin-focus: #bdc79f;
+  --pcms-admin-focus-ring:
+    0 0 0 2px var(--pcms-admin-bg-surface), 0 0 0 4px var(--pcms-admin-focus);
+
+  --pcms-admin-shadow-1: none;
+  --pcms-admin-shadow-2: 0 8px 24px rgb(0 0 0 / 0.32);
+  --pcms-admin-shadow-3: 0 18px 44px rgb(0 0 0 / 0.42);
+
+  /* Status foregrounds, toned down to sit with the dimmed accent palette */
+  --pcms-admin-success: #2fa47c;
+  --pcms-admin-warning: #e9a23b;
+  --pcms-admin-danger: #f06479;
+  --pcms-admin-info: #6ba1f2;
+  --pcms-admin-success-soft: #123527;
+  --pcms-admin-warning-soft: #3a2a10;
+  --pcms-admin-danger-soft: #3d1a20;
+  --pcms-admin-info-soft: #1a2c4e;
+
+  /* Domain accents dimmed for dark: same hues as the raw palette, lower
+   * lightness/saturation so icon tiles don't glow on grey surfaces. */
+  --pcms-admin-domain-content: #5d79c7;
+  --pcms-admin-domain-media: #4f96b8;
+  --pcms-admin-domain-navigation: #7e66bd;
+  --pcms-admin-domain-publication: #4d9a81;
+  --pcms-admin-domain-search: #5d7fbd;
+  --pcms-admin-domain-interactions: #4b958b;
+  --pcms-admin-domain-integrations: #c08a5e;
+  --pcms-admin-domain-payments: #55967b;
+  --pcms-admin-domain-theme: #a06cb4;
+  --pcms-admin-domain-access: #7178c0;
+  --pcms-admin-domain-audit: #ad6f8a;
+  --pcms-admin-domain-system: #79828f;
+
+  --pcms-admin-domain-content-soft: #17284b;
+  --pcms-admin-domain-media-soft: #102c3a;
+  --pcms-admin-domain-navigation-soft: #2a1f46;
+  --pcms-admin-domain-publication-soft: #11342b;
+  --pcms-admin-domain-search-soft: #14243f;
+  --pcms-admin-domain-interactions-soft: #0f3330;
+  --pcms-admin-domain-integrations-soft: #38230f;
+  --pcms-admin-domain-payments-soft: #123027;
+  --pcms-admin-domain-theme-soft: #351a40;
+  --pcms-admin-domain-access-soft: #1d2347;
+  --pcms-admin-domain-audit-soft: #3a1a28;
+  --pcms-admin-domain-system-soft: #232a37;
+
+  --pcms-admin-serp-title: #8ab4f8;
+  --pcms-admin-serp-url: #7dc98f;
+  --pcms-admin-serp-desc: #bdc1c6;
+
+  /* Scrollbar: a step above the surface, barely noticeable until needed */
+  --pcms-admin-scrollbar-thumb: #4a443a;
+  --pcms-admin-scrollbar-thumb-hover: #61594c;
+}

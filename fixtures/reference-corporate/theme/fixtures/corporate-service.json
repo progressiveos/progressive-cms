@@ -1,0 +1,149 @@
+{
+  "name": "corporate-service",
+  "entry": {
+    "templateKey": "service-default",
+    "contentTypeKey": "service",
+    "contentTypeVersion": 1,
+    "title": "Строительство складов",
+    "fields": {
+      "title": "Строительство складов",
+      "intro": "Полный цикл.",
+      "price": "от 12 000 ₽/м²"
+    },
+    "blocks": [
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d652",
+        "type": "callout",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "kind": "success",
+          "body": {
+            "schema_version": 2,
+            "type": "document",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Гарантия 5 лет."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d653",
+        "type": "faq",
+        "schemaVersion": 1,
+        "variant": null,
+        "props": {
+          "items": [
+            {
+              "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e84",
+              "question": "Сроки?",
+              "answer": {
+                "schema_version": 2,
+                "type": "document",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "От 3 месяцев."
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "children": []
+      }
+    ]
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Проекты",
+          "href": "/projects",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Контакты",
+          "href": "/contacts",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": [
+        {
+          "type": "external_url",
+          "title": "Telegram",
+          "href": "https://t.me/acme",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.legal",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Правовая информация",
+          "href": "/legal",
+          "items": []
+        }
+      ]
+    }
+  ],
+  "globals": {},
+  "expectContains": ["Строительство складов", "Стоимость:", "Гарантия 5 лет", "Сроки?"]
+}

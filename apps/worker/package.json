@@ -1,0 +1,12 @@
+{
+  "name": "@pcms/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "pcms-worker process — background composition root (M01 skeleton; job queue lands in M07)",
+  "dependencies": {
+    "@pcms/jobs": "0.0.0",
+    "@pcms/publication": "0.0.0"
+  },
+  "license": "Apache-2.0"
+}

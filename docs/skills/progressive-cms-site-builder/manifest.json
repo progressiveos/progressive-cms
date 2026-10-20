@@ -1,0 +1,78 @@
+{
+  "id": "progressive-cms-site-builder",
+  "version": "1.3.1",
+  "description": "Builds a complete production site (theme, content, forms, navigation, SEO) on a deployed Progressive CMS instance from the operator's stated intent.",
+  "requires": {
+    "cms": ">=1.0.0-rc.19 <2.0.0-0",
+    "contracts": {
+      "theme_contract": "^1.0",
+      "rest_api": "^1.0.0",
+      "block_document": "^1"
+    }
+  },
+  "recommended_scopes": [
+    "content.read",
+    "content.create",
+    "content.edit",
+    "revision.seal",
+    "publication.read",
+    "publication.publish",
+    "media.read",
+    "media.write",
+    "media.import",
+    "forms.read_definition",
+    "forms.manage_definition",
+    "navigation.read",
+    "navigation.edit",
+    "navigation.publish",
+    "seo.read",
+    "seo.edit",
+    "seo.site_settings",
+    "theme.read",
+    "theme.write",
+    "theme.validate",
+    "site.validate",
+    "preview.create",
+    "content_schema.read",
+    "seo.validate",
+    "search.diagnostics",
+    "publication.plan"
+  ],
+  "optional_scopes": [
+    "publication.schedule",
+    "publication.unpublish",
+    "publication.rollback",
+    "content.archive",
+    "media.replace",
+    "media.stock.search",
+    "media.stock.import",
+    "media.generate",
+    "quizzes.read_definition",
+    "quizzes.manage_definition",
+    "theme.preview",
+    "theme.activate",
+    "site.configure",
+    "domains.manage",
+    "content_schema.propose",
+    "content_schema.apply"
+  ],
+  "dangerous_optional_scopes": ["site.maintenance.bypass"],
+  "entry_workflow": [
+    "Start with the supplied local Skill workflow; confirm target/version/scopes and bootstrap.",
+    "Check this delivered manifest with the actual resolver; stop if incompatible.",
+    "Declare Content Types and bodyPolicy before theme/content; arrange required bounded reload.",
+    "Author only declared fields/registered blocks, strict nested RichText v2 and independent Block Document v1.",
+    "Use fresh draft and CAS, validate, inspect preview and SEO, then seal.",
+    "Publish only with permissions and task authorization; verify public HTML and eventual Search.",
+    "Verify editor can save, preview, seal and publish a subsequent revision."
+  ],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "SCHEDULE", "PUBLIC_MUTATION"],
+  "references": [
+    "SKILL.md",
+    "references/workflow.md",
+    "references/content-and-theme.md",
+    "references/checks.md",
+    "references/release.md",
+    "references/api-operations.json"
+  ]
+}

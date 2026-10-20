@@ -1,0 +1,13 @@
+{
+  "id": "018f1000-0000-7000-8000-000000000003",
+  "aggregate": "quiz_run",
+  "aggregate_id": "018f1000-0000-7000-8000-0000000000cd",
+  "event_type": "QuizCompleted",
+  "payload": {
+    "quiz_run_id": "018f1000-0000-7000-8000-0000000000cd",
+    "quiz_definition_id": "partner-qualification",
+    "quiz_schema_version": 1,
+    "outcome_id": "cold",
+    "score": 22
+  }
+}

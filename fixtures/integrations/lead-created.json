@@ -1,0 +1,12 @@
+{
+  "id": "018f1000-0000-7000-8000-000000000006",
+  "aggregate": "lead",
+  "aggregate_id": "018f1000-0000-7000-8000-0000000000dd",
+  "event_type": "LeadCreated",
+  "payload": {
+    "lead_id": "018f1000-0000-7000-8000-0000000000dd",
+    "source_type": "form_submission",
+    "source_id": "018f1000-0000-7000-8000-0000000000aa",
+    "classification": "b2b"
+  }
+}

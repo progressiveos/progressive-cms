@@ -1,0 +1,36 @@
+{
+  "contract": "seo-social-structured-data-v1",
+  "spec": "Progressive_CMS_SEO_Social_Structured_Data_v1_Spec.md §70/§77",
+  "rule": "Minor releases may append codes; renaming, removing or reinterpreting a code is a breaking change (SEO spec §74).",
+  "seoCodes": [
+    "SEO_DOCUMENT_INVALID",
+    "SEO_ROBOTS_INVALID",
+    "SEO_ID_INVALID",
+    "SEO_SETTINGS_INVALID",
+    "SEO_STRUCTURED_DATA_INVALID",
+    "SEO_ROBOTS_TXT_INVALID",
+    "SEO_SITEMAP_INPUT_INVALID"
+  ],
+  "seoDiagnosticCodes": [
+    "SEO_TITLE_MISSING",
+    "SEO_DESCRIPTION_MISSING",
+    "SEO_SOCIAL_IMAGE_MISSING",
+    "SEO_CANONICAL_MISSING",
+    "SEO_CANONICAL_INVALID",
+    "SEO_CANONICAL_EXTERNAL",
+    "SEO_CANONICAL_MISMATCH",
+    "SEO_ROBOTS_CONFLICT",
+    "SEO_DUPLICATE_TITLE",
+    "SEO_DUPLICATE_DESCRIPTION",
+    "SEO_SOCIAL_IMAGE_INVALID",
+    "SEO_FAVICON_MISSING",
+    "SEO_FAVICON_TOO_SMALL",
+    "SEO_LOCAL_BUSINESS_NOT_SELECTED",
+    "SEO_STRUCTURED_DATA_CONFLICT",
+    "SEO_TITLE_LENGTH",
+    "SEO_DESCRIPTION_LENGTH",
+    "SEO_NOINDEX_IN_SITEMAP",
+    "OG_IMAGE_MISSING",
+    "OG_DERIVATIVE_FAILED"
+  ]
+}

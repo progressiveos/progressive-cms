@@ -1,0 +1,9 @@
+{% assign img = media[block.props.media_id] %}
+<figure class="block block-image{% if block.props.presentation_hint == 'wide' %} block-image--wide{% endif %}">
+  {% if img and img.presets.card %}
+    <img src="{{ img.presets.card.src }}" srcset="{{ img.presets.card.srcset }}" sizes="(max-width: 768px) 100vw, 800px" alt="{% if block.props.alt_override %}{{ block.props.alt_override }}{% else %}{{ img.alt }}{% endif %}" width="{{ img.presets.card.width }}" height="{{ img.presets.card.height }}" loading="lazy">
+  {% else %}
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3C/svg%3E" alt="{% if block.props.alt_override %}{{ block.props.alt_override }}{% else %}Изображение недоступно{% endif %}" width="800" height="600" loading="lazy">
+  {% endif %}
+  {% if block.props.caption %}<figcaption>{{ block.props.caption }}</figcaption>{% endif %}
+</figure>

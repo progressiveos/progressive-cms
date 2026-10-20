@@ -1,0 +1,60 @@
+{
+  "id": "progressive-cms-152fz",
+  "version": "1.1.0",
+  "description": "Technical personal-data readiness for an existing Progressive CMS site under Russian 152-FZ, with verified data flows, forms, consent, security and retention; owner legal paperwork and RKN notifications remain separate.",
+  "recommended_scopes": [
+    "content.read",
+    "theme.read",
+    "seo.read",
+    "forms.read_definition",
+    "quizzes.read_definition",
+    "analytics.read",
+    "site.validate"
+  ],
+  "optional_scopes": [
+    "content.create",
+    "content.edit",
+    "revision.seal",
+    "publication.read",
+    "publication.publish",
+    "theme.write",
+    "theme.activate",
+    "theme.validate",
+    "forms.manage_definition",
+    "quizzes.manage_definition",
+    "analytics.manage",
+    "analytics.network.manage",
+    "integrations.read",
+    "seo.site_settings",
+    "preview.create",
+    "publication.plan",
+    "privacy.manage",
+    "interactions.read",
+    "leads.read"
+  ],
+  "entry_workflow": [
+    "Confirm authorized target, actual version and scopes; refresh official legal sources.",
+    "Inventory all personal-data inputs, processors, locations, logs, queues and backups.",
+    "Implement the owner-selected consent/retention policy; immediate mode and optional privacy cases do not gate ordinary CMS operation.",
+    "When chosen, preview and apply addressed tools with privacy.manage, exact request identity, receipt and explicit external followups; verify authorized synthetic cases.",
+    "Deliver evidence and owner legal actions separately, without compliance certification."
+  ],
+  "references": [
+    "SKILL.md",
+    "references/technical-controls.md",
+    "references/pcms-workflow.md",
+    "references/sources.md",
+    "references/api-operations.json",
+    "assets/acceptance.md",
+    "references/personal-data-tools.md"
+  ],
+  "requires": {
+    "cms": ">=1.0.0-rc.27 <2.0.0-0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "theme_contract": "^1.0"
+    }
+  },
+  "dangerous_optional_scopes": ["privacy.manage"],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "PUBLIC_MUTATION"]
+}

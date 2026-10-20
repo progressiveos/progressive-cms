@@ -1,0 +1,5 @@
+Read and follow the installed Progressive CMS Skill
+`progressive-cms-operator`.
+Start from the golden path: agent bootstrap → doctor → capabilities.
+Execute the supplied operational task against the bound environment.
+Never read source code where a documented flag or typed error code exists.

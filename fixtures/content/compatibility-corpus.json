@@ -1,0 +1,96 @@
+{
+  "legacySchemas": [
+    {
+      "key": "legacy_service",
+      "version": 1,
+      "title": "Услуга (legacy)",
+      "description": "Формат v1: цена хранилась в price_old до миграции на money",
+      "bodyPolicy": "rich_text",
+      "fields": {
+        "title": { "id": "title", "type": "string", "required": true },
+        "price_old": { "id": "price_old", "type": "string" }
+      }
+    }
+  ],
+  "legacyPayloads": [
+    {
+      "name": "legacy_service.v1.full",
+      "schema": "legacy_service@1",
+      "fields": {
+        "title": "Аудит маркетинга",
+        "price_old": "125000.00",
+        "extensions": { "vendor.crm": { "crm_id": "CRM-42" } }
+      }
+    },
+    {
+      "name": "legacy_service.v1.minimum",
+      "schema": "legacy_service@1",
+      "fields": { "title": "Старая услуга" }
+    }
+  ],
+  "legacyBlockDocuments": [
+    {
+      "name": "legacy.page-body.text-heading-v1",
+      "document": {
+        "schema_version": 1,
+        "blocks": [
+          {
+            "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e70",
+            "type": "text",
+            "schema_version": 1,
+            "variant": null,
+            "props": {
+              "rich_text": {
+                "schema_version": 2,
+                "type": "document",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [{ "type": "text", "text": "Старый текст страницы" }]
+                  }
+                ]
+              }
+            },
+            "children": []
+          },
+          {
+            "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e71",
+            "type": "heading",
+            "schema_version": 1,
+            "variant": null,
+            "props": { "level": 2, "text": "Старый заголовок" },
+            "children": []
+          },
+          {
+            "id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e72",
+            "type": "gallery",
+            "schema_version": 1,
+            "variant": null,
+            "props": {
+              "items": [
+                {
+                  "id": "11111111-2222-7333-8444-555555555551",
+                  "media_id": "11111111-2222-7333-8444-555555555552"
+                }
+              ],
+              "lightbox_enabled": false
+            },
+            "children": []
+          }
+        ]
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "contentTypeKey": "legacy_service",
+      "fromVersion": 1,
+      "toVersion": 2,
+      "expected": {
+        "title": "Аудит маркетинга",
+        "price": { "amount": "125000.00", "currency": "RUB" },
+        "extensions": { "vendor.crm": { "crm_id": "CRM-42" } }
+      }
+    }
+  ]
+}

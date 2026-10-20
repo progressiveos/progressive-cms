@@ -1,0 +1,8 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.0.0",
+  "description": "Declares a capability that is not a registered permission.",
+  "requires": { "minimum_capabilities": ["content.fly"] },
+  "entry_workflow": ["bootstrap"],
+  "safety_levels": ["READ"]
+}

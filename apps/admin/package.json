@@ -1,0 +1,28 @@
+{
+  "name": "@pcms/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Progressive CMS Admin Workspace SPA (M10, ADR-0009) — human client of /api/v1",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-image": "3.32.0",
+    "@tiptap/extension-table": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "@tiptap/react": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.0"
+  },
+  "license": "Apache-2.0"
+}

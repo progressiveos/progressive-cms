@@ -1,0 +1,342 @@
+{
+  "id": "reference-theme-v1",
+  "name": "Progressive Reference",
+  "description": "First-party reference theme proving the Theme Contract v1: all mandatory Content blocks, three navigation placements groups, design tokens, typed settings and a neutral corporate design.",
+  "version": "1.2.3",
+  "theme_contract": "^1.0",
+  "capabilities": [
+    "mobile_menu",
+    "gallery_lightbox",
+    "calculator_client",
+    "map_shell",
+    "video_facade",
+    "multilingual",
+    "audio_player_rich"
+  ],
+  "directories": ["tests"],
+  "layout": { "default": "extension-layout" },
+  "templates": [
+    {
+      "id": "page-default",
+      "file": "templates/page-default.liquid",
+      "accepts_content_types": ["page@1"],
+      "required_fields": ["title"]
+    },
+    {
+      "id": "page-hero",
+      "file": "templates/page-hero.liquid",
+      "accepts_content_types": ["page@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["hero_image", "intro"]
+    },
+    {
+      "id": "service-default",
+      "file": "templates/service-default.liquid",
+      "accepts_content_types": ["service@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["intro", "price", "features", "hero_image"]
+    },
+    {
+      "id": "service-premium",
+      "file": "templates/service-premium.liquid",
+      "accepts_content_types": ["service@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["intro", "price", "features", "hero_image"]
+    },
+    {
+      "id": "case-default",
+      "file": "templates/case-default.liquid",
+      "accepts_content_types": ["case@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["client", "completed_on", "hero_image"]
+    },
+    {
+      "id": "article-default",
+      "file": "templates/article-default.liquid",
+      "accepts_content_types": ["article@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["author", "tags"]
+    },
+    {
+      "id": "news-default",
+      "file": "templates/news-default.liquid",
+      "accepts_content_types": ["news@1"],
+      "required_fields": ["title"],
+      "optional_fields": ["published_at", "teaser"]
+    },
+    {
+      "id": "search",
+      "file": "templates/search.liquid",
+      "accepts_content_types": ["page@1"],
+      "editor_selectable": false
+    },
+    {
+      "id": "error-404",
+      "file": "templates/error-404.liquid",
+      "accepts_content_types": ["page@1"],
+      "editor_selectable": false
+    }
+  ],
+  "components": [
+    {
+      "id": "extension-layout",
+      "file": "components/extension-layout.liquid"
+    },
+    {
+      "id": "header",
+      "file": "components/header.liquid"
+    },
+    {
+      "id": "footer",
+      "file": "components/footer.liquid"
+    },
+    {
+      "id": "breadcrumbs",
+      "file": "components/breadcrumbs.liquid"
+    },
+    {
+      "id": "button",
+      "file": "components/button.liquid"
+    },
+    {
+      "id": "search-result",
+      "file": "components/search-result.liquid"
+    }
+  ],
+  "block_renderers": [
+    {
+      "block": "text@1",
+      "file": "blocks/text.liquid"
+    },
+    {
+      "block": "heading@1",
+      "file": "blocks/heading.liquid"
+    },
+    {
+      "block": "image@1",
+      "file": "blocks/image.liquid"
+    },
+    {
+      "block": "gallery@1",
+      "file": "blocks/gallery.liquid"
+    },
+    {
+      "block": "quote@1",
+      "file": "blocks/quote.liquid"
+    },
+    {
+      "block": "callout@1",
+      "file": "blocks/callout.liquid"
+    },
+    {
+      "block": "list@1",
+      "file": "blocks/list.liquid"
+    },
+    {
+      "block": "table@1",
+      "file": "blocks/table.liquid"
+    },
+    {
+      "block": "code@1",
+      "file": "blocks/code.liquid"
+    },
+    {
+      "block": "faq@1",
+      "file": "blocks/faq.liquid"
+    },
+    {
+      "block": "cta@1",
+      "file": "blocks/cta.liquid",
+      "variants": ["inline", "wide", "accent"]
+    },
+    {
+      "block": "video@1",
+      "file": "blocks/video.liquid"
+    },
+    {
+      "block": "video_gallery@1",
+      "file": "blocks/video-gallery.liquid"
+    },
+    {
+      "block": "audio@1",
+      "file": "blocks/audio.liquid"
+    },
+    {
+      "block": "calculator@1",
+      "file": "blocks/calculator.liquid"
+    },
+    {
+      "block": "map@1",
+      "file": "blocks/map.liquid"
+    },
+    {
+      "block": "timeline@1",
+      "file": "blocks/timeline.liquid"
+    },
+    {
+      "block": "documents@1",
+      "file": "blocks/documents.liquid"
+    },
+    {
+      "block": "related_content@1",
+      "file": "blocks/related_content.liquid"
+    },
+    {
+      "block": "form@1",
+      "file": "blocks/form.liquid"
+    },
+    {
+      "block": "quiz@1",
+      "file": "blocks/quiz.liquid"
+    }
+  ],
+  "navigation_placements": [
+    {
+      "id": "header.primary",
+      "label": "Primary navigation",
+      "required": true,
+      "max_depth": 3,
+      "supported_item_types": ["internal_entry", "external_url", "group"]
+    },
+    {
+      "id": "header.compact",
+      "label": "Compact header",
+      "max_depth": 1,
+      "supported_item_types": ["internal_entry", "external_url"]
+    },
+    {
+      "id": "header.mobile",
+      "label": "Mobile menu",
+      "required": true,
+      "max_depth": 3,
+      "supported_item_types": ["internal_entry", "group", "separator"]
+    },
+    {
+      "id": "header.utility",
+      "label": "Header utility links",
+      "max_depth": 1,
+      "supported_item_types": ["internal_entry", "external_url", "action"]
+    },
+    {
+      "id": "footer.primary",
+      "label": "Footer",
+      "max_depth": 2,
+      "supported_item_types": ["internal_entry", "group"]
+    },
+    {
+      "id": "footer.legal",
+      "label": "Legal links",
+      "max_depth": 1,
+      "supported_item_types": ["internal_entry", "external_url"]
+    }
+  ],
+  "media_presets": [
+    {
+      "id": "hero",
+      "width": 1600,
+      "height": 900,
+      "fit": "cover",
+      "crop": "entropy",
+      "formats": ["avif", "webp"],
+      "quality": 82,
+      "loading": "eager"
+    },
+    {
+      "id": "card",
+      "width": 800,
+      "height": 600,
+      "fit": "cover",
+      "formats": ["webp"],
+      "quality": 80
+    },
+    {
+      "id": "thumbnail",
+      "width": 96,
+      "height": 96,
+      "fit": "cover",
+      "formats": ["webp"],
+      "quality": 75
+    },
+    {
+      "id": "gallery",
+      "width": 1200,
+      "height": 900,
+      "fit": "inside",
+      "formats": ["webp"],
+      "quality": 78
+    },
+    {
+      "id": "social-display",
+      "width": 1200,
+      "height": 630,
+      "fit": "cover",
+      "formats": ["webp", "jpeg"],
+      "quality": 80
+    }
+  ],
+  "settings_schema": [
+    {
+      "key": "primary_color",
+      "type": "color",
+      "default": "#0f62fe",
+      "token": "--color-primary",
+      "label": "Primary color"
+    },
+    {
+      "key": "accent_color",
+      "type": "color",
+      "default": "#ff7ab6",
+      "token": "--color-accent",
+      "label": "Accent color"
+    },
+    {
+      "key": "header_variant",
+      "type": "enum",
+      "default": "default",
+      "choices": ["default", "compact"],
+      "label": "Header variant"
+    },
+    {
+      "key": "sticky_header",
+      "type": "boolean",
+      "default": true,
+      "label": "Sticky header"
+    },
+    {
+      "key": "container_width",
+      "type": "number",
+      "default": 1200,
+      "min": 800,
+      "max": 1600,
+      "token": "--layout-container-max",
+      "label": "Container width"
+    },
+    {
+      "key": "logo",
+      "type": "media",
+      "default": "assets/img/logo.svg",
+      "token": "--logo-url",
+      "label": "Logo"
+    },
+    {
+      "key": "footer_text",
+      "type": "string",
+      "default": "",
+      "label": "Footer text"
+    },
+    {
+      "key": "lead_form_id",
+      "type": "string",
+      "default": "",
+      "label": "Contact form ID"
+    }
+  ],
+  "assets": {
+    "css": ["assets/css/theme.css"],
+    "js": ["assets/js/theme.js"],
+    "fingerprint": true,
+    "csp": {
+      "frame_src": ["https://www.youtube-nocookie.com"]
+    }
+  }
+}

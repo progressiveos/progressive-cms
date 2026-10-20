@@ -1,0 +1,239 @@
+{
+  "info": {
+    "x-air-id": "bfl:5@1",
+    "x-model-id": "bfl-flux-2-pro"
+  },
+  "components": {
+    "schemas": {
+      "RequestBody": {
+        "items": {
+          "properties": {
+            "model": {
+              "type": "string",
+              "const": "bfl:5@1"
+            },
+            "inputs": {
+              "type": "object",
+              "properties": {
+                "referenceImages": {
+                  "title": "Reference Images",
+                  "description": "List of reference images (UUID, URL, Data URI, or Base64).",
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "title": "Image",
+                    "description": "Image input (UUID, URL, Data URI, or Base64).",
+                    "type": "string",
+                    "anyOf": [
+                      {
+                        "format": "uuid"
+                      },
+                      {
+                        "format": "uri"
+                      },
+                      {
+                        "pattern": "^data:image\\/[a-zA-Z]+;base64,[a-zA-Z0-9+/=]+$"
+                      },
+                      {
+                        "pattern": "^[a-zA-Z0-9+/=]+$"
+                      }
+                    ]
+                  },
+                  "maxItems": 9
+                }
+              },
+              "additionalProperties": false
+            },
+            "positivePrompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32000
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 2048,
+              "multipleOf": 16
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 256,
+              "maximum": 2048,
+              "multipleOf": 16
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854776000
+            },
+            "providerSettings": {
+              "type": "object",
+              "properties": {
+                "bfl": {
+                  "title": "BFL Settings",
+                  "description": "Provider-specific settings for Black Forest Labs (Flux).",
+                  "type": "object",
+                  "properties": {
+                    "safetyTolerance": {
+                      "title": "Safety Tolerance",
+                      "description": "Tolerance level for content moderation. Lower values are stricter; higher values are more permissive.",
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5,
+                      "default": 2
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "taskType": {
+              "type": "string",
+              "const": "imageInference"
+            },
+            "taskUUID": {
+              "type": "string"
+            },
+            "webhookURL": {
+              "type": "string"
+            },
+            "includeCost": {
+              "type": "boolean"
+            },
+            "numberResults": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "maximum": 20
+            },
+            "uploadEndpoint": {
+              "type": "string"
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 60
+            },
+            "outputType": {
+              "type": "string",
+              "enum": ["URL", "base64Data", "dataURI"],
+              "default": "URL"
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["JPG", "PNG", "WEBP"],
+              "default": "JPG"
+            },
+            "outputQuality": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 99,
+              "default": 95
+            },
+            "deliveryMethod": {
+              "type": "string",
+              "default": "sync"
+            },
+            "safety": {
+              "type": "object",
+              "properties": {
+                "checkContent": {
+                  "title": "Check Content",
+                  "description": "Enable or disable content safety checking. Increases total generation time.",
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "advancedFeatures": {
+              "type": "object",
+              "properties": {
+                "watermark": {
+                  "title": "Watermark",
+                  "description": "Configuration object for adding watermarks to generated videos. Watermarks can be applied using either text or image content with customizable positioning and appearance. You must provide either `text` or `image` content for the watermark, but not both.\n\n**Text watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"text\": \"© 2025 Company\",\n    \"displayPosition\": \"bottom-right\",\n    \"opacity\": 0.6,\n    \"fontColor\": \"#ffffff\",\n    \"bgColor\": \"#000000\"\n  }\n}\n```\n\n**Image watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"image\": \"c64351d5-4c59-42f7-95e1-eace013eddab\",\n    \"displayPosition\": \"top-left\",\n    \"opacity\": 0.6\n  }\n}\n```\n\n**Tiled watermark**:\n\n```json\n\"advancedFeatures\": {\n  \"watermark\": {\n    \"text\": \"PREVIEW\",\n    \"tiled\": true,\n    \"opacity\": 0.4,\n    \"fontColor\": \"#cccccc\"\n  }\n}\n```\n\n[Read full documentation](https://runware.ai/docs/models/bfl-flux-2-pro#watermark)",
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "title": "Watermark Text",
+                      "description": "Watermark text.",
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 32
+                    },
+                    "image": {
+                      "title": "Watermark Image",
+                      "description": "Watermark image (UUID, URL, Data URI, or Base64).",
+                      "type": "string",
+                      "anyOf": [
+                        {
+                          "format": "uuid"
+                        },
+                        {
+                          "format": "uri"
+                        },
+                        {
+                          "pattern": "^data:image\\/[a-zA-Z]+;base64,[a-zA-Z0-9+/=]+$"
+                        },
+                        {
+                          "pattern": "^[a-zA-Z0-9+/=]+$"
+                        }
+                      ]
+                    },
+                    "displayPosition": {
+                      "title": "Display Position",
+                      "description": "Watermark position.",
+                      "type": "string",
+                      "enum": [
+                        "top-left",
+                        "top-center",
+                        "top-right",
+                        "center-left",
+                        "center-center",
+                        "center-right",
+                        "bottom-left",
+                        "bottom-center",
+                        "bottom-right",
+                        "tiled"
+                      ]
+                    },
+                    "opacity": {
+                      "title": "Watermark Opacity",
+                      "description": "Watermark opacity.",
+                      "type": "number",
+                      "multipleOf": 0.01,
+                      "minimum": 0.1,
+                      "maximum": 1
+                    },
+                    "fontColor": {
+                      "title": "Font Color",
+                      "description": "Text color in hex format.",
+                      "type": "string",
+                      "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    },
+                    "bgColor": {
+                      "title": "Background Color",
+                      "description": "Background color in hex format.",
+                      "type": "string",
+                      "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                    }
+                  },
+                  "oneOf": [
+                    {
+                      "required": ["text"]
+                    },
+                    {
+                      "required": ["image"]
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["positivePrompt", "width", "height", "taskType", "taskUUID", "model"]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+<div class="block block-faq">
+  {% for item in block.props.items %}
+    <details>
+      <summary>{{ item.question }}</summary>
+      {{ item.answer }}
+    </details>
+  {% endfor %}
+</div>

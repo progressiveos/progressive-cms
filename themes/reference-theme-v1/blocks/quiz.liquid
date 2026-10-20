@@ -1,0 +1,16 @@
+{% assign quiz = quizzes[block.props.quiz_definition_id] %}
+{% if quiz %}
+<section class="block block-quiz" data-pcms-quiz
+         data-quiz-start="{{ quiz.start_url }}"
+         data-quiz-answer="{{ quiz.answer_url }}"
+         data-quiz-complete="{{ quiz.complete_url }}"
+         data-quiz-definition="{{ quiz.quiz_definition_id }}"
+         data-start-label="{{ quiz.start_label }}">
+  <h2 class="block-quiz__title">{{ quiz.title }}</h2>
+  <div class="block-quiz__body" data-quiz-body></div>
+  <p class="form-status" data-quiz-status role="status" hidden></p>
+  <noscript><p class="form-help">This quiz requires JavaScript.</p></noscript>
+</section>
+{% else %}
+<div class="block block-quiz block-quiz--unavailable" data-quiz-definition="{{ block.props.quiz_definition_id }}"></div>
+{% endif %}

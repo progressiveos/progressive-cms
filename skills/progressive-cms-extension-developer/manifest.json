@@ -1,0 +1,34 @@
+{
+  "id": "progressive-cms-extension-developer",
+  "version": "2.0.0",
+  "description": "Build a first-party Progressive CMS extension: manifest with declarative config_schema (settings, secrets, network), typed operations or provider registrations, migrations, Admin-rendered settings and release packaging — battle-tested by the shipped media providers and prompt enhancer.",
+  "requires": {
+    "cms": ">=1.0.0-rc.1 <2.0.0",
+    "contracts": {
+      "extension_contract": "^2.0",
+      "rest_api": "^1.0.0"
+    },
+    "minimum_capabilities": ["extensions.manage"],
+    "optional_capabilities": ["media.providers.manage", "site.validate"]
+  },
+  "recommended_scopes": ["extensions.manage", "site.validate", "media.read"],
+  "optional_scopes": ["audit.read"],
+  "dangerous_optional_scopes": ["media.providers.manage", "tokens.manage"],
+  "entry_workflow": [
+    "bootstrap/discovery (contracts, extension_contract version)",
+    "read Extensions spec sections referenced by the shipped extensions (extensions/ — the living examples)",
+    "choose the contribution kind: typed operations, media stock/generation provider, events, validators, blocks/field types",
+    "write manifest.json: id, version, permissions (registry-checked), registrations, config_schema (settings + secret-ref slots + network block where egress is needed)",
+    "implement the module: named handler exports; providers receive resolved config; operations receive {input, actor, requestId, extension:{id, config(resolved)}}",
+    "outbound egress only through createExtensionFetchClientFromConfig (SOCKS5-capable, network from config — never hardcoded) with host allowlisting",
+    "typed errors only (ProviderError taxonomy / domain codes with stable status mapping)",
+    "migrations directory for schema changes (additive, forward-only)",
+    "unit tests for pure logic + integration tests for handlers (see tests/extensions/)",
+    "register in extensions/catalog.ts (the pin test fails otherwise)",
+    "npm run check; build a release artifact and verify the extension shipped inside it",
+    "install/enable on a test instance, exercise settings through the Admin settings dialog (GET/PUT /extensions/{id}/config, write-only secrets)",
+    "emit the structured run report (agent-run-report-v1)"
+  ],
+  "safety_levels": ["READ", "DRAFT_WRITE", "SECURITY_ACTIVATION"],
+  "references": ["../references/common-operating-rules.md"]
+}

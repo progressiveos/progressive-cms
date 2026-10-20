@@ -1,0 +1,9 @@
+<ul class="block block-list">
+  {% for item in block.props.items %}
+    <li>
+      {% if item.title %}<strong>{{ item.title }}</strong>{% endif %}
+      {% if item.text %}{{ item.text }}{% endif %}
+      {% if item.link %}<a href="{{ item.link.url | default: '#' }}">{{ item.link.anchor | default: 'Подробнее' }}</a>{% endif %}
+    </li>
+  {% endfor %}
+</ul>

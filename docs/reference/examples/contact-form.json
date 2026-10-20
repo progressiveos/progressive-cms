@@ -1,0 +1,50 @@
+{
+  "key": "contact",
+  "title": "Contact the example company",
+  "fields": [
+    {
+      "key": "name",
+      "type": "text",
+      "label": "Name",
+      "required": true,
+      "min_length": 2,
+      "max_length": 200
+    },
+    {
+      "key": "email",
+      "type": "email",
+      "label": "Email",
+      "required": true,
+      "max_length": 200
+    },
+    {
+      "key": "message",
+      "type": "textarea",
+      "label": "Message",
+      "required": true,
+      "min_length": 10,
+      "max_length": 5000
+    },
+    {
+      "key": "consent",
+      "type": "consent",
+      "label": "Consent",
+      "required": true,
+      "consent_key": "contact_request",
+      "consent_text": "I agree to processing this request so the company can reply."
+    }
+  ],
+  "settings": {
+    "success_behavior": {
+      "type": "message",
+      "message": "Thank you. Your request was received."
+    },
+    "spam_policy": {
+      "honeypot_field": "company_website"
+    },
+    "retention": {
+      "mode": "retain",
+      "after_days": 365
+    }
+  }
+}

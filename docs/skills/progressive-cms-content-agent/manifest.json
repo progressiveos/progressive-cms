@@ -1,0 +1,72 @@
+{
+  "id": "progressive-cms-content-agent",
+  "version": "1.5.3",
+  "description": "Safely create, update, validate, preview and publish/schedule Progressive CMS content through public machine contracts (REST/MCP/CLI/.pcpub). Discovery-first; CLI for long deterministic workflows; .pcpub artifact mode for bulk/offline authoring; no direct DB; no Core patches.",
+  "requires": {
+    "cms": ">=1.0.0-rc.19 <2.0.0-0",
+    "contracts": {
+      "rest_api": "^1.0.0",
+      "mcp": "2024-11-05",
+      "block_document": "1"
+    },
+    "minimum_capabilities": ["content.read", "publication.read"],
+    "optional_capabilities": [
+      "preview.create",
+      "publication.schedule",
+      "publication.publish",
+      "media.import",
+      "navigation.edit",
+      "media.stock.search",
+      "media.stock.import"
+    ]
+  },
+  "recommended_scopes": [
+    "content.read",
+    "content.create",
+    "content.edit",
+    "media.read",
+    "media.write",
+    "seo.read",
+    "seo.edit",
+    "preview.create",
+    "revision.seal",
+    "publication.plan",
+    "publication.read",
+    "site.validate",
+    "forms.read_definition",
+    "quizzes.read_definition",
+    "research.search",
+    "research.fetch",
+    "media.stock.search",
+    "media.stock.import",
+    "seo.validate",
+    "search.diagnostics"
+  ],
+  "optional_scopes": [
+    "content.archive",
+    "media.generate",
+    "media.import",
+    "navigation.edit",
+    "navigation.read",
+    "publication.publish",
+    "publication.schedule",
+    "routing.redirects.import",
+    "site.maintenance.bypass"
+  ],
+  "dangerous_optional_scopes": [
+    "publication.publish",
+    "publication.unpublish",
+    "site.maintenance.bypass"
+  ],
+  "entry_workflow": [
+    "Read supplied docs index, confirm target/version/scopes and bootstrap.",
+    "Check this delivered manifest with the actual resolver; stop if incompatible.",
+    "Declare Content Types and bodyPolicy before theme/content; arrange required bounded reload.",
+    "Author only declared fields/registered blocks, strict nested RichText v2 and independent Block Document v1.",
+    "Use fresh draft and CAS, validate, inspect preview and SEO, then seal.",
+    "Publish only with permissions and task authorization; verify public HTML and eventual Search.",
+    "Verify editor can save, preview, seal and publish a subsequent revision."
+  ],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "SCHEDULE", "PUBLIC_MUTATION"],
+  "references": ["SKILL.md", "references/workflow.md"]
+}

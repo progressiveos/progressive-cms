@@ -1,0 +1,4 @@
+interface:
+  display_name: "Progressive CMS SEO"
+  short_description: "Тщательный SEO-аудит и исправления Google и Яндекс"
+  default_prompt: "Используй $progressive-cms-seo, чтобы проверить и исправить все применимые SEO-проблемы этого сайта для Google и Яндекса с проверкой результата."

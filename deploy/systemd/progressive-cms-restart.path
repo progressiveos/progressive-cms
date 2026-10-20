@@ -1,0 +1,22 @@
+#
+# The application user owns /run/progressive-cms (RuntimeDirectory of the app
+# units) but cannot restart the systemd units itself in every environment.
+# This ROOT path unit watches for the application's restart marker and, when
+# it appears, starts progressive-cms-restart.service, which restarts the app
+# units and removes the marker. The update orchestrator writes the marker
+# after a successful release activation, so
+# `cms update apply` finishes without a root operator session.
+#
+# OPTIONAL machinery: installed/enabled by deploy/scripts/install-restart-
+# bridge.sh (provisioning does NOT install it by default). Without it the
+# operator restarts the units manually after updates, as before.
+
+[Unit]
+Description=Progressive CMS restart bridge (watches for the restart marker)
+
+[Path]
+PathExists=/run/progressive-cms/restart-requested
+Unit=progressive-cms-restart.service
+
+[Install]
+WantedBy=multi-user.target

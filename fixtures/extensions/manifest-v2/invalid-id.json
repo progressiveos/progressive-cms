@@ -1,0 +1,11 @@
+{
+  "id": "Site Basics",
+  "name": "Bad id",
+  "version": "1.0.0",
+  "extension_contract": "2.0",
+  "cms_compatibility": ">=1.0.0-rc.1 <2.0.0",
+  "entrypoint": {
+    "type": "module"
+  },
+  "registrations": {}
+}

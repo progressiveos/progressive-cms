@@ -1,0 +1,11 @@
+{
+  "id": "018f1000-0000-7000-8000-000000000007",
+  "aggregate": "lead",
+  "aggregate_id": "018f1000-0000-7000-8000-0000000000dd",
+  "event_type": "LeadStatusChanged",
+  "payload": {
+    "lead_id": "018f1000-0000-7000-8000-0000000000dd",
+    "previous_status": "NEW",
+    "status": "QUALIFIED"
+  }
+}

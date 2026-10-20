@@ -1,0 +1,29 @@
+---
+pcmd_version: 1
+operation: create
+external_id: article
+content_type: service
+fields:
+  title: "Пример статьи"
+  intro: "Короткое вступление."
+---
+:::block text@1
+rich_text: |
+  Первый абзац с **выделением** и списком:
+
+  - пункт один
+  - пункт два
+:::
+
+:::block image@1
+media_id: "bundle:assets/hero.png"
+alt_override: "Пример изображения"
+caption: "Подпись к изображению"
+:::
+
+:::block faq@1
+items:
+  - id: 01989f5a-7c4f-7d3f-bf0a-4d9e7b1c2a01
+    question: "Что это?"
+    answer: "Демонстрация формата PCMD."
+:::

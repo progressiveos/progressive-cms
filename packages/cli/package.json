@@ -1,0 +1,19 @@
+{
+  "name": "@pcms/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pcms/auth": "0.0.0",
+    "@pcms/blocks": "0.0.0",
+    "@pcms/content": "0.0.0",
+    "@pcms/core": "0.0.0",
+    "@pcms/forms": "0.0.0",
+    "@pcms/media": "0.0.0",
+    "@pcms/themes": "0.0.0"
+  },
+  "license": "Apache-2.0"
+}

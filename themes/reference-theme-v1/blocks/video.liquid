@@ -1,0 +1,66 @@
+{% assign video_presentation = block.props.presentation | default: 'inline' %}
+<figure class="block block-video block-video--{{ video_presentation }}">
+  {% if video_presentation == 'background' and block.props.provider == 'upload' %}
+    {% comment %} Ambient background loop: native asset only (muted/loop/
+       playsinline sidestep browser autoplay policies; embed providers
+       cannot autoplay silently and fall back to inline). {% endcomment %}
+    {% assign uploaded = media[block.props.media_asset_id] %}
+    {% if uploaded %}
+      <video class="block-video__bg" autoplay muted loop playsinline tabindex="-1" aria-hidden="true"
+        src="{{ uploaded.download.href }}"
+        {% if block.props.poster_media_id and media[block.props.poster_media_id] %}poster="{{ media[block.props.poster_media_id].presets.gallery.src }}"{% endif %}></video>
+    {% endif %}
+  {% elsif video_presentation == 'modal' %}
+    {% comment %} Poster/preview button opens a lightbox overlay (theme.js
+       initVideoModals); the player (iframe or native video) is created on
+       open and destroyed on close — nothing autoplays on page load. {% endcomment %}
+    {% if block.props.provider == 'youtube' %}
+      <div class="video-facade" data-video-modal data-src="https://www.youtube-nocookie.com/embed/{{ block.props.video_id }}?autoplay=1">
+        <button class="btn" type="button">Watch video{{ block.props.title | prepend: ' — ' | default: '' }}</button>
+      </div>
+    {% elsif block.props.provider == 'vimeo' %}
+      <div class="video-facade" data-video-modal data-src="https://player.vimeo.com/video/{{ block.props.video_id }}?autoplay=1{% if block.props.privacy_mode %}&dnt=1{% endif %}{% if block.props.start_at %}#t={{ block.props.start_at }}s{% endif %}">
+        <button class="btn" type="button">Watch video{{ block.props.title | prepend: ' — ' | default: '' }}</button>
+      </div>
+    {% elsif block.props.provider == 'upload' %}
+      {% assign uploaded = media[block.props.media_asset_id] %}
+      {% if uploaded %}
+        <div class="video-facade" data-video-modal data-upload="{{ uploaded.download.href }}">
+          {% if block.props.poster_media_id and media[block.props.poster_media_id] %}
+            <img src="{{ media[block.props.poster_media_id].presets.gallery.src }}" alt="{% if block.props.title %}{{ block.props.title }}{% else %}Watch video{% endif %}" loading="lazy">
+          {% else %}
+            <button class="btn" type="button">Watch video</button>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="video-facade"><p>Video unavailable</p></div>
+      {% endif %}
+    {% elsif block.props.provider == 'custom' %}
+      <div class="video-facade"><a class="btn" href="{{ block.props.url }}" rel="noopener">Watch video</a></div>
+    {% else %}
+      <div class="video-facade"><p>Video: {{ block.props.video_id | default: block.props.url }}</p></div>
+    {% endif %}
+  {% elsif block.props.provider == 'youtube' %}
+    <div class="video-facade" data-video-facade data-src="https://www.youtube-nocookie.com/embed/{{ block.props.video_id }}?autoplay=1">
+      <button class="btn" type="button">Watch video{{ block.props.title | prepend: ' — ' | default: '' }}</button>
+    </div>
+  {% elsif block.props.provider == 'vimeo' %}
+    <div class="video-facade" data-video-facade data-src="https://player.vimeo.com/video/{{ block.props.video_id }}?autoplay=1{% if block.props.privacy_mode %}&dnt=1{% endif %}{% if block.props.start_at %}#t={{ block.props.start_at }}s{% endif %}">
+      <button class="btn" type="button">Watch video{{ block.props.title | prepend: ' — ' | default: '' }}</button>
+    </div>
+  {% elsif block.props.provider == 'upload' %}
+    {% assign uploaded = media[block.props.media_asset_id] %}
+    {% if uploaded %}
+      <video class="block-video__player" controls preload="metadata"
+        src="{{ uploaded.download.href }}{% if block.props.start_at %}#t={{ block.props.start_at }}{% endif %}"
+        {% if block.props.poster_media_id and media[block.props.poster_media_id] %}poster="{{ media[block.props.poster_media_id].presets.gallery.src }}"{% endif %}></video>
+    {% else %}
+      <div class="video-facade"><p>Video unavailable</p></div>
+    {% endif %}
+  {% elsif block.props.provider == 'custom' %}
+    <div class="video-facade"><a class="btn" href="{{ block.props.url }}" rel="noopener">Watch video</a></div>
+  {% else %}
+    <div class="video-facade"><p>Video: {{ block.props.video_id | default: block.props.url }}</p></div>
+  {% endif %}
+  {% if block.props.caption and video_presentation != 'background' %}<figcaption>{{ block.props.caption }}</figcaption>{% endif %}
+</figure>

@@ -1,0 +1,70 @@
+{
+  "contentTypes": [
+    {
+      "key": "page",
+      "version": 1,
+      "fields": {
+        "title": {
+          "id": "title",
+          "type": "string"
+        },
+        "intro": {
+          "id": "intro",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "key": "service",
+      "version": 1,
+      "fields": {
+        "title": {
+          "id": "title",
+          "type": "string"
+        },
+        "intro": {
+          "id": "intro",
+          "type": "text"
+        },
+        "price": {
+          "id": "price",
+          "type": "money"
+        }
+      }
+    },
+    {
+      "key": "case",
+      "version": 1,
+      "fields": {
+        "title": {
+          "id": "title",
+          "type": "string"
+        },
+        "client": {
+          "id": "client",
+          "type": "string"
+        }
+      }
+    },
+    {
+      "key": "news",
+      "version": 1,
+      "fields": {
+        "title": {
+          "id": "title",
+          "type": "string"
+        }
+      }
+    },
+    {
+      "key": "article",
+      "version": 1,
+      "fields": {
+        "title": {
+          "id": "title",
+          "type": "string"
+        }
+      }
+    }
+  ]
+}

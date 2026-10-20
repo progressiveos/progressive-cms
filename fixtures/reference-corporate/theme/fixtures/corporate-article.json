@@ -1,0 +1,92 @@
+{
+  "name": "corporate-article",
+  "entry": {
+    "templateKey": "article-default",
+    "contentTypeKey": "article",
+    "contentTypeVersion": 1,
+    "title": "Тенденции инжиниринга 2026",
+    "fields": {
+      "title": "Тенденции инжиниринга 2026"
+    },
+    "blocks": []
+  },
+  "media": {},
+  "navigation": [
+    {
+      "placement": "header.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Проекты",
+          "href": "/projects",
+          "items": []
+        },
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Контакты",
+          "href": "/contacts",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.mobile",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Меню",
+          "href": "/",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "header.utility",
+      "items": [
+        {
+          "type": "external_url",
+          "title": "Telegram",
+          "href": "https://t.me/acme",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.primary",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Услуги",
+          "href": "/services",
+          "items": []
+        }
+      ]
+    },
+    {
+      "placement": "footer.legal",
+      "items": [
+        {
+          "type": "internal_entry",
+          "entry_id": "018f6d2c-5f31-7abc-8def-2a3b4c5d6e10",
+          "title": "Правовая информация",
+          "href": "/legal",
+          "items": []
+        }
+      ]
+    }
+  ],
+  "globals": {},
+  "expectContains": ["Тенденции инжиниринга"],
+  "bodyHtml": "<p>Обзор ключевых тенденций отрасли.</p>"
+}

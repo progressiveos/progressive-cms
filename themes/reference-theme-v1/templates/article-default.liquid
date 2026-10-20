@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="{{ request.locale | default: "ru" }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ head.title }} — {{ site.site_name }}</title>
+  {% for meta in head.core_meta %}<meta {% if meta.property %}property="{{ meta.property }}"{% else %}name="{{ meta.name }}"{% endif %} content="{{ meta.content }}">{% endfor %}
+  {% if head.canonical %}<link rel="canonical" href="{{ head.canonical }}">{% endif %}
+  {% for alt in head.alternates %}<link rel="alternate" hreflang="{{ alt.hreflang }}" href="{{ alt.href }}">{% endfor %}
+  <link rel="stylesheet" href="/themes/reference-theme-v1/assets/css/theme.css">
+  <style>{{ tokens_css }}</style>
+</head>
+<body>
+  {% include 'components/header.liquid' %}
+  <main class="container page-main" id="main">
+    {% include 'components/breadcrumbs.liquid' %}
+    <article>
+      <h1 class="page-title">{{ entry.title }}</h1>
+      {% if entry.fields.author %}<p>Author: {{ entry.fields.author }}</p>{% endif %}
+      {{ body_html }}
+      {{ blocks_html }}
+    </article>
+  </main>
+  {% include 'components/footer.liquid' %}
+  <script src="/themes/reference-theme-v1/assets/js/theme.js" defer></script>
+</body>
+</html>

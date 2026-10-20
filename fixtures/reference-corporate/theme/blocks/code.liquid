@@ -1,0 +1,4 @@
+<figure class="block block-code">
+  <pre><code>{{ block.props.code }}</code></pre>
+  {% if block.props.caption %}<figcaption>{{ block.props.filename | default: block.props.language }} — {{ block.props.caption }}</figcaption>{% endif %}
+</figure>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 124" width="128" height="124" role="img" aria-label="Progressive CMS">
+  <defs>
+    <linearGradient id="pm-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3af9d8"/>
+      <stop offset="1" stop-color="#0190fb"/>
+    </linearGradient>
+    <linearGradient id="pm-right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22f8e4"/>
+      <stop offset="1" stop-color="#0090fd"/>
+    </linearGradient>
+    <linearGradient id="pm-left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#02b4cc"/>
+      <stop offset="1" stop-color="#105b8a"/>
+    </linearGradient>
+  </defs>
+  <polygon points="30,0 91,0 117,34.2 0,34.2" fill="url(#pm-top)"/>
+  <polygon points="72,33.4 118,33.4 127,44.6 127,48 89,96 43,96 82,48.5" fill="url(#pm-right)"/>
+  <polygon points="33,42.5 69.5,42.5 4.5,124 0,124 0,75.5" fill="url(#pm-left)"/>
+</svg>

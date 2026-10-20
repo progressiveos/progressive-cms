@@ -1,0 +1,13 @@
+# Progressive CMS release installation service.
+
+[Unit]
+Description=Progressive CMS release install (install-release.sh --from-incoming)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/pcms/install-release.sh --from-incoming
+ExecStartPost=/bin/sh -c 'readlink -f /opt/progressive-cms/current > /run/progressive-cms/install.status'
+RuntimeMaxSec=600
+PrivateTmp=true

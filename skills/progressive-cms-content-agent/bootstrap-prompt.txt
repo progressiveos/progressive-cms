@@ -1,0 +1,5 @@
+Run `cms agent bootstrap --json` and follow the installed
+`progressive-cms-content-agent` skill for the bound site/environment.
+For artifact authoring read `references/artifact-mode.md` first; check
+`capabilities.pcpub.external_entries` before using published paths.
+Never guess target UUIDs or paths; use documented discovery when unsupported.

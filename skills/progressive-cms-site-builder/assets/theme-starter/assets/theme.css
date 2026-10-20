@@ -1,0 +1,77 @@
+body {
+  margin: 0;
+  color: #183041;
+  background: #f6f8fa;
+  font:
+    18px / 1.65 system-ui,
+    sans-serif;
+}
+header,
+footer,
+main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 1.5rem;
+}
+header {
+  border-bottom: 2px solid #174b63;
+}
+a {
+  color: #174b63;
+}
+nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}
+.mobile {
+  display: none;
+}
+.card {
+  padding: 1rem;
+  border: 1px solid #9baeb9;
+  margin-block: 1rem;
+}
+.form-field {
+  margin-block: 1rem;
+}
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  padding: 0.5rem;
+  max-width: 100%;
+}
+textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+.form-hp {
+  position: absolute;
+  left: -10000px;
+}
+pre {
+  overflow: auto;
+}
+@media (max-width: 700px) {
+  .desktop {
+    display: none;
+  }
+  .mobile {
+    display: block;
+  }
+  nav ul {
+    display: block;
+  }
+  h1 {
+    font-size: 1.8rem;
+  }
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
