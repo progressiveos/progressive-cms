@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Progressive CMS — единый установщик: первичная установка И обновление.
-# PCMS-INSTALLER:2
+# PCMS-INSTALLER:3
 #
 # Один скрипт на все фазы жизни инстанса; режим определяется сам:
 #
@@ -374,6 +374,7 @@ install_from_incoming() { # $1 = требовать ли целевой мани
   previous_target=$(readlink "$CURRENT" 2>/dev/null || true)
   ln -sfn "$target_dir" "$CURRENT.tmp" && mv -T "$CURRENT.tmp" "$CURRENT"
   log "активирован: $(readlink -f "$CURRENT")"
+  install_cli_launcher /usr/local/bin/cms
 
   rm -f "$matched" "$matched.sha256"
   log "входящий артефакт потреблён: $(basename "$matched")"
@@ -419,6 +420,23 @@ seed_reference_theme() {
 }
 
 cms_cli() { PCMS_CONFIG_FILE=$CONFIG node "$CURRENT/packages/cli/src/bin/cms.js" "$@"; }
+
+install_cli_launcher() { # $1 = operator command path
+  local target=$1 temp
+  if { [ -e "$target" ] || [ -L "$target" ]; } && ! grep -qF '# Progressive CMS managed CLI launcher' "$target"; then
+    log "существующая команда $target сохранена (не управляется установщиком)"
+    return 0
+  fi
+  temp=$(mktemp)
+  cat > "$temp" <<EOF
+#!/usr/bin/env bash
+# Progressive CMS managed CLI launcher
+export PCMS_CONFIG_FILE="\${PCMS_CONFIG_FILE:-$CONFIG}"
+exec node "$CURRENT/packages/cli/src/bin/cms.js" "\$@"
+EOF
+  install -D -m 755 "$temp" "$target"
+  rm -f "$temp"
+}
 
 wait_ready() { # $1 = адрес web
   local i
