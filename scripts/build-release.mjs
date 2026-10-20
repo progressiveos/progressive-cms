@@ -56,6 +56,7 @@ import { pruneReleaseDependencyTests } from "./prune-release-dependency-tests.mj
 import {
   isAllowedReleasePath,
   OFFICIAL_DOCS_SKILL_FILES,
+  PUBLIC_LICENSE_FILES,
   readReleaseZipEntries,
 } from "./release-content-policy.mjs";
 import { DOCS_RELEASE_DIR, stageDocsDirectory } from "./stage-docs-dir.mjs";
@@ -404,10 +405,7 @@ for (const themeName of themeDirs) {
 // The release includes portable deployment code/configuration only. Internal
 // pilot manuals and site-specific operating notes remain in the source repo.
 for (const path of [
-  "LICENSE",
-  "NOTICE",
-  "TRADEMARKS.md",
-  "THIRD_PARTY_NOTICES.md",
+  ...PUBLIC_LICENSE_FILES,
   "deploy/scripts/backup-site.sh",
   "deploy/scripts/install-release.sh",
   "deploy/scripts/install-restart-bridge.sh",
