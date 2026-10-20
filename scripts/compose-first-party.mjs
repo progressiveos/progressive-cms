@@ -401,8 +401,11 @@ if (command === "prepare-supply") {
         stdio: "inherit",
       });
     }
-    if (sha256(readFileSync(archive)) !== pkg.source.sha256)
-      fail(`${pkg.id}: immutable supply digest mismatch`);
+    const actualSupplySha256 = sha256(readFileSync(archive));
+    if (actualSupplySha256 !== pkg.source.sha256)
+      fail(
+        `${pkg.id}: immutable supply digest mismatch (expected ${pkg.source.sha256}, got ${actualSupplySha256})`,
+      );
   }
   check();
 } else if (command === "write-lock") {
