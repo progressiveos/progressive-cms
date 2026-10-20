@@ -4,7 +4,7 @@
 Current Progressive CMS release: **RC29** (`1.0.0-rc.29`).
 <!-- cms-current:end -->
 
-Public Markdown documentation, agent workflows and official Skills for the current Progressive CMS release. Start with the task guides below; historical introductions, compatibility boundaries and source pins are retained in [versioning and compatibility](compatibility.md). Read the installed target’s reported version before authoring.
+Public Markdown documentation, agent workflows and official Skills for the current Progressive CMS release. Start with the task guides below; historical introductions and compatibility boundaries are retained in [versioning and compatibility](compatibility.md). Release-specific source and documentation pins are recorded in immutable release metadata. Read the installed target’s reported version before authoring.
 
 English is the primary documentation language. [Russian translation is partial](ru/index.md).
 

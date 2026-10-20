@@ -34,7 +34,7 @@ Read `server.cms_version` and `server.release_id` from `cms agent bootstrap --js
 The baseline workflow minimum remains `>=1.0.0-rc.19 <2.0.0-0`; it is not a claim that RC19 is current. RichText generations before rc.18 and internal 0.1.x are outside this workflow. SemVer prerelease matching must use the actual Core resolver: same-tuple later RCs and stable 1.x may satisfy that range, while 2.x and unrelated future minor prereleases do not automatically qualify.
 <!-- cms-history:end -->
 
-The current public documentation was checked against public Core source commit `4e40feafaaff9d08d228d906d4b4e1b5bb77e0b9`. The source commit and this documentation commit are separate pins. The managed release block above carries the current product version. This records source and document review; it does not claim live-site or vendor acceptance. Preserve the bounded history and compatibility minimums when preparing another release.
+The exact Core source input, documentation commit and artifact pins are recorded in the immutable metadata for each release; they are separate pins. The managed release block above carries the current product version. This does not claim live-site or vendor acceptance. Preserve the bounded history and compatibility minimums when preparing another release.
 
 Check actual ranges, migrations and rollback policy before an operation. See [Skills](agent-skills.md) and [release inclusion](release-copy.md).
 
