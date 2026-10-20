@@ -132,6 +132,8 @@ if (gitDirty && process.argv.includes("--require-clean")) {
 }
 
 if (!skipBuild) {
+  // Clean before compilation; keep outputs available for an explicit --skip-build.
+  rmSync(join(repoRoot, "dist"), { recursive: true, force: true });
   // First-party lock gate BEFORE tsc: it materializes external packages
   // (verify-then-unpack, ADR-0017 R4) that the generated catalog imports.
   const composeCheck = spawnSync(process.execPath, ["scripts/compose-first-party.mjs", "check"], {
@@ -614,11 +616,6 @@ writeFileSync(
   join(stage, RELEASE_LAYOUT.updateManifest),
   `${JSON.stringify(updateManifest, null, 2)}\n`,
 );
-
-// Clean compiled output: tsc incremental trusts mtimes, and a stale dist/
-// once shipped an outdated compiled schema (0.1.91 incident). The release
-// must always compile from scratch.
-sh("rm", ["-rf", "dist"]);
 
 // --- production dependencies per lockfile -----------------------------------
 console.log("build-release: materializing production-only lockfile and dependencies (staged)");
