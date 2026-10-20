@@ -4,9 +4,11 @@ Contract owner: Core Admin/editor, revision lifecycle and actor permissions.
 
 ## Editor account
 
-An operator provisions a normal editor role with the site-scoped permissions needed to read/edit content, preview, seal and (if intended) publish, plus media read/write for image replacement. Site configuration, system recovery and reading/exporting form submissions are separate privileges. A login page or a 200 response is not authenticated acceptance.
+The human editor signs in with an ordinary Admin user account, not a Service Account token. An operator provisions that user under **Users & Access → Users** and grants the role and site-scoped permissions needed to read/edit content, preview, seal and (if intended) publish, plus media read/write for image replacement. Site configuration, system recovery and reading/exporting form submissions are separate privileges. A login page or a 200 response is not authenticated acceptance.
 
 The standard Web deployment serves Admin at `<authorized-https-origin>/admin/` (`/admin` redirects there). Open that entry and sign in with the operator-issued editor account, completing any required MFA. API-only deployments may omit the Admin bundle; a missing entry is an operator setup issue. Obtain the permitted external origin from the operator if a proxy changes access; do not infer another host or bypass its controls.
+
+An authoring agent uses a separate Service Account access token with task-specific scopes, delivered through the approved secret channel. Provision it in **Users & Access → Service accounts**; the token is shown once. Do not give the agent the human editor password, OWNER bootstrap credential or `tokens.manage`. The Admin token wizard currently scopes permissions but does not expose site/environment token bindings. When those restrictions are required, use the documented [`create_access_token` REST operation](rest-api-map.md#create_access_token) with explicit `site_key` and `environment`; the operation requires an authenticated session and CSRF token. The site/environment headers on later requests select context but do not create those restrictions.
 
 ## Human continuation test
 
