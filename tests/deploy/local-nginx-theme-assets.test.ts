@@ -74,6 +74,7 @@ test("API-installed restrictive theme serves CSS/JS/SVG through a real Nginx end
     logger: createLogger({ level: "error", base: {} }),
     cookieSecure: false,
   });
+  server.get("/proxy-scheme", (request) => ({ scheme: request.headers["x-forwarded-proto"] }));
   registerThemeFilesRoute(server, { renderDir: active });
   const upstream = await server.listen({ host: "127.0.0.1", port: 0 });
   const zip = new yazl.ZipFile();
@@ -149,6 +150,10 @@ test("API-installed restrictive theme serves CSS/JS/SVG through a real Nginx end
     }
   }
   assert.ok(ready, "nginx did not start");
+  const scheme = await fetch(`${endpoint}/proxy-scheme`, {
+    headers: { "x-forwarded-proto": "https" },
+  });
+  assert.deepEqual(await scheme.json(), { scheme: "http" }, "edge must overwrite spoofed scheme");
   for (const [path, mime] of [
     ["css/theme.css", "text/css"],
     ["js/theme.js", "text/javascript"],
