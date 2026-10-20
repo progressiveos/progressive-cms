@@ -16,7 +16,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: pcms
-          POSTGRES_PASSWORD: pcms
+          POSTGRES_PASSWORD: ci-only-postgres-password
           POSTGRES_DB: pcms
         ports:
           - 5432:5432
@@ -26,7 +26,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      PCMS_TEST_DATABASE_URL: postgres://pcms:pcms@127.0.0.1:5432/pcms
+      PCMS_TEST_DATABASE_URL: postgres://pcms:ci-only-postgres-password@127.0.0.1:5432/pcms
     steps:
       - uses: actions/checkout@v5
         with:
