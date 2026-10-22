@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Progressive CMS — единый установщик: первичная установка И обновление.
-# PCMS-INSTALLER:3
+# PCMS-INSTALLER:4
 #
 # Один скрипт на все фазы жизни инстанса; режим определяется сам:
 #
@@ -83,11 +83,42 @@ die() { printf '[pcms-install] ERROR: %s\n' "$*" >&2; exit 1; }
 
 normalize_release_permissions() { # $1 = installed immutable release tree
   [ "$(id -u)" = 0 ] || die "установка релиза требует root для владельца root:$SERVICE_USER"
-  # ZIPs omit directory entries, so unzip permissions inherit the caller's umask.
+  # Keep group access predictable, including older ZIPs without directory entries.
   chown -R "root:$SERVICE_USER" -- "$1"
   find "$1" -type d -exec chmod 750 {} +
   find "$1" -type f -perm /111 -exec chmod 750 {} +
   find "$1" -type f ! -perm /111 -exec chmod 640 {} +
+}
+
+verify_release_access() { # root probes as the actual runtime user before activation
+  runuser -u "$SERVICE_USER" -- sh -c '
+    root=$1
+    cd "$root" || exit 1
+    for file in build-metadata.json apps/web/src/main.js apps/worker/src/main.js apps/admin/dist/index.html; do
+      test -r "$root/$file" || { echo "unreadable runtime file: $file" >&2; exit 1; }
+    done
+    inaccessible=$(find "$root" \( -type f ! -readable -o -type d ! -executable \) -print -quit) || exit 1
+    test -z "$inaccessible" || { echo "inaccessible runtime path: $inaccessible" >&2; exit 1; }
+  ' verify-release "$1" || die "runtime недоступен пользователю $SERVICE_USER; current не изменён"
+}
+
+rollback_failed_deployment() {
+  local request previous target current
+  [ -f "$INCOMING/rollback-deployment.json" ] && [ ! -L "$INCOMING/rollback-deployment.json" ] || die "rollback deployment: request должен быть обычным файлом"
+  request=$(cat "$INCOMING/rollback-deployment.json")
+  rm -f "$INCOMING/rollback-deployment.json"
+  previous=$(jq -er '.previous | select(type == "string" and length > 0)' "$PIN_DIR/deployment.json")
+  target=$(jq -er '.target | select(type == "string" and length > 0)' "$PIN_DIR/deployment.json")
+  current=$(readlink -f "$CURRENT")
+  [ "$(printf '%s' "$request" | jq -er .previous)" = "$previous" ] &&
+    [ "$(printf '%s' "$request" | jq -er .target)" = "$target" ] &&
+    [ "$current" = "$target" ] || die "rollback deployment: receipt/CAS mismatch"
+  case "$previous" in "$RELEASES"/*) ;; *) die "rollback deployment: previous вне releases" ;; esac
+  [ -d "$previous" ] && [ ! -L "$previous" ] || die "rollback deployment: previous отсутствует"
+  verify_release_access "$previous"
+  ln -sfn "$previous" "$CURRENT.tmp" && mv -T "$CURRENT.tmp" "$CURRENT"
+  rm -f "$PIN_DIR/deployment.json"
+  log "неуспешный deployment отменён: $previous (миграции ещё не запускались)"
 }
 
 # Маркер версии логики: self-refresh пина происходит только когда копия из
@@ -287,7 +318,7 @@ if [ "$OPT_PG_SETUP_ONLY" = 1 ]; then
   exit 0
 fi
 
-install_from_incoming() { # $1 = требовать ли целевой манифест (1 — только юнит)
+install_from_incoming() ( # $1 = требовать ли целевой манифест (1 — только юнит)
   local require_manifest=$1 expect_version=$OPT_EXPECT_VERSION expect_policy=$OPT_EXPECT_POLICY
   [ -d "$INCOMING" ] || die "нет каталога: $INCOMING"
   # Normalize ownership and permissions before staging an artifact.
@@ -370,8 +401,25 @@ install_from_incoming() { # $1 = требовать ли целевой мани
     log "установлен релиз: $target_dir"
   fi
   normalize_release_permissions "$target_dir"
+  verify_release_access "$target_dir"
 
-  previous_target=$(readlink "$CURRENT" 2>/dev/null || true)
+  previous_target=$(readlink -f "$CURRENT" 2>/dev/null || true)
+  if [ "$previous_target" != "$target_dir" ]; then
+    local receipt
+    receipt=$(mktemp "$PIN_DIR/.deployment.XXXXXX")
+    jq -n --arg previous "$previous_target" --arg target "$target_dir" '{previous:$previous,target:$target}' > "$receipt"
+    chown root:root "$receipt"; chmod 600 "$receipt"
+    mv -f "$receipt" "$PIN_DIR/deployment.json"
+  fi
+  trap '
+    rc=$?
+    if [ "$rc" -ne 0 ] && [ -n "$previous_target" ] && [ -d "$previous_target" ] &&
+      [ "$(readlink -f "$CURRENT")" = "$target_dir" ]; then
+      ln -sfn "$previous_target" "$CURRENT.tmp" && mv -T "$CURRENT.tmp" "$CURRENT"
+      log "активация отменена до миграций: $previous_target"
+    fi
+    exit "$rc"
+  ' EXIT
   ln -sfn "$target_dir" "$CURRENT.tmp" && mv -T "$CURRENT.tmp" "$CURRENT"
   log "активирован: $(readlink -f "$CURRENT")"
   install_cli_launcher /usr/local/bin/cms
@@ -406,7 +454,7 @@ install_from_incoming() { # $1 = требовать ли целевой мани
       log "пин установщика обновлён: $SCRIPT_PATH"
     fi
   fi
-}
+)
 
 # ---------- приложение: CLI текущего релиза и сервисные действия --------------
 seed_reference_theme() {
@@ -808,7 +856,11 @@ fi
 if [ "$IS_ORCHESTRATED" = 1 ]; then
   # Юнит progressive-cms-install.service: только артефакт; миграции/рестарты/doctor
   # делает оркестратор (`cms update apply` / apply-update из реестра).
-  install_from_incoming 1
+  if [ -f "$INCOMING/rollback-deployment.json" ]; then
+    rollback_failed_deployment
+  else
+    install_from_incoming 1
+  fi
 elif [ -f "$CONFIG" ]; then
   manual_update
 else

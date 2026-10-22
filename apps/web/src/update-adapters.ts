@@ -23,8 +23,8 @@
 // progressive-cms-* units; the privileged install runs as a root oneshot
 // (progressive-cms-install.service).
 import { execFile } from "node:child_process";
-import { readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type DbPool, loadMigrations, migrateDatabase, systemClock } from "@pcms/core";
@@ -199,25 +199,65 @@ export function createProductionUpdatePorts(
         // target, stages an immutable release and flips `current`. The
         // running process keeps serving the old code until RESTARTING —
         // migrations land after activation.
-        await run("systemctl", ["start", options.installUnit]);
-        const activated = readFileSync(options.installStatusFile, "utf8").trim();
-        if (activated === "") {
-          throw new Error("install unit produced no activation status");
-        }
-        // Idempotent re-apply (2026-09-29): a retried apply of an ALREADY
-        // installed release is a success, not a failure — the installer
-        // re-activates the same release id and the orchestrator must proceed
-        // (previously this red-herrered as UPDATE_POSTFLIGHT_FAILED and left
-        // maintenance ON). The version check below still guards the contract.
-        const metadata = JSON.parse(
-          readFileSync(join(activated, "build-metadata.json"), "utf8"),
-        ) as { version?: string };
-        if (metadata.version !== preflight.target.version) {
-          throw new Error(
-            `activated release version ${metadata.version} does not match target ${preflight.target.version}`,
+        const previous = resolve(
+          dirname(options.currentSymlink),
+          readlinkSync(options.currentSymlink),
+        );
+        try {
+          await run("systemctl", ["start", options.installUnit]);
+          const activated = readFileSync(options.installStatusFile, "utf8").trim();
+          if (activated === "") {
+            throw new Error("install unit produced no activation status");
+          }
+          const current = resolve(
+            dirname(options.currentSymlink),
+            readlinkSync(options.currentSymlink),
           );
+          if (activated !== current)
+            throw new Error("install status does not match the active release");
+          // Idempotent re-apply (2026-09-29): a retried apply of an ALREADY
+          // installed release is a success, not a failure — the installer
+          // re-activates the same release id and the orchestrator must proceed
+          // (previously this red-herrered as UPDATE_POSTFLIGHT_FAILED and left
+          // maintenance ON). The version check below still guards the contract.
+          const metadata = JSON.parse(
+            readFileSync(join(activated, "build-metadata.json"), "utf8"),
+          ) as { version?: string };
+          if (metadata.version !== preflight.target.version) {
+            throw new Error(
+              `activated release version ${metadata.version} does not match target ${preflight.target.version}`,
+            );
+          }
+          deployState.activatedReleaseRoot = activated;
+        } catch (error) {
+          // No migrations have run yet. Restore only this deployment, using
+          // the root-owned receipt and a compare-and-swap in the install unit.
+          const target = resolve(
+            dirname(options.currentSymlink),
+            readlinkSync(options.currentSymlink),
+          );
+          if (target !== previous) {
+            try {
+              writeFileSync(
+                join(options.incomingDir, "rollback-deployment.json"),
+                JSON.stringify({ previous, target }),
+                { mode: 0o600, flag: "wx" },
+              );
+              await run("systemctl", ["start", options.installUnit]);
+              const restored = resolve(
+                dirname(options.currentSymlink),
+                readlinkSync(options.currentSymlink),
+              );
+              if (restored !== previous)
+                throw new Error("install unit did not restore the previous release");
+            } catch (rollbackError) {
+              throw new Error(
+                `deployment failed and recovery failed: ${String(error)}; ${String(rollbackError)}`,
+              );
+            }
+          }
+          throw error;
         }
-        deployState.activatedReleaseRoot = activated;
       },
     },
 

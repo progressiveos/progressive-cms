@@ -18,6 +18,10 @@ Rehearse restore into a fresh disposable database and scratch media root using t
 
 For upgrades, use approved release metadata through the supported updater: preflight → backup → install/migrate → restart → doctor → public/Admin verification. Read rollback policy: rollback_safe can permit switching to a prior immutable release, while restore_required needs the corresponding database recovery plan. A content revision rollback is unrelated. Keep Web/Worker logs and request ids without credentials.
 
+Release ZIPs use explicit Unix modes: regular files `0644`, executables `0755`, and directories `0755`. The final ZIP gate rejects incomplete permission inventories and noncanonical modes; do not chmod or repack a rejected artifact. The installer normalizes the installed immutable tree to `root:<service-user>` with directories/executables `0750` and regular files `0640`, then checks required runtime files and the full tree as the actual service user before switching `current`. If this access check fails, the new release is not activated and `current` stays unchanged.
+
+If deployment verification fails after activation but before database migrations, the existing privileged recovery path can restore the previous release only after its root-owned receipt matches the request and `current` still points to the failed target. A mismatch fails closed. This bounded recovery does not reverse database migrations and is not a general binary rollback: after migrations begin, follow the release's `rollback_safe`/`restore_required` policy and the corresponding database/media backup plan. Do not switch `current` manually.
+
 ## Runtime version ordering
 
 Registry updates (`POST /api/v1/registry/apply-update`) and manual release ZIP uploads (`POST /api/v1/registry/release-upload`) compare the candidate's full SemVer against the running runtime, including prerelease precedence. Only a strictly newer version is accepted; the same or an older version returns `UPDATE_NOT_AN_UPGRADE` with HTTP 409. A prerelease may update to a higher prerelease of the same version tuple; stable `1.0.0` cannot be downgraded to any `1.0.0-rc.N`.

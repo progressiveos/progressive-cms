@@ -52,7 +52,7 @@ function checkOfficialSkills(zipPath, releaseId, entries, docsDir) {
   const prefix = `${releaseId}/`;
   for (const name of entries) {
     counts.set(name, (counts.get(name) ?? 0) + 1);
-    if (!name.startsWith(prefix)) continue;
+    if (!name.startsWith(prefix) || name.endsWith("/")) continue;
     const path = name.slice(prefix.length).replace(/^docs\//, "");
     if (
       path.startsWith("skills/") &&

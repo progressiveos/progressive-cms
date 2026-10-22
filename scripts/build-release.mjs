@@ -53,6 +53,7 @@ import { SEARCH_INDEX_VERSION } from "@pcms/search";
 import { THEME_CONTRACT_VERSION } from "@pcms/themes";
 import { checkNativeSourceSupply } from "./check-native-source-supply.mjs";
 import { assertReleaseZipClean, readPreparedOfficialSkillFiles } from "./check-release-zip.mjs";
+import { assertReleaseZipPermissions, packReleaseZip } from "./pack-release-zip.mjs";
 import { pruneReleaseDependencyTests } from "./prune-release-dependency-tests.mjs";
 import {
   isAllowedReleasePath,
@@ -693,53 +694,11 @@ if (catalogSmoke.status !== 0) {
   );
 }
 
-/** Packs the staged release directory into the product-wide zip artifact
- * (top-level <releaseId>/ prefix — same layout the tar.gz used to have). */
-async function packReleaseZip(outRoot, releaseId, artifactPath) {
-  const { readdirSync, createWriteStream } = await import("node:fs");
-  const yazl = (await import("yazl")).default;
-  const zip = new yazl.ZipFile();
-  const { lstatSync, realpathSync } = await import("node:fs");
-  const visited = new Set();
-  const addDir = (absolute, relative) => {
-    for (const entry of readdirSync(absolute, { withFileTypes: true })) {
-      const childAbsolute = join(absolute, entry.name);
-      const childRelative = relative === "" ? entry.name : `${relative}/${entry.name}`;
-      const entryName = `${releaseId}/${childRelative}`;
-      if (entry.isSymbolicLink()) {
-        // Workspace links (node_modules/@pcms/* → ../../packages/*) resolve
-        // inside the tree; file links are followed as files (cycle-guarded).
-        const real = realpathSync(childAbsolute);
-        if (visited.has(real)) continue;
-        if (lstatSync(real).isDirectory()) {
-          visited.add(real);
-          addDir(real, childRelative);
-        } else {
-          zip.addFile(real, entryName);
-        }
-        continue;
-      }
-      if (entry.isDirectory()) {
-        addDir(childAbsolute, childRelative);
-      } else {
-        zip.addFile(childAbsolute, entryName);
-      }
-    }
-  };
-  addDir(join(outRoot, releaseId), "");
-  zip.end();
-  await new Promise((resolve, reject) => {
-    zip.outputStream
-      .pipe(createWriteStream(artifactPath))
-      .on("finish", resolve)
-      .on("error", reject);
-  });
-}
-
 // --- pack (zip — the product-wide artifact format, registry contract) -------
 console.log("build-release: packing");
 const artifactPath = join(outRoot, `progressive-cms-${releaseId}.zip`);
 await packReleaseZip(outRoot, releaseId, artifactPath);
+assertReleaseZipPermissions(artifactPath);
 sh("unzip", ["-tq", artifactPath]);
 const cleanEntryCount = assertReleaseZipClean(artifactPath, releaseId, {
   packageNames,

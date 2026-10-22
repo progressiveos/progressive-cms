@@ -2,7 +2,7 @@
 
 **Build agency-quality websites with AI agents. Own the result.**
 
-Turn a business brief, design references, and content into a complete, custom website. AI agents can set up Progressive CMS, build themes and pages, organize navigation, prepare SEO, validate changes, and publish the result.
+Progressive CMS is an **agent-native, self-hosted CMS for building, publishing, and maintaining professional websites with AI coding agents on infrastructure you control**. Turn a business brief, design references, and content into a complete, custom website. AI agents can set up Progressive CMS, build themes and pages, organize navigation, prepare SEO, validate changes, and publish the result.
 
 You guide the work and review the output. Once the site is live, you can maintain it through a full CMS Admin interface — with or without an AI agent.
 
@@ -22,15 +22,33 @@ Progressive CMS runs on your own Linux server. Your content, database, media, an
 
 Developers can build custom themes and integrations. Studios can use agents across website production and hand clients an editable CMS. Business owners retain the site, its source and its data, with freedom to choose who maintains it.
 
-## From brief to published website
+## Agent-native website development
 
-1. **Define the site:** provide business goals, page structure, design references, language, and source materials.
-2. **Install the CMS:** use the native installer on your authorized server, configure the domain and HTTPS, and create scoped credentials for authoring.
-3. **Build the design and content:** create a Liquid theme, editable pages, media, forms, and navigation through the documented CMS tools.
-4. **Review the result:** check content, previews, SEO, links, and responsive layouts before publication.
-5. **Publish and maintain:** publish through the CMS, then continue editing in Admin or through an authorized agent.
+An external coding agent works on a real CMS project through documented tools. It can author a custom Liquid theme in your workspace, create structured content through the CMS, inspect previews, and publish the revisions you approve. The result stays editable in Admin; continued maintenance does not require keeping the original agent session.
 
-The [First Site guide](docs/first-site.md) covers the authoring sequence on an installed instance. Initial server provisioning is a separate operator workflow.
+**Business brief → design references → installation → theme and content → validation → SEO → publication → ongoing maintenance.**
+
+1. **Brief and references:** define the business goals, pages, languages, source materials, and visual direction. The agent translates these into a page plan and editable content.
+2. **Installation:** authorize a specific server and follow the native installer, domain, HTTPS, and initial-account setup. Authoring then uses scoped CMS credentials.
+3. **Theme and content:** build the design in a Liquid theme; use declared content fields for articles and page sections, managed media, forms, and navigation. Reuse existing Content Types when suitable.
+4. **Validation and SEO:** validate revisions, inspect exact previews, check responsive layouts and links, then review titles, canonical URLs, indexing rules, and social images.
+5. **Publication:** seal the reviewed revision and publish through the CMS within the authorized scope. Check the resulting public routes and applicable search results.
+6. **Maintenance and client handoff:** keep improving the theme and content through documented workflows. A normal editor can open Admin, edit the declared fields, preview, and publish another revision.
+
+The [First Site guide](docs/first-site.md) provides commands and payloads for an installed instance. [Installation](docs/installation.md) covers the separate operator workflow. The [agent workflow](docs/agent-workflow.md) connects discovery, authoring, validation, and editor handoff.
+
+## Using your coding agent or harness
+
+If you use Codex, Claude Code, OpenCode, or another coding-agent harness, check which instruction and transport mechanisms your host supports. Progressive CMS exposes portable **Agent Skills**, a **CLI**, **REST**, and **MCP**; it does not require a particular model or AI provider.
+
+| Mechanism | What the agent uses it for | Start here |
+|---|---|---|
+| Agent Skills | Follow the site-building or maintenance workflow, with bundled references and examples. | [Installation in your agent and compatibility checks](docs/agent-skills.md) |
+| CLI | Run documented discovery, validation, authoring, theme, and publication commands from an authorized workspace. | [CLI guide](docs/cli.md) and [complete command map](docs/cli-map.md) |
+| REST | Read and change CMS objects with the current API contract and scoped credentials. | [REST guide](docs/rest-api.md), [operation map](docs/rest-api-map.md), and [OpenAPI](docs/reference/openapi-v1.json) |
+| MCP | Use tools advertised by the running instance through a configured MCP connection. | [MCP guide](docs/agents.md) and [tool/protocol map](docs/mcp-map.md) |
+
+A Skill provides instructions, not permissions. CLI/REST access needs the authorized origin, site, environment, and credentials; MCP needs a configured connection. Host-specific Skill setup is documented where available. Format compatibility does not establish a tested session in every named client or an official partnership with its vendor. Check the actual target version and capabilities before making changes.
 
 ## Quickstart
 
@@ -46,6 +64,12 @@ cms agent bootstrap --json
 
 This command is the discovery entry point after configuring the instance URL, site/environment context, and credentials. See [Agent Skills](docs/agent-skills.md) for setup. Choose your own agent and model; ordinary Admin editing requires no AI subscription.
 
+For an installed instance, a concrete authoring request is:
+
+> Use progressive-cms-site-builder to create an editable company website from the supplied brief and design references. Use only the authorized CMS origin, site, and environment. Start with bootstrap, inspect the existing Content Types and active theme, and report missing prerequisites. Build the pages, navigation, media, and forms through documented CMS operations. Validate and preview the revisions, check responsive layouts and SEO, and publish only if this task authorizes it. Finish with the changed object IDs, observed public URLs, validation results, and instructions for a normal editor to continue in Admin.
+
+Supply the business facts and references with the request. Keep credentials in the approved secret channel; the prompt does not grant installation, schema changes, theme activation, or publication authority by itself.
+
 ### Install and manage it yourself
 
 1. Get the official ZIP and SHA-256 sidecar from [GitHub Releases](https://github.com/progressiveos/progressive-cms/releases).
@@ -54,6 +78,18 @@ This command is the discovery entry point after configuring the instance URL, si
 4. Follow [First Site](docs/first-site.md) for the content model, theme, navigation, and publishing workflow. Use Admin for ongoing content editing.
 
 The current installation target is Ubuntu 26.04 with systemd, Node.js 24, and PostgreSQL. Read the [exact requirements](docs/requirements.md) before provisioning. See [BUILDING.md](BUILDING.md) if you want to build from source instead of installing an official archive.
+
+## Practical workflows
+
+These guides contain the documented commands, payloads, and checks for each task. They describe reproducible procedures rather than a guarantee about a particular agent's output.
+
+| Task | Workflow and completion check |
+|---|---|
+| Install Progressive CMS with an agent | [Installation](docs/installation.md) and the [Operator Skill](skills/progressive-cms-operator/SKILL.md): authorized host, verified artifact, configured HTTPS, and installation diagnostics. |
+| Build an editable corporate website | [First Site](docs/first-site.md) and the [Site Builder Skill](skills/progressive-cms-site-builder/SKILL.md): theme, declared content, navigation, forms, previews, and editor handoff. |
+| Manage content through MCP or the CLI | [MCP](docs/agents.md), [CLI](docs/cli.md), and [Publishing](docs/publishing.md): discover operations, create a draft, edit with its current generation, preview, seal, and publish. |
+| Publish and check SEO changes | [Publishing](docs/publishing.md) and [SEO](docs/seo.md): verify the exact revision and public HTML, canonical/indexing metadata, sitemap, and applicable Search state. |
+| Hand a site to a client and maintain it | [Admin](docs/admin.md), [Themes](docs/themes.md), and [Operations](docs/operations.md): an editor continues authoring; authorized operators maintain the theme and CMS. |
 
 ## Technical capabilities
 

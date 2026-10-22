@@ -41,7 +41,7 @@ test("release install permissions are umask-independent and keep private paths c
 
   assert.match(
     installer,
-    /fi\n\s*normalize_release_permissions "\$target_dir"\n\n\s*previous_target=/,
+    /fi\n\s*normalize_release_permissions "\$target_dir"\n\s*verify_release_access "\$target_dir"\n\n\s*previous_target=/,
     "normalize both newly extracted and previously installed releases",
   );
   assert.match(installer, /chown root:"\$SERVICE_USER" "\$CONFIG"; chmod 640 "\$CONFIG"/);

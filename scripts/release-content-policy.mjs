@@ -251,6 +251,7 @@ export function checkReleaseZipEntries(entries, releaseId, context) {
   const failures = [];
   const prefix = `${releaseId}/`;
   for (const raw of entries) {
+    if (raw === prefix) continue;
     const name = raw.endsWith("/") ? raw.slice(0, -1) : raw;
     if (
       !name ||
@@ -265,8 +266,17 @@ export function checkReleaseZipEntries(entries, releaseId, context) {
       continue;
     }
     const path = name.slice(prefix.length);
-    if (!isAllowedReleasePath(path, context))
+    const allowedParent =
+      raw.endsWith("/") &&
+      entries.some(
+        (entry) =>
+          !entry.endsWith("/") &&
+          entry.startsWith(raw) &&
+          isAllowedReleasePath(entry.slice(prefix.length), context),
+      );
+    if (!allowedParent && !isAllowedReleasePath(path, context))
       failures.push(`${path}: outside release component allowlist`);
+    if (allowedParent) continue; // Children are checked individually, including official authoring fixtures.
     // The docs subtree has its own content-integrity gate (the bundle verifier)
     // and is documentation by construction — the test-payload heuristic must
     // not reject a legitimate `source/specs/…` page.
