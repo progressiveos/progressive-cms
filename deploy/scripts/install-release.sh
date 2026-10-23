@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Progressive CMS — единый установщик: первичная установка И обновление.
-# PCMS-INSTALLER:4
+# PCMS-INSTALLER:5
 #
 # Один скрипт на все фазы жизни инстанса; режим определяется сам:
 #
@@ -402,6 +402,15 @@ install_from_incoming() ( # $1 = требовать ли целевой мани
   fi
   normalize_release_permissions "$target_dir"
   verify_release_access "$target_dir"
+
+  # The confined backup unit uses a pinned script; updates must refresh it too.
+  if [ -f "$target_dir/deploy/scripts/backup-site.sh" ]; then
+    local tmp_backup
+    tmp_backup=$(mktemp "$PIN_DIR/.backup-site.XXXXXX")
+    cp "$target_dir/deploy/scripts/backup-site.sh" "$tmp_backup"
+    chmod 750 "$tmp_backup"; chown root:"$SERVICE_USER" "$tmp_backup"
+    mv -f "$tmp_backup" "$PIN_DIR/backup-site.sh"
+  fi
 
   previous_target=$(readlink -f "$CURRENT" 2>/dev/null || true)
   if [ "$previous_target" != "$target_dir" ]; then

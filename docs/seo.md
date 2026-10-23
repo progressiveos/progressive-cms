@@ -22,6 +22,8 @@ Read `GET /api/v1/settings/site-identity` before updating it; preserve unrelated
 {"document":{"social_image":{"asset_id":"<uploaded-media-id>"}}}
 ```
 
+For this ordinary SEO API, `asset_id` must be an existing MediaAsset id. The only `bundle:` exception is a declared asset reference at `.pcpub`'s typed `seo.social_image.asset_id` field; see [the bulk package workflow](publishing.md#bulk-offline-pcpub-packages). Do not send `bundle:` references through ordinary SEO APIs.
+
 The entry’s optional `hero_image` is a declared media field holding its asset id. A theme banner is a separate presentation composition. Do not hide an `image` block merely to give a prose article an OG image or a card cover.
 
 Core selects/generates `og-v1` (1200×630 JPEG) at semantic assignment/preview/validation/publication points, rather than per crawler request. Inspect derivative availability and the resolved preview; an original URL does not prove social processing succeeded.

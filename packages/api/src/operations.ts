@@ -3089,6 +3089,11 @@ export async function getSystemStatusOp(
     stats[key] === undefined ? null : Number(stats[key]);
   return {
     runtime,
+    deployment: {
+      running_version: app.extensions.contractVersions.get("cms")?.version ?? null,
+      running_release_id: app.releaseId,
+      selected: app.selectedReleaseStatus?.() ?? null,
+    },
     db_ok: dbOk,
     db_latency_ms: dbLatencyMs,
     media_storage_bytes: mediaSize,

@@ -1,6 +1,6 @@
 {
   "id": "progressive-cms-seo",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Audit and improve the technical and on-page SEO of an existing Progressive CMS site for Google and Yandex, with complete applicable checks, public rendering evidence and no ranking guarantees.",
   "recommended_scopes": [
     "content.read",

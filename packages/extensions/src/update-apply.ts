@@ -47,6 +47,8 @@ const TRANSITIONS: Readonly<Record<UpdatePhase, readonly UpdatePhase[]>> = {
 export interface BackupGate {
   /** Confirms the operator's backup proof for this plan. Must throw to veto. */
   confirm(plan: UpdatePreflight): Promise<void>;
+  /** Non-blocking housekeeping warnings after a verified backup. */
+  warnings?(): readonly "BACKUP_RETENTION_FAILED"[];
 }
 
 export interface MaintenanceController {
@@ -343,6 +345,7 @@ export function createUpdateOrchestrator(input: {
       }
       try {
         await ports.backupGate.confirm(preflight);
+        record.validationSummary.backup_warnings = ports.backupGate.warnings?.() ?? [];
       } catch (error) {
         return finishFailed(
           record,

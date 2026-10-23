@@ -135,10 +135,20 @@ function RegistryTab(props: {
   const [instanceStatus, setInstanceStatus] = useState<RegistryInstanceStatus | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [notConfigured, setNotConfigured] = useState(false);
+  const [backupWarning, setBackupWarning] = useState(false);
 
   const reload = useCallback(() => {
     setError(null);
     setNotConfigured(false);
+    if (props.canManage) {
+      fetchUpdateStatus()
+        .then((status) => {
+          setBackupWarning(
+            status.update?.backup_warnings?.includes("BACKUP_RETENTION_FAILED") === true,
+          );
+        })
+        .catch(() => {});
+    }
     fetchRegistryIndex()
       .then(setIndex)
       .catch((err: unknown) => {
@@ -157,7 +167,7 @@ function RegistryTab(props: {
         setInstance(null);
         setInstanceStatus(null);
       });
-  }, []);
+  }, [props.canManage]);
   useEffect(reload, [reload]);
 
   const run = async (action: () => Promise<void>): Promise<void> => {
@@ -199,6 +209,7 @@ function RegistryTab(props: {
         try {
           const status = await fetchUpdateStatus();
           const record = status.update;
+          setBackupWarning(record?.backup_warnings?.includes("BACKUP_RETENTION_FAILED") === true);
           if (record !== null && record.to_version === version && record.status !== "RUNNING") {
             outcome = record.status;
             failureCode = record.failure_code;
@@ -258,6 +269,7 @@ function RegistryTab(props: {
   const manualUpload =
     props.canManage && props.view === "updates" ? (
       <>
+        {backupWarning ? <p role="status">{t("registry.backup_retention_warning")}</p> : null}
         <RegistryBindingCard
           busy={busy}
           instance={instance}
@@ -265,7 +277,7 @@ function RegistryTab(props: {
           unauthorized={unauthorized}
           onConfirm={confirmBinding}
         />
-        <ReleaseUpload busy={busy} instanceCode={instance?.code ?? null} />
+        <ReleaseUpload busy={busy} instanceCode={instance?.code ?? null} onApplied={reload} />
       </>
     ) : null;
 
@@ -348,6 +360,7 @@ function RegistryTab(props: {
       {props.view === "updates" ? (
         <div style={{ marginTop: 16 }}>
           <Card title={t("registry.releases_title")}>
+            {backupWarning ? <p role="status">{t("registry.backup_retention_warning")}</p> : null}
             {index.releases.length === 0 ? (
               <p className="pcms-field__hint">{t("registry.releases_empty")}</p>
             ) : (
@@ -403,7 +416,7 @@ function RegistryTab(props: {
             ) : null}
             <p className="pcms-field__hint">{t("registry.update_restart_hint")}</p>
             {props.canManage ? (
-              <ReleaseUpload busy={busy} instanceCode={instance?.code ?? null} />
+              <ReleaseUpload busy={busy} instanceCode={instance?.code ?? null} onApplied={reload} />
             ) : null}
           </Card>
         </div>
@@ -676,7 +689,11 @@ export default function SkillsScreen() {
  * The backend validates the embedded manifest and the version gate, stages
  * into incoming/ with the checksum sidecar and runs the standard apply;
  * the response shape matches apply-update, so the outcome toast is shared. */
-function ReleaseUpload(props: { readonly busy: boolean; readonly instanceCode: string | null }) {
+function ReleaseUpload(props: {
+  readonly busy: boolean;
+  readonly instanceCode: string | null;
+  readonly onApplied: () => void;
+}) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -703,6 +720,7 @@ function ReleaseUpload(props: { readonly busy: boolean; readonly instanceCode: s
                 );
                 return;
               }
+              props.onApplied();
               toast(
                 t("registry.update_applied_toast", { version: result.update.to_version ?? "" }),
                 "success",

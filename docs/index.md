@@ -1,7 +1,7 @@
 # Progressive CMS documentation
 
 <!-- cms-current:start -->
-Current Progressive CMS release: **RC30** (`1.0.0-rc.30`).
+Current Progressive CMS release: **RC31** (`1.0.0-rc.31`).
 <!-- cms-current:end -->
 
 Public Markdown documentation, agent workflows and official Skills for the current Progressive CMS release. Start with the task guides below; historical introductions and compatibility boundaries are retained in [versioning and compatibility](compatibility.md). Release-specific source and documentation pins are recorded in immutable release metadata. Read the installed target’s reported version before authoring.

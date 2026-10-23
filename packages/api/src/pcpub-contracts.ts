@@ -9,6 +9,7 @@ import {
   type ContentTypeRegistry,
   markdownToRichText,
   validateContentPayload,
+  validateRichText,
 } from "@pcms/content";
 import type {
   CanonicalBlockDocument,
@@ -17,6 +18,7 @@ import type {
   PcpubTargetContracts,
   RichTextPropsResolver,
 } from "@pcms/publication";
+import { mapEntryRichText, validateRichTextBlockPolicy } from "./richtext-documents.js";
 
 function failClosedBlocks(
   documentPath: string,
@@ -64,6 +66,29 @@ export function createPcpubTargetContracts(
           : {
               validateFields(fields: unknown) {
                 return validateContentPayload(loaded, fields, "publish").errors;
+              },
+              validateEntry(documentPath, payload) {
+                const issues: PcpubDiagnostic[] = validateRichTextBlockPolicy(
+                  loaded.bodyPolicy,
+                  payload.blocks,
+                  "WORKING",
+                ).map((issue) => ({
+                  code: "PCPUB_DOCUMENT_INVALID",
+                  path: `${documentPath}${issue.path ?? ""}`,
+                  message: issue.message,
+                }));
+                mapEntryRichText(payload, loaded, blocks, (document, path) => {
+                  const validation = validateRichText(document);
+                  if (!validation.ok)
+                    for (const issue of validation.issues)
+                      issues.push({
+                        code: "PCPUB_DOCUMENT_INVALID",
+                        path: `${documentPath}${path}${issue.path}`,
+                        message: issue.message,
+                      });
+                  return document;
+                });
+                return issues;
               },
             };
       contentTypeContracts.set(key, contract);

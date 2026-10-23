@@ -30,6 +30,24 @@ cms content seal --revision <revision-id> --expected-generation <generation> --e
 
 Sealing needs `revision.seal`; it does not itself publish. A sealed revision is immutable.
 
+## Bulk/offline `.pcpub` packages
+
+For a prepared `.pcpub` ZIP, first run `cms bundle validate <archive>` locally. This checks the archive against contracts available to that CLI; it does not prove that the target server accepts the package. Before applying it, send the raw archive to `POST /api/v1/bundles/pcpub?mode=validate` with the `.pcpub` media type. This target-side validation makes no writes and checks against the target's current Content Types, RichText rules and `bodyPolicy` before media is staged.
+
+An entry may refer to a bundled asset as its social image:
+
+```yaml
+seo:
+  social_image:
+    asset_id: "bundle:assets/hero.png"
+```
+
+The asset must exist in the archive and be declared by the package. This `bundle:` reference is accepted only at `.pcpub`'s typed `seo.social_image.asset_id` field; the target resolves it to the same MediaAsset identity used by content fields that refer to that bundle asset. Ordinary `PUT /entries/<entry-id>/seo` still requires an existing MediaAsset id. Do not send `bundle:` references through ordinary SEO APIs or use them for other SEO fields.
+
+Read every target validation diagnostic before applying. Each issue identifies a `code`, archive-relative `path` and `message`; invalid RichText or content hidden by the target Content Type's `bodyPolicy` is rejected before media staging. If an apply-time seal check still rejects the document, the ingest status reports `PCPUB_DOCUMENT_INVALID` and retains the original diagnostic codes, messages and archive paths in `safe_error_detail.diagnostics`. Fix the source document, repack, and validate again; do not ignore or reduce diagnostics to a count.
+
+After a clean target validation, apply only when the requested content mutation is authorized: `cms bundle submit <archive> [--wait]`. Apply is asynchronous; poll the returned ingest status (or use `--wait`) and verify its terminal outcome and result. A local validation pass or HTTP 202 does not mean the content was sealed or published.
+
 ## Publish explicitly
 
 Read `GET /publications/entry/<entry-id>` for the actual generation. Direct `POST /publications/publish` requires an **existing live route**, even for a never-published identity. Without it, Core rejects with `PUBLICATION_ROUTE_MISSING`; first publication must coordinate the route in a ChangeSet.

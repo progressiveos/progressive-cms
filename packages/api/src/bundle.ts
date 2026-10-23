@@ -31,6 +31,7 @@ import { requireQuarantine, requireStorage } from "./http/routes/helpers.js";
 export interface BundleApplyChecks {
   readonly literalRefs?: readonly string[];
   readonly beforeCandidates?: (tx: DbClient) => Promise<void>;
+  readonly sourcePathForEntry?: (entry: BundleEntryInput) => string | undefined;
 }
 
 export const BUNDLE_VERSION = 1;
@@ -245,7 +246,11 @@ export function validateBundleStructure(
     const contentType = entry?.["content_type"];
     if (typeof contentType !== "string") continue;
     const payload = (entry?.["payload"] ?? {}) as { fields?: unknown; blocks?: unknown };
-    const usedRefs = collectRefs(payload).filter((ref) => !checks.literalRefs?.includes(ref));
+    const seo = entry?.["seo"];
+    const usedRefs = [
+      ...collectRefs(payload).filter((ref) => !checks.literalRefs?.includes(ref)),
+      ...collectSeoMediaRef(seo),
+    ];
     const unknownRefs = usedRefs.filter((ref) => !declaredRefs.has(ref));
     for (const ref of unknownRefs) {
       issues.push({
@@ -282,7 +287,6 @@ export function validateBundleStructure(
           },
       ),
     );
-    const seo = entry?.["seo"];
     if (seo !== undefined && seo !== null) {
       try {
         parseSeoDocument(seo);
@@ -318,6 +322,29 @@ function collectRefs(value: unknown): string[] {
   };
   walk(value);
   return [...refs];
+}
+
+function collectSeoMediaRef(value: unknown): string[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+  const image = (value as Record<string, unknown>).social_image;
+  if (typeof image !== "object" || image === null || Array.isArray(image)) return [];
+  const assetId = (image as Record<string, unknown>).asset_id;
+  return typeof assetId === "string" && assetId.startsWith(REF_PREFIX)
+    ? [assetId.slice(REF_PREFIX.length)]
+    : [];
+}
+
+function resolveSeoMediaRef(value: unknown, resolve: (ref: string) => string): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const seo = { ...(value as Record<string, unknown>) };
+  const image = seo.social_image;
+  if (typeof image !== "object" || image === null || Array.isArray(image)) return seo;
+  const socialImage = { ...(image as Record<string, unknown>) };
+  const assetId = socialImage.asset_id;
+  if (typeof assetId === "string" && assetId.startsWith(REF_PREFIX))
+    socialImage.asset_id = resolve(assetId.slice(REF_PREFIX.length));
+  seo.social_image = socialImage;
+  return seo;
 }
 
 function semanticIssues(
@@ -531,8 +558,11 @@ export async function applyBundle(
         [],
         options.literalRefs,
       ) as { fields: unknown; blocks: BlockDocument | null };
-      const seoDocument =
-        entry.seo === undefined || entry.seo === null ? null : parseSeoDocument(entry.seo);
+      const resolvedSeo =
+        entry.seo === undefined || entry.seo === null
+          ? null
+          : resolveSeoMediaRef(entry.seo, resolveRef);
+      const seoDocument = resolvedSeo === null ? null : parseSeoDocument(resolvedSeo);
       const revision = await app.revisions.createWorkingRevisionWithinTx(tx, {
         entityType: "entry",
         entityId: target.entry_id as StableId,
@@ -541,10 +571,35 @@ export async function applyBundle(
         ...(entry.locale === undefined ? {} : { locale: entry.locale }),
         actor: { ...actor, bundleId: bundle.external_id },
       });
-      const sealed = await app.revisions.sealRevisionWithinTx(tx, {
-        revisionId: revision.id,
-        ...(seoDocument === null ? {} : { sidecar: { seo: seoDocument } }),
-      });
+      let sealed;
+      try {
+        sealed = await app.revisions.sealRevisionWithinTx(tx, {
+          revisionId: revision.id,
+          ...(seoDocument === null ? {} : { sidecar: { seo: seoDocument } }),
+        });
+      } catch (error) {
+        const details = (error as { details?: { issues?: unknown } } | null)?.details;
+        if (
+          (error as { code?: unknown } | null)?.code === "REVISION_VALIDATION_FAILED" &&
+          Array.isArray(details?.issues)
+        ) {
+          const sourcePath = options.sourcePathForEntry?.(entry) ?? `/entries/${index}`;
+          throw new ApiError("BUNDLE_INVALID", "bundle entry failed seal validation", {
+            status: 422,
+            details: details.issues.map((issue) => {
+              const item = issue as { code?: unknown; path?: unknown; message?: unknown };
+              return {
+                code: typeof item.code === "string" ? item.code : "REVISION_VALIDATION_FAILED",
+                path: `${sourcePath}${typeof item.path === "string" ? item.path : ""}`,
+                message:
+                  typeof item.message === "string" ? item.message : "revision validation failed",
+              };
+            }),
+            cause: error,
+          });
+        }
+        throw error;
+      }
       target.revision_id = sealed.id;
       if (seoDocument !== null) {
         await app.seo.saveDocumentWithinTx(tx, target.entry_id, seoDocument);

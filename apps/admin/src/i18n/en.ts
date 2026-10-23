@@ -502,6 +502,8 @@ export const en: Messages = {
   "registry.col_notes": "Notes",
   "registry.col_actions": "Actions",
   "registry.update_to_version": "Update to this version",
+  "registry.backup_retention_warning":
+    "The new backup is verified. Old backups could not be removed; this does not block the update. Ask the operator to check backup directory ownership and permissions.",
   "registry.update_applied_toast": "Update applied: version {version}",
   "registry.update_running": "Applying update…",
   "registry.update_not_required": "No update needed",

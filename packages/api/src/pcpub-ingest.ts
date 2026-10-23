@@ -31,6 +31,7 @@ import {
   validatePcpub,
   verifyPcpub,
 } from "@pcms/publication";
+import { parseSeoDocument } from "@pcms/seo";
 import { type BundleEntryInput, type BundleInput, submitBundle } from "./bundle.js";
 import { type ApplicationServices, type OperationContext, requirePermission } from "./context.js";
 import { ApiError } from "./errors.js";
@@ -249,12 +250,51 @@ export async function validatePcpubBytes(
     await writeFile(path, bytes, { mode: 0o600 });
     const verified = await verifyPcpub(path, { limits });
     try {
-      const issues = await validatePcpub(path, {
-        limits,
-        contracts: createPcpubTargetContracts(app.contentTypes, app.blocks),
-        richTextBridge: pcpubRichTextBridge,
-        richTextPropsFor: richTextPropsResolver(app.blocks),
-      });
+      const issues = [
+        ...(await validatePcpub(path, {
+          limits,
+          contracts: createPcpubTargetContracts(app.contentTypes, app.blocks),
+          richTextBridge: pcpubRichTextBridge,
+          richTextPropsFor: richTextPropsResolver(app.blocks),
+        })),
+      ];
+      for (const item of verified.documents) {
+        if (item.document.seo === undefined || item.document.seo === null) continue;
+        const seo = structuredClone(item.document.seo) as Record<string, unknown>;
+        const socialImage = seo.social_image;
+        if (
+          socialImage !== null &&
+          typeof socialImage === "object" &&
+          !Array.isArray(socialImage)
+        ) {
+          const image = socialImage as Record<string, unknown>;
+          if (typeof image.asset_id === "string" && image.asset_id.startsWith("bundle:"))
+            image.asset_id = "01900000-0000-7000-8000-000000000001";
+        }
+        try {
+          parseSeoDocument(seo);
+        } catch (error) {
+          const rawIssues = (error as { details?: { issues?: unknown } } | null)?.details?.issues;
+          const diagnostics = Array.isArray(rawIssues)
+            ? rawIssues.map((raw) => {
+                const issue = raw as { code?: unknown; path?: unknown; message?: unknown };
+                return {
+                  code: "PCPUB_DOCUMENT_INVALID" as const,
+                  path: `${item.path}/seo${typeof issue.path === "string" ? issue.path : ""}`,
+                  message:
+                    typeof issue.message === "string" ? issue.message : "invalid SEO document",
+                };
+              })
+            : [
+                {
+                  code: "PCPUB_DOCUMENT_INVALID" as const,
+                  path: `${item.path}/seo`,
+                  message: "invalid SEO document",
+                },
+              ];
+          issues.push(...diagnostics);
+        }
+      }
       if (verified.manifest.external_entries !== undefined) {
         if (ctx === undefined || !ctx.actor.permissions.has("content.read"))
           throw new PcpubError(
@@ -616,16 +656,18 @@ export async function processPcpubIngest(
           pcpubRichTextBridge,
           richTextPropsResolver(app.blocks),
         );
-        const rewritten = rewriteBundleRefs(
+        const rewrittenPayload = rewriteBundleRefs(
           rewriteExternalEntryRefs(app, doc.document.contentType, payload, externalMapping),
           pathToRef,
-        );
+        ) as { fields: Record<string, unknown>; blocks: unknown };
         entries.push({
           ref: doc.document.externalId,
           content_type: doc.document.contentType,
-          payload: rewritten.payload,
+          payload: rewrittenPayload,
           ...(doc.document.locale === undefined ? {} : { locale: doc.document.locale }),
-          ...(doc.document.seo === undefined ? {} : { seo: doc.document.seo }),
+          ...(doc.document.seo === undefined
+            ? {}
+            : { seo: rewriteSeoBundleRef(doc.document.seo, pathToRef) }),
           ...(doc.document.route === undefined ? {} : { route: doc.document.route }),
           ...(doc.document.operation === "update"
             ? { entry_id: doc.document.targetEntryId as string }
@@ -654,6 +696,8 @@ export async function processPcpubIngest(
       await advanceStage(pool, ingestId, "validating_candidates");
       const checks = {
         literalRefs: Object.keys(external),
+        sourcePathForEntry: (entry: import("./bundle.js").BundleEntryInput) =>
+          documents.find((doc) => doc.document.externalId === entry.ref)?.path,
         beforeCandidates: async (tx: import("@pcms/core").DbClient) => {
           await resolveExternalEntries(app, external, tx, externalMapping);
           for (const doc of documents) {
@@ -738,7 +782,11 @@ export async function processPcpubIngest(
             error.code,
             safeDetail(error),
           )
-        : error;
+        : error instanceof ApiError && error.code === "BUNDLE_INVALID" && error.details.length > 0
+          ? new StageFailure("rejected", "PCPUB_DOCUMENT_INVALID", {
+              diagnostics: error.details,
+            })
+          : error;
     if (cause instanceof StageFailure) {
       await completeIngest(pool, ingestId, {
         outcome: cause.outcome,
@@ -814,10 +862,7 @@ const BUNDLE_REF_PREFIX = "bundle:";
 
 /** Rewrites bundle: asset refs to canonical ref:<mediaRef> form. Entry refs
  * pass through — the canonical bundle resolves them inside its transaction. */
-function rewriteBundleRefs(
-  payload: { fields: Record<string, unknown>; blocks: unknown },
-  pathToRef: Map<string, string>,
-): { payload: { fields: Record<string, unknown>; blocks: unknown } } {
+function rewriteBundleRefs(value: unknown, pathToRef: Map<string, string>): unknown {
   const walk = (value: unknown): unknown => {
     if (typeof value === "string") {
       if (value.startsWith(BUNDLE_REF_PREFIX)) {
@@ -838,12 +883,21 @@ function rewriteBundleRefs(
     }
     return value;
   };
-  return {
-    payload: {
-      fields: walk(payload.fields) as Record<string, unknown>,
-      blocks: walk(payload.blocks),
-    },
-  };
+  return walk(value);
+}
+
+function rewriteSeoBundleRef(value: unknown, pathToRef: Map<string, string>): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const seo = { ...(value as Record<string, unknown>) };
+  const image = seo.social_image;
+  if (typeof image !== "object" || image === null || Array.isArray(image)) return seo;
+  const socialImage = { ...(image as Record<string, unknown>) };
+  const assetPath = socialImage.asset_id;
+  if (typeof assetPath === "string" && assetPath.startsWith(BUNDLE_REF_PREFIX)) {
+    socialImage.asset_id = pathToRef.get(assetPath.slice(BUNDLE_REF_PREFIX.length)) ?? assetPath;
+  }
+  seo.social_image = socialImage;
+  return seo;
 }
 
 /** Recent ingests, newest first (theme developer report: a lost submit

@@ -46,6 +46,8 @@ test("installer restores current on an activation error and refuses unreadable r
         version: "2.0.0",
       }),
     );
+    mkdirSync(join(payload, "deploy/scripts"), { recursive: true });
+    writeFileSync(join(payload, "deploy/scripts/backup-site.sh"), "#!/bin/sh\necho fresh-backup\n");
     writeFileSync(join(payload, "update-manifest.json"), JSON.stringify(manifest));
     writeFileSync(join(incoming, "update-manifest.json"), JSON.stringify(manifest));
     const zip = join(incoming, "release.zip");
@@ -71,6 +73,12 @@ test("installer restores current on an activation error and refuses unreadable r
       { encoding: "utf8" },
     );
     assert.equal(result.status, failure === "none" ? 0 : 1, result.stderr);
+    if (failure !== "unreadable") {
+      assert.equal(
+        readFileSync(join(pin, "backup-site.sh"), "utf8"),
+        "#!/bin/sh\necho fresh-backup\n",
+      );
+    }
     assert.equal(
       readlinkSync(join(scenario, "current")),
       failure === "none" ? join(releases, "v2-new") : previous,

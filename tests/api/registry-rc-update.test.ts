@@ -6,9 +6,14 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createApiFastify, createApiV1, makeRegistryRoutes } from "@pcms/api";
 import { createLogger, loadMigrations } from "@pcms/core";
-import { createContractVersionRegistry } from "@pcms/extensions/internal";
+import {
+  createContractVersionRegistry,
+  recordFailedUpdateAttempt,
+} from "@pcms/extensions/internal";
 import yazl from "yazl";
+import { getSystemStatusOp } from "../../packages/api/src/operations.js";
 import type { RegistryClient } from "../../packages/api/src/registry-client.js";
+import { apiContextOf, ownerActor } from "../helpers/api-composition.js";
 import { rollbackApiFixture } from "../helpers/rollback-api-fixture.js";
 import { testDatabaseConfigured } from "../helpers/testdb.js";
 
@@ -48,6 +53,12 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
     cmsVersion: "1.0.0-rc.23",
     releaseId: "v1.0.0-rc.23-20261018T000000Z-abcdef0",
     registryIncomingDir: incoming,
+    selectedReleaseStatus: () => ({
+      version: "1.0.0-rc.24",
+      release_id: "rc24-selected",
+      matches_running: false,
+      read_error: null,
+    }),
   });
   let downloads = 0;
   let report = "";
@@ -108,6 +119,16 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
     ttlMilliseconds: 60_000,
   });
   const authorization = `Bearer ${token.rawSecret}`;
+  await recordFailedUpdateAttempt(
+    app.pool,
+    { now: () => new Date() },
+    {
+      from_version: "1.0.0-rc.23",
+      to_version: "1.0.0-rc.24",
+      failure_code: "UPDATE_BACKUP_REQUIRED",
+      actor: { type: "operator", id: "test" },
+    },
+  );
   const status = await server.inject({
     method: "GET",
     url: "/api/v1/registry/update-status",
@@ -115,6 +136,22 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
   });
   assert.equal(status.statusCode, 200, status.body);
   assert.equal(status.json().current_version, "1.0.0-rc.23");
+  assert.deepEqual(status.json().deployment, {
+    running_version: "1.0.0-rc.23",
+    running_release_id: "v1.0.0-rc.23-20261018T000000Z-abcdef0",
+    selected: {
+      version: "1.0.0-rc.24",
+      release_id: "rc24-selected",
+      matches_running: false,
+      read_error: null,
+    },
+  });
+  assert.equal(status.json().update.status, "FAILED");
+  assert.equal(status.json().update.failure_code, "UPDATE_BACKUP_REQUIRED");
+  const system = await getSystemStatusOp(app, apiContextOf(ownerActor()));
+  assert.deepEqual(system.deployment, status.json().deployment);
+  const anonymous = await server.inject({ method: "GET", url: "/api/v1/registry/update-status" });
+  assert.equal(anonymous.statusCode, 401);
 
   for (const version of ["1.0.0-rc.23", "1.0.0-rc.22"]) {
     for (const upload of [false, true]) {
@@ -152,14 +189,14 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
   const history = await app.pool.query<{ from_version: string; to_version: string }>(
     "SELECT from_version, to_version FROM pcms_update_history",
   );
-  assert.equal(history.rows.length, 2);
+  assert.equal(history.rows.length, 3);
   for (const row of history.rows)
     assert.deepEqual(row, { from_version: "1.0.0-rc.23", to_version: "1.0.0-rc.24" });
 
   // Success is simulated only through no-op deployment ports, never a real install.
   Object.defineProperty(app, "updateOrchestrationPorts", {
     value: {
-      backupGate: { confirm: async () => {} },
+      backupGate: { confirm: async () => {}, warnings: () => ["BACKUP_RETENTION_FAILED"] },
       maintenance: { enter: async () => {}, exit: async () => {} },
       releaseDeployment: { deploy: async () => {} },
       serviceRestart: { restart: async () => {} },
@@ -175,6 +212,19 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
   });
   assert.equal(success.statusCode, 200, success.body);
   assert.equal(success.json().update.status, "SUCCEEDED");
+  assert.deepEqual(success.json().update.backup_warnings, ["BACKUP_RETENTION_FAILED"]);
+  const completed = await server.inject({
+    method: "GET",
+    url: "/api/v1/registry/update-status",
+    headers: { authorization },
+  });
+  assert.deepEqual(completed.json().update.backup_warnings, ["BACKUP_RETENTION_FAILED"]);
+  const summary = await app.pool.query<{ validation_summary: { backup_warnings: string[] } }>(
+    "SELECT validation_summary FROM pcms_update_history WHERE status='SUCCEEDED' ORDER BY started_at DESC LIMIT 1",
+  );
+  assert.deepEqual(summary.rows[0]?.validation_summary.backup_warnings, [
+    "BACKUP_RETENTION_FAILED",
+  ]);
   assert.match(report, /\| previous_version \| 1\.0\.0-rc\.23 \|/);
 
   const versions = createContractVersionRegistry();

@@ -237,3 +237,53 @@ test("worker postflight fails closed when restart confirmation times out", async
   assert.equal(confirmed, null);
   assert.equal(reads, 3);
 });
+
+test("backup gate reports retention warnings only after checksum verification", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "pcms-backup-warnings-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  mkdirSync(join(base, "bin"));
+  mkdirSync(join(base, "20261022T000000Z"));
+  const set = join(base, "20261022T000000Z");
+  writeFileSync(join(set, "manifest.json"), "{}");
+  writeFileSync(join(set, "db.dump"), "test");
+  // sha256 of the literal string "test"; the production verifier executes sha256sum.
+  const valid = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08  db.dump\n";
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${join(base, "bin")}:${oldPath}`;
+  try {
+    const preflight = {} as UpdatePreflight;
+    for (const scenario of ["legacy", "warning", "bad-checksum", "failed-unit", "bad-warning"]) {
+      writeFileSync(
+        join(base, "bin/systemctl"),
+        `#!/bin/sh\nexit ${scenario === "failed-unit" ? 1 : 0}\n`,
+        { mode: 0o755 },
+      );
+      writeFileSync(
+        join(set, "checksums.sha256"),
+        scenario === "bad-checksum" ? `${"0".repeat(64)}  db.dump\n` : valid,
+      );
+      rmSync(join(set, "warnings.json"), { force: true });
+      if (scenario !== "legacy")
+        writeFileSync(
+          join(set, "warnings.json"),
+          JSON.stringify(scenario === "bad-warning" ? ["unknown"] : ["BACKUP_RETENTION_FAILED"]),
+        );
+      const ports = createProductionUpdatePorts({
+        backupDir: base,
+        backupUnit: "test-backup",
+      } as UpdateAdapterOptions);
+      if (["bad-checksum", "failed-unit", "bad-warning"].includes(scenario)) {
+        await assert.rejects(ports.backupGate.confirm(preflight));
+        assert.deepEqual(ports.backupGate.warnings?.(), []);
+      } else {
+        await ports.backupGate.confirm(preflight);
+        assert.deepEqual(
+          ports.backupGate.warnings?.(),
+          scenario === "warning" ? ["BACKUP_RETENTION_FAILED"] : [],
+        );
+      }
+    }
+  } finally {
+    process.env.PATH = oldPath;
+  }
+});

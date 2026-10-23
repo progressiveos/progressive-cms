@@ -6,7 +6,7 @@ Skills provide guidance, not permissions. Three official self-contained Agent Sk
 |---|---|---|
 | [progressive-cms-site-builder](skills/progressive-cms-site-builder/SKILL.md) | Build an editable site from a brief, using local workflow, API schemas, examples and theme assets | 1.3.1 |
 | [progressive-cms-152fz](skills/progressive-cms-152fz/SKILL.md) | Technical personal-data readiness of an existing site: data flows, consent, access, retention and verified controls; owner-selected consent/retention and addressed tools; owner handles legal documents/RKN | 1.1.0 |
-| [progressive-cms-seo](skills/progressive-cms-seo/SKILL.md) | Thorough applicable Google/Yandex SEO fixes, metadata/H1/duplicates, crawl/rendering and performance evidence | 1.0.1 |
+| [progressive-cms-seo](skills/progressive-cms-seo/SKILL.md) | Thorough applicable Google/Yandex SEO fixes, metadata/H1/duplicates, crawl/rendering and performance evidence | 1.0.2 |
 
 These are portable instruction Skills, not executable CMS Extensions or an automatic legal/ranking certification. Each includes a CMS manifest, local references, selected API schemas and optional Codex UI metadata. The additional content-agent documentation distribution is **1.5.3**. The [catalogue](skills/catalog.json) and manifests declare compatibility independently of the product release. The specialist workflows and source annotations are in Russian.
 

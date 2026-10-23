@@ -131,6 +131,7 @@ export function createProductionUpdatePorts(
   options: UpdateAdapterOptions,
 ): UpdateOrchestrationPorts {
   const deployState: DeployState = {};
+  let backupWarnings: "BACKUP_RETENTION_FAILED"[] = [];
   let previousMaintenance: boolean | undefined;
   let workerRestartBaseline: WorkerRestartBaseline | undefined;
 
@@ -139,7 +140,9 @@ export function createProductionUpdatePorts(
       // Real proof only: start the confined backup oneshot (blocking), then
       // verify the produced set's checksums as this user. A failed unit or a
       // broken manifest vetoes the update (Operations spec §32–§35).
+      warnings: () => backupWarnings,
       async confirm() {
+        backupWarnings = [];
         await run("systemctl", ["start", options.backupUnit]);
         const entries = readdirSync(options.backupDir)
           .filter((e) => /^2/.test(e))
@@ -156,6 +159,20 @@ export function createProductionUpdatePorts(
           cwd: set,
           timeout: 120_000,
         });
+        let warnings: unknown;
+        try {
+          warnings = JSON.parse(readFileSync(join(set, "warnings.json"), "utf8"));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          warnings = [];
+        }
+        if (
+          !Array.isArray(warnings) ||
+          warnings.some((code) => code !== "BACKUP_RETENTION_FAILED")
+        ) {
+          throw new Error("invalid backup warnings");
+        }
+        backupWarnings = warnings;
       },
     },
 

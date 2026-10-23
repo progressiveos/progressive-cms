@@ -503,6 +503,8 @@ export const ru = {
   "registry.col_notes": "Заметки",
   "registry.col_actions": "Действия",
   "registry.update_to_version": "Обновить до этой версии",
+  "registry.backup_retention_warning":
+    "Новая резервная копия проверена. Старые копии не удалось удалить; обновление не блокируется. Оператору нужно проверить владельца и права каталогов резервных копий.",
   "registry.update_applied_toast": "Обновление применено: версия {version}",
   "registry.update_running": "Идёт обновление…",
   "registry.update_not_required": "Обновление не требуется",

@@ -63,6 +63,7 @@ export interface RegistryUpdateOutcome {
   readonly from_version: string | null;
   readonly to_version: string | null;
   readonly failure_code: string | null;
+  readonly backup_warnings?: readonly string[];
 }
 
 export interface RegistryUpdateResult {

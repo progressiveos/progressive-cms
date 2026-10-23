@@ -6,8 +6,64 @@
 // naming, metadata and package-exports rewrite contracts so the builder, the
 // deployed runtime (doctor reads build-metadata.json) and the tests share a
 // single definition.
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, readlinkSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+
+export interface SelectedReleaseStatus {
+  readonly version: string | null;
+  readonly release_id: string | null;
+  readonly matches_running: boolean | null;
+  readonly read_error: "EACCES" | "ENOENT" | "INVALID_METADATA" | "UNAVAILABLE" | null;
+}
+
+/** Read disk selection independently of the immutable identity captured at boot. */
+export function readSelectedReleaseStatus(input: {
+  currentSymlink: string;
+  runningRoot: string;
+  runningReleaseId: string;
+}): SelectedReleaseStatus {
+  let sameDirectory: boolean | null = null;
+  try {
+    const selectedRoot = resolve(dirname(input.currentSymlink), readlinkSync(input.currentSymlink));
+    sameDirectory = selectedRoot === input.runningRoot;
+    const metadata = JSON.parse(readFileSync(join(selectedRoot, "build-metadata.json"), "utf8"));
+    if (
+      metadata?.schema !== "pcms-release-build/1" ||
+      typeof metadata.version !== "string" ||
+      !metadata.version ||
+      typeof metadata.releaseId !== "string" ||
+      !metadata.releaseId
+    ) {
+      return {
+        version: null,
+        release_id: null,
+        matches_running: sameDirectory ? null : false,
+        read_error: "INVALID_METADATA",
+      };
+    }
+    return {
+      version: metadata.version,
+      release_id: metadata.releaseId,
+      matches_running: sameDirectory && metadata.releaseId === input.runningReleaseId,
+      read_error: null,
+    };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return {
+      version: null,
+      release_id: null,
+      matches_running: sameDirectory === false ? false : null,
+      read_error:
+        error instanceof SyntaxError
+          ? "INVALID_METADATA"
+          : code === "EACCES" || code === "EPERM"
+            ? "EACCES"
+            : code === "ENOENT"
+              ? "ENOENT"
+              : "UNAVAILABLE",
+    };
+  }
+}
 
 /**
  * A workspace package.json as shipped in the repository. Development exports

@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  getPcpubIngestStatus,
   type OperationContext,
   processPcpubIngest,
   receivePcpub,
@@ -835,6 +836,144 @@ rich_text: "ref:existing"
   assert.equal((await state())?.revisions, beforeLate?.revisions);
   assert.equal((await state())?.changesets, beforeLate?.changesets);
   assert.ok(unpublished.entry_id); // the negative target remains only its original sealed revision
+});
+
+test("PCPUB validates RichText seal rules and resolves bundled SEO media references", {
+  skip: !testDatabaseConfigured(),
+}, async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "pcpub-seo-ref-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const { app } = await createApiFixture(t, {
+    contentTypeDefinitions: [
+      ...CONTENT_TYPES,
+      {
+        key: "rich_article",
+        version: 1,
+        title: "Rich article",
+        bodyPolicy: "rich_text",
+        fields: { title: { id: "title", type: "string", required: true } },
+      },
+    ] as never,
+    mediaRoots: { storage: join(dir, "media"), quarantine: join(dir, "quarantine") },
+  });
+  (app as { pcpubBundleLimits?: PcpubLimits }).pcpubBundleLimits = SMALL_LIMITS;
+  const workspace = join(dir, "workspace");
+  await mkdir(join(workspace, "content"), { recursive: true });
+  await mkdir(join(workspace, "assets"));
+  await writeFile(join(workspace, "assets", "hero.png"), PNG_1PX);
+  await writeFile(
+    join(workspace, "publication.yaml"),
+    'changeset_title: "SEO media reference"\npublication:\n  mode: none\n',
+  );
+  const article = WORKSPACE_FILES["content/hero.pcmd"]!.replace(
+    "seo:\n  seo_title:",
+    'seo:\n  social_image:\n    asset_id: "bundle:assets/hero.png"\n  seo_title:',
+  );
+  await writeFile(join(workspace, "content", "hero.pcmd"), article);
+  const packed = await packWorkspace(workspace, {
+    out: join(dir, "seo.pcpub"),
+    limits: SMALL_LIMITS,
+  });
+  const bytes = await readFile(packed.path);
+  const validation = await validatePcpubBytes(app, bytes, OWNER());
+  assert.equal(validation.accepted, true, JSON.stringify(validation.issues));
+
+  const received = await receivePcpub(app, OWNER(), bytes);
+  await processPcpubIngest(app, received.ingest_id);
+  const status = (await getPcpubIngestStatus(app, OWNER(), received.ingest_id)) as {
+    outcome: string;
+    result: { entries: { revision_id: string }[]; media: { media_id: string }[] };
+  };
+  assert.equal(status.outcome, "sealed");
+  const revision = await app.revisions.getRevision(
+    app.pool,
+    status.result.entries[0]!.revision_id as never,
+  );
+  const seo = revision?.sidecar?.seo as { social_image: { asset_id: string } };
+  assert.equal(seo.social_image.asset_id, status.result.media[0]!.media_id);
+  assert.equal(
+    (revision?.payload as { fields: { hero_image: string } }).fields.hero_image,
+    status.result.media[0]!.media_id,
+  );
+
+  const badArticle = article.replace("bundle:assets/hero.png", "bundle:assets/missing.png");
+  await writeFile(join(workspace, "content", "hero.pcmd"), badArticle);
+  await assert.rejects(
+    packWorkspace(workspace, { out: join(dir, "bad-seo.pcpub"), limits: SMALL_LIMITS }),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, "PCPUB_DOCUMENT_INVALID");
+      assert.match(
+        JSON.stringify((error as { diagnostics?: unknown }).diagnostics),
+        /PCPUB_DOCUMENT_REF_UNRESOLVED/,
+      );
+      return true;
+    },
+  );
+
+  const richTextDoc = `---\npcmd_version: 1\noperation: create\nexternal_id: hidden-blocks\ncontent_type: rich_article\nfields:\n  title: Rich\n---\n:::block text@1\nrich_text: "not rendered by rich_text body policy"\n:::\n`;
+  await writeFile(join(workspace, "content", "hero.pcmd"), richTextDoc);
+  const richTextPacked = await packWorkspace(workspace, {
+    out: join(dir, "rich-text-policy.pcpub"),
+    limits: SMALL_LIMITS,
+  });
+  const richTextValidation = await validatePcpubBytes(
+    app,
+    await readFile(richTextPacked.path),
+    OWNER(),
+  );
+  assert.equal(richTextValidation.accepted, false);
+  assert.ok(
+    richTextValidation.issues.some(
+      (issue) => issue.code === "PCPUB_DOCUMENT_INVALID" && issue.path.includes("blocks"),
+    ),
+    JSON.stringify(richTextValidation.issues),
+  );
+
+  await writeFile(
+    join(workspace, "content", "hero.pcmd"),
+    article.replace("external_id: hero", "external_id: late-seal"),
+  );
+  const latePacked = await packWorkspace(workspace, {
+    out: join(dir, "late-seal.pcpub"),
+    limits: SMALL_LIMITS,
+  });
+  const late = await receivePcpub(app, OWNER(), await readFile(latePacked.path));
+  const revisions = app.revisions as unknown as {
+    sealRevisionWithinTx: (...args: unknown[]) => Promise<unknown>;
+  };
+  const originalSeal = revisions.sealRevisionWithinTx;
+  revisions.sealRevisionWithinTx = async () => {
+    throw Object.assign(new Error("revision validation failed"), {
+      code: "REVISION_VALIDATION_FAILED",
+      details: {
+        issues: [
+          {
+            code: "RICHTEXT_NODE_INVALID",
+            path: "/fields/body/0",
+            message: "invalid node",
+            severity: "error",
+          },
+        ],
+      },
+    });
+  };
+  try {
+    await processPcpubIngest(app, late.ingest_id);
+  } finally {
+    revisions.sealRevisionWithinTx = originalSeal;
+  }
+  const lateStatus = (await getPcpubIngestStatus(app, OWNER(), late.ingest_id)) as {
+    error_code: string;
+    safe_error_detail: { diagnostics: { path: string; code: string }[] };
+  };
+  assert.equal(lateStatus.error_code, "PCPUB_DOCUMENT_INVALID");
+  assert.deepEqual(lateStatus.safe_error_detail.diagnostics, [
+    {
+      code: "RICHTEXT_NODE_INVALID",
+      path: "content/hero.pcmd/fields/body/0",
+      message: "invalid node",
+    },
+  ]);
 });
 
 test("external refs rewrite only declared relation paths, including nested fields and block children", async () => {

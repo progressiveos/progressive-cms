@@ -3,7 +3,7 @@ name: progressive-cms-seo
 description: "Тщательно проверить и улучшить техническое и страничное SEO готового сайта Progressive CMS для Google и Яндекса: индексация, дубли title/H1/метаданных, canonical, robots, sitemap, разметка, OG, изображения, мобильность и производительность. Применять для SEO-аудита и исправления сайта с проверкой опубликованного результата."
 metadata:
   author: Progressive CMS
-  version: "1.0.1"
+  version: "1.0.2"
 ---
 
 # Progressive CMS SEO

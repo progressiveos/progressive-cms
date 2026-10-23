@@ -727,6 +727,11 @@ export function makeRegistryRoutes(): ApiRoute[] {
           status: 200,
           body: {
             current_version: currentCmsVersion(app),
+            deployment: {
+              running_version: currentCmsVersion(app),
+              running_release_id: app.releaseId,
+              selected: app.selectedReleaseStatus?.() ?? null,
+            },
             update:
               record === null
                 ? null
@@ -736,6 +741,7 @@ export function makeRegistryRoutes(): ApiRoute[] {
                     from_version: record.fromVersion,
                     to_version: record.toVersion,
                     failure_code: record.failureCode ?? null,
+                    backup_warnings: record.validationSummary.backup_warnings ?? [],
                     started_at: record.startedAt.toISOString(),
                     completed_at: record.completedAt?.toISOString() ?? null,
                   },

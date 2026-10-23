@@ -13,6 +13,8 @@
 
 SEO document отдельный от content payload. Поддерживаемые ключи: `seo_title`, `meta_description`, `canonical_override`, `robots_policy`, `social_title`, `social_description`, `social_image`, `structured_data_type_hint`. `social_image` — `{asset_id, version?}`, не произвольный URL. Сохраняй существующие значения и корректную семантику null/fallback; не обнуляй весь document только для title.
 
+Для обычного `PUT /entries/<id>/seo` указывай существующий MediaAsset id. Исключение существует только в `.pcpub`: если изображение включено и объявлено в пакете, `seo.social_image.asset_id` может содержать `bundle:assets/<archive-path>`. На target эта ссылка разрешается в идентичность того же MediaAsset, что и ссылки полей контента. Не используй `bundle:` в обычном SEO API или других SEO-полях.
+
 `GET /entries/<id>/seo` возвращает `{document: <object|null>}`. При null начни с восьми поддерживаемых полей со значениями null/fallback, затем задай утверждённые значения; существующий object сохраняй полностью. `PUT /entries/<id>/seo` — **полная замена** `{document: ...}`, не patch: пропущенные ключи становятся null/fallback. Возьми все восемь перечисленных полей текущего документа, измени только нужные и отправь полный сохранённый набор. Например, на уровне клиентского кода (не готовая команда CLI):
 
 ```javascript

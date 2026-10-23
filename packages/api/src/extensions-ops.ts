@@ -464,6 +464,7 @@ export async function applyUpdate(
       status: record.status,
       failure_code: record.failureCode ?? null,
       rollback_policy: record.rollbackPolicy,
+      backup_warnings: record.validationSummary.backup_warnings ?? [],
     };
   } catch (error) {
     const code = (error as { code?: string } | null)?.code;

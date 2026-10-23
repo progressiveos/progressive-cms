@@ -397,6 +397,8 @@ export interface ApplicationServicesInput {
   readonly environmentClassification?: "development" | "production";
   /** M16 agent bootstrap: deployed release id from build metadata, if known. */
   readonly releaseId?: string | null;
+  /** Optional installed-layout probe; absent in development/API-only composition. */
+  readonly selectedReleaseStatus?: () => import("@pcms/operations").SelectedReleaseStatus;
   /** M16 agent bootstrap: installed skill packages root (release ships skills/). */
   readonly skillsDir?: string;
   /** Community skills root (operator-installed packages); loaded only when
@@ -582,6 +584,7 @@ export interface ApplicationServices {
   // M16 agent bootstrap (discovery-first; agent-bootstrap-ops.ts)
   readonly environmentClassification: "development" | "production";
   readonly releaseId: string | null;
+  readonly selectedReleaseStatus: (() => import("@pcms/operations").SelectedReleaseStatus) | null;
   readonly skillsDir: string;
   readonly communitySkillsDir: string;
   readonly communitySkillsEnabled: boolean;
@@ -2979,6 +2982,7 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     previewState,
     environmentClassification,
     releaseId,
+    selectedReleaseStatus: input.selectedReleaseStatus ?? null,
     skillsDir,
     communitySkillsDir,
     communitySkillsEnabled,

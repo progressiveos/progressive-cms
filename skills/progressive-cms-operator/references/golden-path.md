@@ -100,6 +100,29 @@ cms agent bootstrap --json                 # confirm served version/release
 # there is no cms registry update-status subcommand
 ```
 
+A verified backup may carry `update.backup_warnings: ["BACKUP_RETENTION_FAILED"]`
+in the apply result or `GET /api/v1/registry/update-status`. This means old
+backup cleanup failed; it does **not** block installation or mean the new backup
+failed. Admin shows the warning on Updates. Check the update status separately.
+Do not delete old backups or relax permissions automatically.
+
+For an authorized host operator, use
+`systemctl start progressive-cms-backup.service`. The unit supplies the
+`progressive-cms` identity, sandbox and single-unit execution. Direct root
+invocation of the script without arguments delegates to that same unit before
+reading credentials or writing files. Root arguments are rejected explicitly;
+unit settings are not overridden or silently ignored. If the unit itself runs
+as root, the script refuses with BACKUP_SERVICE_USER_INVALID instead of recursing.
+Do not use root invocation of older, unguarded scripts: they create root-owned sets.
+
+On older installations, the same cleanup error can still veto the backup unit.
+With authorized host access, read `journalctl -u progressive-cms-backup.service`
+and inspect ownership/permissions of the exact path named by the error. A
+retention failure, dump failure and checksum failure are different causes.
+An API-only operator must pass the concrete cause to the host operator; never
+bypass BackupGate or claim that a new release can repair the old running script
+before installation. Failed backup creation or verification remains blocking.
+
 **Manifest-driven (fallback):** artifacts already staged in `incoming/`:
 
 ```bash

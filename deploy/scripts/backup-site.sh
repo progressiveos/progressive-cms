@@ -8,10 +8,25 @@
 # live in /etc/progressive-cms/secrets/* and only file-backed secret *refs*
 # appear in pcms.json.
 #
-# Usage (root on the site container):
-#   backup-site.sh [--retention N]     # N most recent sets kept, default 7
+# Operator entry point: systemctl start progressive-cms-backup.service
+# Direct root invocation without arguments delegates to that same confined unit.
+# Root arguments are rejected rather than silently ignored; the unit keeps 7 sets.
+# The unit runs as progressive-cms. Never create backup sets as root.
 # Requires: psql/pg_dump client, the release's build-metadata.json.
 set -euo pipefail
+
+# Delegate before reading credentials or creating files; preserve the unit sandbox.
+if [ "$(id -u)" -eq 0 ]; then
+  if [ -n "${INVOCATION_ID:-}" ]; then
+    echo "BACKUP_SERVICE_USER_INVALID: backup unit must run as progressive-cms, not root" >&2
+    exit 2
+  fi
+  if [ "$#" -ne 0 ]; then
+    echo "BACKUP_UNIT_ARGUMENTS_UNSUPPORTED: run progressive-cms-backup.service; arguments cannot be forwarded to the unit" >&2
+    exit 2
+  fi
+  exec systemctl start progressive-cms-backup.service
+fi
 
 RETENTION=7
 [ "${1:-}" = "--retention" ] && { RETENTION=$2; shift 2; }
@@ -89,17 +104,22 @@ chmod -R g-rwx,o-rwx "$DIR"
 chmod 0640 "$DIR"/*
 
 # --- retention --------------------------------------------------------------
+printf '[]\n' > "$DIR/warnings.json"
+chmod 0640 "$DIR/warnings.json"
 # Keep at most $RETENTION sets, but never drop a set younger than
 # $RETENTION_MIN_AGE_DAYS: at multi-deploy-per-day cadence a pure count-based
 # retention shrinks the recovery window to hours.
 RETENTION_MIN_AGE_DAYS=3
 CUTOFF=$(date -u -d "-${RETENTION_MIN_AGE_DAYS} days" +%Y%m%dT%H%M%SZ 2>/dev/null || date -u -v-${RETENTION_MIN_AGE_DAYS}d +%Y%m%dT%H%M%SZ)
-ls -1d "$BACKUP_ROOT"/2* 2>/dev/null | sort | head -n -"$RETENTION" | while read -r old; do
+if ! ls -1d "$BACKUP_ROOT"/2* 2>/dev/null | sort | head -n -"$RETENTION" | while read -r old; do
   stamp=$(basename "$old")
   if [ "$stamp" \> "$CUTOFF" ]; then
     continue  # inside the minimum-age window — keep regardless of count
   fi
-  rm -rf "$old"
-done
+  rm -rf "$old" || exit 1
+done; then
+  printf '["BACKUP_RETENTION_FAILED"]\n' > "$DIR/warnings.json"
+  echo "BACKUP_RETENTION_FAILED: backup complete; old sets could not be removed; check backup ownership and permissions" >&2
+fi
 
 echo "backup set: $DIR"

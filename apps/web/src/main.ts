@@ -23,7 +23,7 @@ import {
   newRequestId,
   systemClock,
 } from "@pcms/core";
-import { resolveReleaseIdentity } from "@pcms/operations";
+import { readSelectedReleaseStatus, resolveReleaseIdentity } from "@pcms/operations";
 import type { FastifyInstance } from "fastify";
 import { loadContentTypeDefinitions } from "./content-types.js";
 import { healthRoutes } from "./health.js";
@@ -383,6 +383,16 @@ export async function buildWebRuntime(options: {
       ? {}
       : { registryIncomingDir: process.env["PCMS_INCOMING_DIR"] }),
     ...(releaseId === undefined ? {} : { releaseId }),
+    ...(resolvedRelease.mode !== "release"
+      ? {}
+      : {
+          selectedReleaseStatus: () =>
+            readSelectedReleaseStatus({
+              currentSymlink: "/opt/progressive-cms/current",
+              runningRoot: resolvedRelease.root,
+              runningReleaseId: resolvedRelease.identity.releaseId,
+            }),
+        }),
     secrets,
     ...(config.themes?.renderDir === undefined ? {} : { themeDir: config.themes.renderDir }),
     mediaPresets: readThemeManifestPresets(config.themes?.renderDir),

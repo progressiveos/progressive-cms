@@ -39,6 +39,11 @@ export interface PcpubTargetContracts {
 export interface PcpubTargetContentType {
   /** Publish-level field validation (same checks seal enforces). */
   validateFields(fields: unknown): readonly { readonly path: string; readonly message: string }[];
+  /** Additional entry seal checks that require the Core content registries. */
+  validateEntry?(
+    path: string,
+    payload: { fields: unknown; blocks: unknown },
+  ): readonly PcpubDiagnostic[];
 }
 
 export interface PcpubAdapterServices {
@@ -269,6 +274,9 @@ export async function validatePcpub(
       // verified above and real IDs replace these before transactional apply.
       const blocks = replaceDeferredReferences(canonicalDocument, referenceIds);
       for (const issue of contracts.validateEntryBlocks(item.path, blocks)) {
+        issues.add(issue.code, issue.path || item.path, issue.message);
+      }
+      for (const issue of loaded.validateEntry?.(item.path, { fields, blocks }) ?? []) {
         issues.add(issue.code, issue.path || item.path, issue.message);
       }
     }
