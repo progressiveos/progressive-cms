@@ -150,6 +150,7 @@ test("RC update: Registry/upload/status retain runtime prerelease and fail close
   assert.equal(status.json().update.failure_code, "UPDATE_BACKUP_REQUIRED");
   const system = await getSystemStatusOp(app, apiContextOf(ownerActor()));
   assert.deepEqual(system.deployment, status.json().deployment);
+  assert.equal(system.db_migration_head, loadMigrations("db/migrations").at(-1)?.name);
   const anonymous = await server.inject({ method: "GET", url: "/api/v1/registry/update-status" });
   assert.equal(anonymous.statusCode, 401);
 

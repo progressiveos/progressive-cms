@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createApplicationServices } from "@pcms/api";
 import type { DbClient, DbPool } from "@pcms/core";
-import { loadMigrations } from "@pcms/core";
+import { loadMigrations, MIGRATIONS_TABLE } from "@pcms/core";
 import { Client, Pool } from "pg";
 
 export async function rollbackApiFixture(
@@ -26,8 +26,20 @@ export async function rollbackApiFixture(
     .replaceAll("public.", `${schema}.`)
     .replaceAll(`${schema}.gin_trgm_ops`, "public.gin_trgm_ops");
   await client.query(baseline);
-  for (const migration of loadMigrations("db/migrations").slice(1)) {
+  const migrations = loadMigrations("db/migrations");
+  for (const migration of migrations.slice(1)) {
     await client.query(migration.sql.replaceAll("public.", `${schema}.`));
+  }
+  await client.query(`CREATE TABLE ${schema}.${MIGRATIONS_TABLE} (
+    name text PRIMARY KEY,
+    checksum text NOT NULL,
+    applied_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  for (const migration of migrations) {
+    await client.query(
+      `INSERT INTO ${schema}.${MIGRATIONS_TABLE} (name, checksum) VALUES ($1, $2)`,
+      [migration.name, migration.checksum],
+    );
   }
   let pendingQuery: Promise<unknown> = Promise.resolve();
   const connection: DbClient = {
