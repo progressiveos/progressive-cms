@@ -117,6 +117,7 @@ export interface McpOperations {
     query: { text?: string; kind?: string; limit?: number; cursor?: string },
   ): Promise<unknown>;
   getMediaUsage(ctx: OperationContextLike, id: string): Promise<unknown>;
+  regenerateMediaVariants(ctx: OperationContextLike, id: string): Promise<unknown>;
   archiveMedia(ctx: OperationContextLike, id: string): Promise<unknown>;
   validateEntrySeo(ctx: OperationContextLike, id: string): Promise<unknown>;
   listSeoEntries(

@@ -831,6 +831,17 @@ export const TOOLS: readonly McpTool[] = [
     },
   },
   {
+    name: "cms_regenerate_media_variants",
+    description:
+      "Generate missing active-theme variants for one raster image. Keeps the MediaAsset ID, original bytes, and version; returns per-preset failures for retry. Requires media.write.",
+    permission: "media.write",
+    mutation: true,
+    inputSchema: objectSchema({ media_id: STR_ID }, ["media_id"]),
+    async run(operations, ctx, args) {
+      return operations.regenerateMediaVariants(ctx, args["media_id"] as string);
+    },
+  },
+  {
     name: "cms_get_media_usage",
     description: "Inbound references and source titles. Review before media cleanup.",
     permission: "media.read",

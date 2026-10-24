@@ -26,10 +26,18 @@ import {
   makeThemeManageRoutes,
 } from "@pcms/api";
 import { createLogger } from "@pcms/core";
-import { LocalMediaStorage, uploadMedia } from "@pcms/media";
+import {
+  archiveAsset,
+  getAsset,
+  LocalMediaStorage,
+  listVariants,
+  uploadMedia,
+  variantPublicUrl,
+} from "@pcms/media";
 import { readThemeManifestPresets } from "@pcms/themes";
 import sharp from "sharp";
 import yazl from "yazl";
+import { registerMediaFilesRoute } from "../../apps/web/src/media-files.js";
 import { registerSiteRoute } from "../../apps/web/src/site.js";
 import { registerThemeFilesRoute } from "../../apps/web/src/theme-files.js";
 import { apiContextOf, ownerActor } from "../helpers/api-composition.js";
@@ -86,6 +94,7 @@ async function fixture(t: TestContext) {
     // application.themeRuntime) — the same wiring the web process uses.
     await registerSiteRoute(server, { application });
     registerThemeFilesRoute(server, { renderDir: themeDir, application });
+    registerMediaFilesRoute(server, { application });
     t.after(() => server.close());
     await server.listen({ host: "127.0.0.1", port: 0 });
     return server;
@@ -265,6 +274,147 @@ test("variant generation failures are surfaced per preset, never thrown", { skip
     assert.equal(failure.media_id, accepted.asset.id);
     assert.ok(failure.error.length > 0);
   }
+});
+
+test("REST retries missing image variants without replacing the MediaAsset", {
+  skip,
+}, async (t) => {
+  const f = await fixture(t);
+  const server = await f.boot();
+  const accepted = await uploadPng(f, 320, 200);
+  const before = await getAsset(f.pool, accepted.asset.id);
+  assert.ok(before);
+  const storage = f.app.mediaStorage;
+  assert.ok(storage);
+  const getBuffer = storage.getBuffer.bind(storage);
+  storage.getBuffer = async () => {
+    throw new Error("derivative source read failed");
+  };
+  const failed = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${accepted.asset.id}/variants/regenerate`,
+    headers: f.headers,
+  });
+  assert.equal(failed.statusCode, 200, failed.body);
+  const failureResult = failed.json() as {
+    media_id: string;
+    generated: number;
+    media_variant_failures?: readonly { media_id: string; preset: string; error: string }[];
+  };
+  assert.equal(failureResult.media_id, accepted.asset.id);
+  assert.equal(failureResult.generated, 0);
+  assert.equal(
+    failureResult.media_variant_failures?.length,
+    f.app.mediaPresets.listPresets().length,
+  );
+
+  storage.getBuffer = getBuffer;
+  const repaired = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${accepted.asset.id}/variants/regenerate`,
+    headers: f.headers,
+  });
+  assert.equal(repaired.statusCode, 200, repaired.body);
+  const repairedResult = repaired.json() as {
+    media_id: string;
+    generated: number;
+    reused: number;
+    media_variant_failures?: readonly unknown[];
+  };
+  assert.equal(repairedResult.media_id, accepted.asset.id);
+  assert.ok(repairedResult.generated > 0);
+  assert.equal(repairedResult.media_variant_failures, undefined);
+  const after = await getAsset(f.pool, accepted.asset.id);
+  assert.ok(after);
+  assert.equal(after.currentVersionNo, before.currentVersionNo);
+  assert.equal(after.sha256, before.sha256);
+  const variants = await listVariants(f.pool, accepted.asset.id, after.currentVersionNo);
+  assert.ok(variants.length > 0);
+  const variant = variants[0];
+  assert.ok(variant);
+  const publicResponse = await server.inject({
+    method: "GET",
+    url: variantPublicUrl({
+      assetId: variant.assetId,
+      versionNo: variant.versionNo,
+      presetId: variant.presetId,
+      variantKey: variant.variantKey,
+      format: variant.format,
+    }),
+  });
+  assert.equal(publicResponse.statusCode, 200);
+
+  const repeated = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${accepted.asset.id}/variants/regenerate`,
+    headers: f.headers,
+  });
+  assert.equal(repeated.statusCode, 200, repeated.body);
+  const repeatedResult = repeated.json() as { generated: number; reused: number };
+  assert.equal(repeatedResult.generated, 0);
+  assert.ok(repeatedResult.reused > 0);
+});
+
+test("media variant regeneration requires media.write", { skip }, async (t) => {
+  const f = await fixture(t);
+  const server = await f.boot();
+  const accepted = await uploadPng(f, 320, 200);
+  const account = await f.app.machineIdentity.createServiceAccount({
+    name: "media-reader",
+    purpose: "test",
+  });
+  const token = await f.app.machineIdentity.createAccessToken({
+    serviceAccountId: account.id,
+    scopes: ["media.read"],
+    ttlMilliseconds: 3600000,
+    siteKey: "default",
+    environment: "production",
+  });
+  const response = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${accepted.asset.id}/variants/regenerate`,
+    headers: {
+      authorization: `Bearer ${token.rawSecret}`,
+      "x-pcms-site": "default",
+      "x-pcms-environment": "production",
+    },
+  });
+  assert.equal(response.statusCode, 403, response.body);
+});
+
+test("media variant regeneration rejects archived assets and non-images", { skip }, async (t) => {
+  const f = await fixture(t);
+  const server = await f.boot();
+  const archived = await uploadPng(f, 320, 200);
+  await archiveAsset(f.pool, archived.asset.id);
+  const archivedResponse = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${archived.asset.id}/variants/regenerate`,
+    headers: f.headers,
+  });
+  assert.equal(archivedResponse.statusCode, 409, archivedResponse.body);
+  assert.equal(archivedResponse.json().error.code, "MEDIA_ARCHIVED");
+
+  const storage = f.app.mediaStorage;
+  const quarantine = f.app.mediaQuarantine;
+  assert.ok(storage);
+  assert.ok(quarantine);
+  const document = await uploadMedia(
+    { pool: f.pool, storage, quarantine },
+    {
+      bytes: Buffer.from("plain text document"),
+      filename: "notes.txt",
+      declaredMimeType: "text/plain",
+      createdBy: "test:active-presets",
+    },
+  );
+  const documentResponse = await server.inject({
+    method: "POST",
+    url: `/api/v1/media/${document.asset.id}/variants/regenerate`,
+    headers: f.headers,
+  });
+  assert.equal(documentResponse.statusCode, 422, documentResponse.body);
+  assert.equal(documentResponse.json().error.code, "MEDIA_VARIANT_REGENERATION_UNSUPPORTED");
 });
 
 test("REST upload returns preset failures while keeping the accepted asset", {

@@ -1252,6 +1252,27 @@
       }
     },
     {
+      "name": "cms_regenerate_media_variants",
+      "description": "Generate missing active-theme variants for one raster image. Keeps the MediaAsset ID, original bytes, and version; returns per-preset failures for retry. Requires media.write.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "media_id"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "media.write"
+      }
+    },
+    {
       "name": "cms_get_media_usage",
       "description": "Inbound references and source titles. Review before media cleanup.",
       "inputSchema": {
@@ -2859,7 +2880,7 @@
     },
     {
       "name": "cms_import_stock_candidate",
-      "description": "Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. Duplicate-safe per provider asset.",
+      "description": "Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. On a new import, if a theme derivative fails, the accepted asset is returned with media_variant_failures; duplicate-safe re-import returns the existing asset without rerunning derivatives.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -2944,7 +2965,7 @@
     },
     {
       "name": "cms_get_media_generation",
-      "description": "Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed. Never reference preview URLs; use media_id.",
+      "description": "Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed, and optional media_variant_failures. Never reference preview URLs; use media_id.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -3146,7 +3167,7 @@
     },
     {
       "name": "cms_import_media_url",
-      "description": "Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks, sha256 dedupe — an already-imported file returns the existing media_id with duplicate_blob true, so repeated references to the same source image cost nothing — and variants generated on accept. Returns media_id; reference it in content instead of the source URL.",
+      "description": "Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks and sha256 dedupe. Returns media_id; if a theme derivative fails, the accepted asset also includes media_variant_failures. Reference the media_id in content instead of the source URL.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -3168,7 +3189,7 @@
     },
     {
       "name": "cms_accept_generated_media",
-      "description": "Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true).",
+      "description": "Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true), including any media_variant_failures.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,

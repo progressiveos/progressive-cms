@@ -30,7 +30,7 @@ SKILL.md (it is thin), then one or two files from the table below.
 | Canonical path of an entry | `GET /discovery/content/tree` → `route_path` (or `GET /entries/:id/route`) |
 | Remote diagnostics (no shell) | `GET /api/v1/diagnostics` (site.validate) |
 | **Migrate a site from a legacy engine (MODX/WordPress/Tilda/Bitrix)** | [`progressive-cms-content-agent/references/migration-engines.md`](../progressive-cms-content-agent/references/migration-engines.md) |
-| Media: upload, import by URL, variants | [`progressive-cms-content-agent/references/media.md`](../progressive-cms-content-agent/references/media.md) |
+| Media: upload, import by URL, variants and retry failed derivatives | [`progressive-cms-content-agent/references/media.md`](../progressive-cms-content-agent/references/media.md) |
 | Entry SEO/social meta | [`progressive-cms-content-agent/references/seo.md`](../progressive-cms-content-agent/references/seo.md) |
 | **Does a page need an image? hero_image vs page hero vs social_image; the known OG fallback chain (`social_image → hero_image → site default`)** | [`progressive-cms-content-agent/references/canonical-workflow.md`](../progressive-cms-content-agent/references/canonical-workflow.md) (§ Card illustrations) |
 | Site payments: what may be written | [`progressive-cms-content-agent/references/payments.md`](../progressive-cms-content-agent/references/payments.md) |

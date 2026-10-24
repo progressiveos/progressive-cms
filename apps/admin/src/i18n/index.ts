@@ -139,6 +139,12 @@ const errorMessages: Record<AdminLocale, Readonly<Record<string, string>>> = {
     FOLDER_NOT_EMPTY: "Сначала переместите или заархивируйте материалы внутри папки",
     NAV_SET_NOT_FOUND: "Набор навигации не найден",
     CONTENT_TYPE_UNKNOWN: "Неизвестный тип контента",
+    MEDIA_ASSET_NOT_FOUND: "Медиафайл не найден",
+    MEDIA_ARCHIVED: "Нельзя восстановить варианты архивного медиафайла",
+    MEDIA_VARIANT_REGENERATION_UNSUPPORTED:
+      "Варианты можно восстановить только для растровых изображений",
+    MEDIA_PRESETS_UNAVAILABLE: "Пресеты активной темы сейчас недоступны",
+    MEDIA_STORAGE_CONFIG: "Хранилище медиа не настроено",
   },
   en: {
     AUTH_INVALID_CREDENTIALS: "Incorrect email or password",
@@ -162,6 +168,11 @@ const errorMessages: Record<AdminLocale, Readonly<Record<string, string>>> = {
     FOLDER_NOT_EMPTY: "Move or archive the folder's entries first",
     NAV_SET_NOT_FOUND: "Navigation set not found",
     CONTENT_TYPE_UNKNOWN: "Unknown content type",
+    MEDIA_ASSET_NOT_FOUND: "Media asset not found",
+    MEDIA_ARCHIVED: "Variants cannot be restored for an archived media asset",
+    MEDIA_VARIANT_REGENERATION_UNSUPPORTED: "Only raster images support variant regeneration",
+    MEDIA_PRESETS_UNAVAILABLE: "Active theme presets are currently unavailable",
+    MEDIA_STORAGE_CONFIG: "Media storage is not configured",
   },
 };
 

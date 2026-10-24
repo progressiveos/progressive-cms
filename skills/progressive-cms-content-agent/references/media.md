@@ -49,6 +49,12 @@ behavior: a new asset ID per accepted upload, no extra original byte copy.
   task cannot vouch for.
 - Wait for the asset to be ready before referencing it; inspect metadata
   (`GET /media/:mediaId`) after ingest.
+- If an image response contains `media_variant_failures`, the MediaAsset is
+  saved but one or more active-theme derivatives are missing. An operator or
+  agent with `media.write` can retry them with
+  `POST /media/:mediaId/variants/regenerate` or MCP
+  `cms_regenerate_media_variants`. The operation is idempotent, keeps the
+  asset ID/source/version, and returns any per-preset failures still present.
 
 ## Media acquisition (when the capability exists)
 

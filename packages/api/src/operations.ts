@@ -22,6 +22,7 @@ import {
   getAsset,
   LOGO_PRESET_ID,
   listMediaFolders,
+  type MediaAssetRecord,
   moveMediaAsset,
   OG_IMAGE_PRESET_ID,
   replaceDocument,
@@ -541,25 +542,22 @@ export function mediaVariantFailureField(failures: readonly MediaVariantGenerati
 }
 
 /**
- * Generates theme-preset derivatives for a freshly accepted image
- * (audit gap #2: `generateVariantsForAsset` had no runtime caller). The
- * preset set comes from the active theme via the composition; generation is
- * synchronous and idempotent (existing byte-identical variants are reused).
- * Derivative generation must never fail the upload itself: the asset is
- * committed, and any incomplete preset set is returned to its caller.
+ * Generates missing theme-preset derivatives for one image MediaAsset. This
+ * is idempotent and never changes its source bytes or version. Callers decide
+ * whether failures are fatal or should be returned as warnings.
  */
 // ponytail: inline generation suits the pilot volume (tens of images); move
 // behind the job queue when upload latency or volume says so.
-export async function generateVariantsAfterAccept(
+export async function generateThemeVariantsForAsset(
   app: ApplicationServices,
-  accepted: AcceptedMedia,
+  asset: MediaAssetRecord,
 ): Promise<MediaVariantGenerationOutcome> {
   if (app.mediaStorage === null) return { generated: 0, reused: 0, failures: [] };
   const presets = app.mediaPresets.listPresets();
   if (presets.length === 0) return { generated: 0, reused: 0, failures: [] };
   const deps = { pool: app.pool, storage: app.mediaStorage, maxSourceBytes: 128 * 1024 * 1024 };
   try {
-    const rows = await generateVariantsForAsset(deps, accepted.asset, app.mediaPresets);
+    const rows = await generateVariantsForAsset(deps, asset, app.mediaPresets);
     return {
       generated: rows.filter((row) => !row.reused).length,
       reused: rows.filter((row) => row.reused).length,
@@ -574,14 +572,12 @@ export async function generateVariantsAfterAccept(
     let reused = 0;
     for (const preset of presets) {
       try {
-        const rows = await generateVariantsForAsset(deps, accepted.asset, app.mediaPresets, [
-          preset,
-        ]);
+        const rows = await generateVariantsForAsset(deps, asset, app.mediaPresets, [preset]);
         generated += rows.filter((row) => !row.reused).length;
         reused += rows.filter((row) => row.reused).length;
       } catch (error) {
         failures.push({
-          media_id: accepted.asset.id,
+          media_id: asset.id,
           preset: preset.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -589,6 +585,59 @@ export async function generateVariantsAfterAccept(
     }
     return { generated, reused, failures };
   }
+}
+
+/** Acceptance and operator retry share the same idempotent generation path. */
+export async function generateVariantsAfterAccept(
+  app: ApplicationServices,
+  accepted: AcceptedMedia,
+): Promise<MediaVariantGenerationOutcome> {
+  return generateThemeVariantsForAsset(app, accepted.asset);
+}
+
+/** Repair missing current-theme derivatives without changing media identity. */
+export async function regenerateMediaVariantsOp(
+  app: ApplicationServices,
+  ctx: OperationContext,
+  input: { readonly media_id: string },
+) {
+  requirePermission(app, ctx, "media.write");
+  assertTokenConstraints(ctx.actor, {
+    siteKey: app.defaultSiteKey,
+    environment: ctx.actor.environment,
+  });
+  if (app.mediaStorage === null) {
+    throw new ApiError("MEDIA_STORAGE_CONFIG", "media storage is not configured", { status: 503 });
+  }
+  const asset = await getAsset(app.pool, input.media_id as StableId);
+  if (asset === null) {
+    throw new ApiError("MEDIA_ASSET_NOT_FOUND", "media asset does not exist", { status: 404 });
+  }
+  if (asset.archivedAt !== null) {
+    throw new ApiError("MEDIA_ARCHIVED", "archived media assets cannot be regenerated", {
+      status: 409,
+    });
+  }
+  if (asset.kind !== "image" || asset.mimeType === "image/svg+xml") {
+    throw new ApiError(
+      "MEDIA_VARIANT_REGENERATION_UNSUPPORTED",
+      "theme variants can only be regenerated for raster images",
+      { status: 422 },
+    );
+  }
+  if (app.mediaPresets.listPresets().length === 0) {
+    throw new ApiError("MEDIA_PRESETS_UNAVAILABLE", "no active theme media presets are loaded", {
+      status: 503,
+      retryable: true,
+    });
+  }
+  const outcome = await generateThemeVariantsForAsset(app, asset);
+  return {
+    media_id: asset.id,
+    generated: outcome.generated,
+    reused: outcome.reused,
+    ...mediaVariantFailureField(outcome.failures),
+  };
 }
 
 export async function uploadMediaOp(

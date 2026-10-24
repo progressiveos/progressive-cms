@@ -35,7 +35,7 @@ Core владеет protected head и композицией JSON-LD. Не до�
 
 Новая первая публикация без live route идёт через changeset с route operation → preflight → apply; direct publish требует существующий live route и `expected_generation`. Content rollback, theme rollback и восстановление БД — разные процедуры.
 
-Реальное наследование social image: explicit `social_image` → собственное published `hero_image` → ближайший подходящий **Content Tree** parent в locale → site default. Меню/URL не определяют родителя. Проверяй `og-v1` managed derivative (1200×630), MIME, доступность и alt. Draft-only ancestor не должен менять live OG. Фото не обязательно на юридической/текстовой странице; реальный site fallback допустим, фиктивные asset ids — нет.
+Реальное наследование social image: explicit `social_image` → собственное published `hero_image` → ближайший подходящий **Content Tree** parent в locale → site default. Меню/URL не определяют родителя. Проверяй `og-v1` managed derivative (1200×630), MIME, доступность и alt. Draft-only ancestor не должен менять live OG. Если derivative отсутствует и у тебя есть `media.write`, восстанови текущие варианты активной темы через `POST /media/<media-id>/variants/regenerate` или MCP `cms_regenerate_media_variants({media_id})`; операция сохраняет исходный asset и не требует перезаливать изображение. Проверь `generated`, `reused` и оставшиеся `media_variant_failures`. Старые варианты не backfill-ятся автоматически; для archived, SVG и других не-raster assets операция возвращает typed error. Без `media.write` отметь блокер, не выдумывай обход. Фото не обязательно на юридической/текстовой странице; реальный site fallback допустим, фиктивные asset ids — нет.
 
 ## Theme changes и безопасная проверка
 

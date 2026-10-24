@@ -106,6 +106,7 @@ import {
   previewPublicationPlan,
   publishNowOp,
   publishRevision,
+  regenerateMediaVariantsOp,
   reidentifyEntryLocale,
   reschedulePlanItem,
   schedulePublicationPlan,
@@ -370,6 +371,8 @@ export function bindOperations(app: ApplicationServices) {
         ...(query.limit === undefined ? {} : { limit: String(query.limit) }),
       }),
     getMediaUsage: (ctx: OperationContext, id: string) => getMediaUsageOp(app, ctx, id),
+    regenerateMediaVariants: (ctx: OperationContext, id: string) =>
+      regenerateMediaVariantsOp(app, ctx, { media_id: id }),
     archiveMedia: (ctx: OperationContext, id: string) => archiveMediaOp(app, ctx, { media_id: id }),
     validateEntrySeo: (ctx: OperationContext, id: string) => validateEntrySeoOp(app, ctx, id),
     listSeoEntries: (ctx: OperationContext, query: { limit?: number; cursor?: string }) =>

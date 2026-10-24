@@ -58,6 +58,7 @@ import {
   previewPublicationPlan,
   publishNowOp,
   publishRevision,
+  regenerateMediaVariantsOp,
   reidentifyEntryLocale,
   removeNavigationOverride,
   replaceMediaVersionOp,
@@ -1850,6 +1851,32 @@ export function makeMutationRoutes(): ApiRoute[] {
             duplicate_blob: accepted.duplicateBlob,
             ...mediaVariantFailureField(accepted.media_variant_failures ?? []),
           },
+        };
+      },
+    },
+    {
+      spec: {
+        method: "POST",
+        url: "/media/:mediaId/variants/regenerate",
+        operationId: "regenerate_media_variants",
+        summary: "Generate missing raster image variants for the active theme",
+        tag: "media",
+        auth: "authenticated",
+        permission: "media.write",
+        responseSchema: mediaResponseSchema(
+          {
+            media_id: { type: "string" },
+            generated: { type: "integer", minimum: 0 },
+            reused: { type: "integer", minimum: 0 },
+          },
+          ["media_id", "generated", "reused"],
+        ),
+      },
+      async handle(app, ctx, request) {
+        const params = request.params as { mediaId: string };
+        return {
+          status: 200,
+          body: await regenerateMediaVariantsOp(app, ctx, { media_id: params.mediaId }),
         };
       },
     },

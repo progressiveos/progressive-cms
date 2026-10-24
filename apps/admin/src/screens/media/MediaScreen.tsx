@@ -702,6 +702,40 @@ function MediaDetails(props: {
     }
   };
 
+  const regenerateVariants = async () => {
+    setBusy(true);
+    try {
+      const result = await apiRequest<{
+        readonly generated: number;
+        readonly reused: number;
+        readonly media_variant_failures?: readonly MediaVariantFailureWire[];
+      }>("POST", `/media/${props.item.id}/variants/regenerate`);
+      const failures = result.media_variant_failures;
+      if (failures !== undefined && failures.length > 0) {
+        const presets = [...new Set(failures.map((failure) => failure.preset))].sort().join(", ");
+        toast(t("media.variant_regeneration_incomplete", { presets }), "warning");
+      } else {
+        toast(
+          t("media.variant_regeneration_success", {
+            generated: result.generated,
+            reused: result.reused,
+          }),
+          "success",
+        );
+      }
+      props.onChanged();
+    } catch (caught) {
+      toast(
+        caught instanceof ApiError
+          ? (errorText(caught.code) ?? caught.message)
+          : t("media.variant_regeneration_failed"),
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Drawer open onClose={props.onClose} title={props.item.filenameOriginal}>
       <div data-testid="media-details">
@@ -809,6 +843,17 @@ function MediaDetails(props: {
             </Button>
           ) : null}
         </fieldset>
+
+        {props.item.kind === "image" &&
+        props.item.mimeType !== "image/svg+xml" &&
+        props.canWrite ? (
+          <div className="pcms-panel">
+            <p className="pcms-field__hint">{t("media.variant_regenerate_hint")}</p>
+            <Button disabled={busy} onClick={() => void regenerateVariants()}>
+              {t("media.variant_regenerate_button")}
+            </Button>
+          </div>
+        ) : null}
 
         {props.item.kind === "document" && props.canReplace ? (
           <div className="pcms-panel">

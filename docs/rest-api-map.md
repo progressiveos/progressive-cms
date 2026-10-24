@@ -83,7 +83,7 @@ The complete fixed registry follows below. Enabled extensions can additionally c
 HTTP routes outside `/api/v1` are listed after the registry. They include health, signed preview, public files/site rendering, Admin assets and extension dispatch. They are not all REST JSON endpoints. Fastify also supplies HEAD handling for GET routes; this is not a separate application operation.
 
 <!-- interface-map:start -->
-## Fixed REST registry: 315 operations
+## Fixed REST registry: 316 operations
 
 | Area | Operations | Purpose |
 |---|---:|---|
@@ -96,7 +96,7 @@ HTTP routes outside `/api/v1` are listed after the registry. They include health
 | [forms](#rest-forms) | 19 | Version definitions and run anonymous server-validated interactions; history can contain personal data. |
 | [integrations](#rest-integrations) | 25 | Configure connectors, notifications and delivery reliability; secret slots are write-only. |
 | [interactions](#rest-interactions) | 13 | Read/moderate/export submissions, quiz runs and leads with separate scopes. |
-| [media](#rest-media) | 32 | Manage assets, folders, providers and acquisition. Import/accept before referencing managed media ids. |
+| [media](#rest-media) | 33 | Manage assets, folders, providers and acquisition. Import/accept before referencing managed media ids. |
 | [payments](#rest-payments) | 16 | Provider discovery, payment lifecycle, refunds and verified callbacks; mutations can move real money. |
 | [publication](#rest-publication) | 23 | Coordinate sealed revisions, routes, changesets, plans and public visibility. |
 | [search](#rest-search) | 7 | Query public/admin search, inspect index health and explicitly run reindexing. |
@@ -11543,6 +11543,7 @@ Manage assets, folders, providers and acquisition. Import/accept before referenc
 | `GET /api/v1/media/{mediaId}/file` | [get_media_file](#get_media_file) | Current-version file bytes for Admin previews (media.read; private cache) |
 | `PATCH /api/v1/media/{mediaId}/folder` | [move_media_asset](#move_media_asset) | Move an asset into a folder (null = root) — logical only, identity/URLs unchanged |
 | `GET /api/v1/media/{mediaId}/usage` | [get_media_usage](#get_media_usage) | Inbound references for the asset |
+| `POST /api/v1/media/{mediaId}/variants/regenerate` | [regenerate_media_variants](#regenerate_media_variants) | Generate missing raster image variants for the active theme |
 | `PUT /api/v1/media/{mediaId}/version` | [replace_media_version](#replace_media_version) | Replace the current document version (new immutable version) |
 | `GET /api/v1/media/by-hash/{sha256}` | [search_media_by_hash](#search_media_by_hash) | Exact-bytes lookup (§45 dedupe): every asset whose current content hash matches — explains library duplicates |
 | `GET /api/v1/media/folders` | [list_media_folders](#list_media_folders) | Logical media folders (editorial organization only) |
@@ -12070,6 +12071,86 @@ return {
     ctx,
     stableId(request.params.mediaId, "mediaId")
   )
+};
+```
+
+<a id="regenerate_media_variants"></a>
+
+### POST /api/v1/media/{mediaId}/variants/regenerate
+
+**regenerate_media_variants** — Generate missing raster image variants for the active theme
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `media.write` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/mutations.ts` |
+
+Path parameters: `mediaId`.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_id",
+    "generated",
+    "reused"
+  ],
+  "properties": {
+    "media_id": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reused": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "media_variant_failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_id",
+          "preset",
+          "error"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Response construction:
+```javascript
+const params = request.params;
+return {
+  status: 200,
+  body: await regenerateMediaVariantsOp(app, ctx, { media_id: params.mediaId })
 };
 ```
 

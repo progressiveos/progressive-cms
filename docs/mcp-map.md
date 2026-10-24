@@ -69,7 +69,7 @@ Names are `cms_ext_<sanitized-extension-id>_<sanitized-operation-id>`. Sanitizat
 Only operations from deployed, **enabled** extensions appear. Their title becomes the description; their manifest input schema, permission and mutation flag become the tool contract. Calls use the same typed extension invocation as REST. `tools/list` does not publish the extension output schema, so this map includes it from the shipped manifest for reference. Discover the actual instance again after enable/disable, update or capability changes. Do not hard-code an optional provider id in a generic consumer.
 
 <!-- interface-map:start -->
-## Built-in tools: 132
+## Built-in tools: 133
 
 | Tool | Purpose | Permission | Read-only hint |
 |---|---|---|---|
@@ -124,6 +124,7 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_export_interactions](#cms_export_interactions) | Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (Forms spec §29; interactions.export / leads.export). | `interactions.export` | true |
 | [cms_search_media](#cms_search_media) | Bounded media search with typed filters (text, kind). Follow next_cursor until has_more=false for a full catalog. | `media.read` | true |
 | [cms_get_media](#cms_get_media) | Full media asset view: versions and variants. | `media.read` | true |
+| [cms_regenerate_media_variants](#cms_regenerate_media_variants) | Generate missing active-theme variants for one raster image. Keeps the MediaAsset ID, original bytes, and version; returns per-preset failures for retry. Requires media.write. | `media.write` | false |
 | [cms_get_media_usage](#cms_get_media_usage) | Inbound references and source titles. Review before media cleanup. | `media.read` | true |
 | [cms_archive_media](#cms_archive_media) | Archive an unused media asset after explicit confirmation. Usage is checked first; referenced assets are refused. Requires media.read and media.archive. | `media.archive` | false |
 | [cms_list_seo_entries](#cms_list_seo_entries) | Active Content Tree page for a full SEO audit. Skip folders; follow next_cursor to exhaustion and validate each entry with cms_validate_seo. | `content.read` | true |
@@ -2108,6 +2109,38 @@ Complete argument schema:
 Adapter input/result mapping:
 ```javascript
 return operations.getMedia(args["media_id"]);
+```
+
+<a id="cms_regenerate_media_variants"></a>
+
+### cms_regenerate_media_variants
+
+Generate missing active-theme variants for one raster image. Keeps the MediaAsset ID, original bytes, and version; returns per-preset failures for retry. Requires media.write.
+
+Permission annotation: `media.write`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "media_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f-]{36}$"
+    }
+  },
+  "required": [
+    "media_id"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.regenerateMediaVariants(ctx, args["media_id"]);
 ```
 
 <a id="cms_get_media_usage"></a>

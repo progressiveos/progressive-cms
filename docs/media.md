@@ -21,7 +21,9 @@ When generation of a theme preset fails, Core still accepts the image asset and 
 
 For `.pcpub` ingestion, the worker refreshes its presets from the persistently active theme before processing each package. `themes.renderDir` is the configured fallback directory, not a reliable indication of which theme is active.
 
-New image accepts attempt the current theme presets, but existing images are not automatically backfilled when presets change. There is no public single-asset variant-regeneration operation. `PUT /api/v1/media/{mediaId}/version` replaces document assets and rejects images with `MEDIA_IMAGE_REPLACEMENT_FORBIDDEN`; do not use document version replacement to repair image derivatives.
+Existing images are not automatically backfilled when presets change. Regenerate one asset's current active-theme variants with `POST /api/v1/media/{mediaId}/variants/regenerate`; the request has no body and requires the existing `media.write` permission. It is idempotent, preserves the MediaAsset ID, original bytes and version, and returns `media_id`, `generated`, `reused`, plus optional `media_variant_failures` when some presets still fail. Retry the operation after addressing a reported failure; already present variants are reused.
+
+The equivalent MCP tool is `cms_regenerate_media_variants` with `{"media_id":"<media-id>"}`. Admin exposes the same action in Media Details for writable raster images. This is a single-asset operation; there is no bulk backfill. Archived assets return `MEDIA_ARCHIVED` (409), SVG and other non-raster assets return `MEDIA_VARIANT_REGENERATION_UNSUPPORTED` (422), missing assets return `MEDIA_ASSET_NOT_FOUND` (404), and unavailable storage or active presets return `MEDIA_STORAGE_CONFIG` or retryable `MEDIA_PRESETS_UNAVAILABLE` (503). `PUT /api/v1/media/{mediaId}/version` replaces document assets and rejects images with `MEDIA_IMAGE_REPLACEMENT_FORBIDDEN`; do not use document version replacement to repair image derivatives.
 
 Published-card selection and its explicit-hero behavior are described below. Card covers and OG images have different resolution rules; never add invisible blocks to drive a cover.
 

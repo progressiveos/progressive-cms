@@ -2,7 +2,7 @@
   "schema": "pcms-public-source/1",
   "channel": "Public Beta",
   "version": "1.0.0-rc.32",
-  "core": "f7868fd91dacb1502b470e279ed2f2bb7fd2999d",
+  "core": "b44b6aedb8b42bc3612962cffbd78fc74aa78bd0",
   "extensions": "5df62103cf20ef82cd1a96896e1010fba858c8a1",
-  "docs": "1461f4a1008cb50e602eed0887018a724317a4b5"
+  "docs": "34e2836593df0a1498d6af3e49700604431d71f1"
 }
