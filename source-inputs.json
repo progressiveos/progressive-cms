@@ -1,8 +1,8 @@
 {
   "schema": "pcms-public-source/1",
   "channel": "Public Beta",
-  "version": "1.0.0-rc.31",
-  "core": "25b940bb4d19c27a4d9f74aadeb34e0d94c15ecc",
+  "version": "1.0.0-rc.32",
+  "core": "f7868fd91dacb1502b470e279ed2f2bb7fd2999d",
   "extensions": "5df62103cf20ef82cd1a96896e1010fba858c8a1",
-  "docs": "0b5b0df0bc7bc3ab607789c95c7183fe5432f3e9"
+  "docs": "1461f4a1008cb50e602eed0887018a724317a4b5"
 }

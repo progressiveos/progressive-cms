@@ -68,12 +68,16 @@ function fastifyPathToOpenApi(url: string): { path: string; parameters: unknown[
 
 function operationFor(route: ApiRoute): Record<string, unknown> {
   const { spec } = route;
+  const successResponse: Record<string, unknown> = { description: "Success" };
+  if (spec.responseSchema !== undefined) {
+    successResponse.content = { "application/json": { schema: spec.responseSchema } };
+  }
   const operation: Record<string, unknown> = {
     operationId: spec.operationId,
     summary: spec.summary,
     tags: [spec.tag],
     responses: {
-      "200": { description: "Success" },
+      [String(spec.successStatus ?? 200)]: successResponse,
       "400": errorResponse("Invalid request syntax (request schema)"),
       "401": errorResponse("Unauthenticated"),
       "403": errorResponse("Authenticated but forbidden"),

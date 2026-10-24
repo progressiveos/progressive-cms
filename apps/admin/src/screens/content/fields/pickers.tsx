@@ -10,6 +10,7 @@ import {
   fetchContentTypes,
 } from "../../../api/content.js";
 import { Dialog } from "../../../design/dialog.js";
+import { useToast } from "../../../design/toast.js";
 import {
   Button,
   EmptyState,
@@ -21,6 +22,7 @@ import {
 } from "../../../design/ui.js";
 import { t } from "../../../i18n/index.js";
 import { GeneratePanel, StockPanel, useMediaProviders } from "../../media/acquisition.js";
+import { mediaVariantWarning } from "../../media/variant-warning.js";
 
 export interface MediaSummaryWire {
   readonly id: string;
@@ -75,6 +77,7 @@ export function MediaPickerDialog(props: {
   readonly onPick: (mediaId: string, label: string) => void;
   readonly title: string;
 }) {
+  const toast = useToast();
   const [text, setText] = useState("");
   const [kind, setKind] = useState<MediaKindFilter>("all");
   const [items, setItems] = useState<readonly MediaSummaryWire[] | null>(null);
@@ -188,16 +191,20 @@ export function MediaPickerDialog(props: {
       ) : null}
       {mode === "stock" ? (
         <StockPanel
-          onImported={(mediaId, label) => {
+          onImported={(mediaId, label, failures) => {
             props.onPick(mediaId, label);
+            const warning = mediaVariantWarning(failures);
+            if (warning !== null) toast(warning, "warning");
             props.onClose();
           }}
         />
       ) : null}
       {mode === "generate" ? (
         <GeneratePanel
-          onAccepted={(mediaId, label) => {
+          onAccepted={(mediaId, label, failures) => {
             props.onPick(mediaId, label);
+            const warning = mediaVariantWarning(failures);
+            if (warning !== null) toast(warning, "warning");
             props.onClose();
           }}
         />

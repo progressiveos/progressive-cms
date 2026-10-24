@@ -124,6 +124,7 @@ export const media = defineFragment(
     "media.uploading": "Загрузка…",
     "media.load_failed": "Не удалось загрузить медиатеку",
     "media.upload_success": "Файл загружен",
+    "media.variant_generation_incomplete": "Файл сохранён, но не созданы варианты: {presets}",
     "media.upload_failed": "Загрузка не удалась",
     "media.retry": "Повторить",
     "media.empty_title": "Медиатека пуста",
@@ -388,6 +389,8 @@ export const media = defineFragment(
     "media.uploading": "Uploading…",
     "media.load_failed": "Failed to load the media library",
     "media.upload_success": "File uploaded",
+    "media.variant_generation_incomplete":
+      "File saved, but these variants were not created: {presets}",
     "media.upload_failed": "Upload failed",
     "media.retry": "Retry",
     "media.empty_title": "Media library is empty",

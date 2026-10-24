@@ -1856,7 +1856,7 @@ export const TOOLS: readonly McpTool[] = [
   {
     name: "cms_import_stock_candidate",
     description:
-      "Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. Duplicate-safe per provider asset.",
+      "Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. On a new import, if a theme derivative fails, the accepted asset is returned with media_variant_failures; duplicate-safe re-import returns the existing asset without rerunning derivatives.",
     permission: "media.stock.import",
     mutation: true,
     inputSchema: objectSchema(
@@ -1904,7 +1904,7 @@ export const TOOLS: readonly McpTool[] = [
   {
     name: "cms_get_media_generation",
     description:
-      "Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed. Never reference preview URLs; use media_id.",
+      "Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed, and optional media_variant_failures. Never reference preview URLs; use media_id.",
     permission: "media.generate",
     mutation: false,
     inputSchema: objectSchema({ generation_id: { type: "string" } }, ["generation_id"]),
@@ -2014,7 +2014,7 @@ export const TOOLS: readonly McpTool[] = [
   {
     name: "cms_import_media_url",
     description:
-      "Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks, sha256 dedupe — an already-imported file returns the existing media_id with duplicate_blob true, so repeated references to the same source image cost nothing — and variants generated on accept. Returns media_id; reference it in content instead of the source URL.",
+      "Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks and sha256 dedupe. Returns media_id; if a theme derivative fails, the accepted asset also includes media_variant_failures. Reference the media_id in content instead of the source URL.",
     permission: "media.import",
     mutation: true,
     inputSchema: objectSchema({ url: { type: "string", minLength: 8, maxLength: 2048 } }, ["url"]),
@@ -2025,7 +2025,7 @@ export const TOOLS: readonly McpTool[] = [
   {
     name: "cms_accept_generated_media",
     description:
-      "Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true).",
+      "Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true), including any media_variant_failures.",
     permission: "media.generate",
     mutation: true,
     inputSchema: objectSchema(

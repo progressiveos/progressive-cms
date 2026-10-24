@@ -14,6 +14,7 @@ export {
   uninstallThemePackage,
   validateThemePackage,
 } from "@pcms/themes";
+export * from "./active-theme-media-presets.js";
 export { getAgentBootstrapOp } from "./agent-bootstrap-ops.js";
 export * from "./analytics-ops.js";
 export * from "./bundle.js";

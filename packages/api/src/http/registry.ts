@@ -45,6 +45,8 @@ export interface RouteSpec {
   readonly bodySchema?: Record<string, unknown>;
   readonly querySchema?: Record<string, unknown>;
   readonly paramsSchema?: Record<string, unknown>;
+  /** Success HTTP status (defaults to 200). */
+  readonly successStatus?: number;
   readonly responseSchema?: Record<string, unknown>;
 }
 

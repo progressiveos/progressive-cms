@@ -25,6 +25,7 @@ import {
   type ProviderContext,
   ProviderError,
   recordCandidateAccept,
+  recordCandidateVariantFailures,
   requireGenerationRun,
   type StockCandidate,
   type StockOrientation,
@@ -37,11 +38,28 @@ import {
 import type { ApplicationServices, OperationContext } from "./context.js";
 import { requirePermission } from "./context.js";
 import { ApiError } from "./errors.js";
-import { generateVariantsAfterAccept } from "./operations.js";
+import {
+  generateVariantsAfterAccept,
+  type MediaVariantGenerationFailure,
+  mediaVariantFailureField,
+} from "./operations.js";
 
 const SEARCH_LIMIT_DEFAULT = 24;
 const SEARCH_LIMIT_MAX = 50;
 const GENERATION_MAX_PROMPT = 2000;
+
+interface GenerationCandidateView {
+  readonly index: number;
+  readonly preview_url: string | null;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly mime_type: string | null;
+  readonly model: string | null;
+  readonly seed: number | null;
+  readonly cost: number | null;
+  readonly media_id?: string;
+  readonly media_variant_failures?: readonly MediaVariantGenerationFailure[];
+}
 
 function providerCtx(ctx: OperationContext): ProviderContext {
   return { requestId: ctx.requestId };
@@ -257,8 +275,13 @@ export async function importStockCandidateOp(
       imported_at: new Date().toISOString(),
     },
   });
-  await generateVariantsAfterAccept(app, accepted);
-  return { media_id: accepted.asset.id, duplicate: false, duplicate_blob: accepted.duplicateBlob };
+  const variantOutcome = await generateVariantsAfterAccept(app, accepted);
+  return {
+    media_id: accepted.asset.id,
+    duplicate: false,
+    duplicate_blob: accepted.duplicateBlob,
+    ...mediaVariantFailureField(variantOutcome.failures),
+  };
 }
 
 export async function createMediaGenerationOp(
@@ -416,19 +439,34 @@ function generationView(run: Awaited<ReturnType<typeof requireGenerationRun>>) {
       ? {}
       : { error: { code: run.errorCode, message: run.errorMessage } }),
     cost: run.cost,
-    candidates: run.candidates.map((candidate: GeneratedCandidate) => ({
-      index: candidate.index,
-      preview_url: candidate.previewUrl,
-      width: candidate.width,
-      height: candidate.height,
-      mime_type: candidate.mimeType,
-      model: candidate.model,
-      seed: candidate.seed,
-      cost: candidate.cost,
-      ...(run.accepted[String(candidate.index)] === undefined
-        ? {}
-        : { media_id: run.accepted[String(candidate.index)] }),
-    })),
+    candidates: run.candidates.map((candidate: GeneratedCandidate): GenerationCandidateView => {
+      const accepted = run.accepted[String(candidate.index)];
+      const acceptance =
+        accepted === undefined
+          ? {}
+          : typeof accepted === "string"
+            ? { media_id: accepted }
+            : {
+                media_id: accepted.media_id,
+                ...mediaVariantFailureField(
+                  accepted.media_variant_failures?.map((failure) => ({
+                    media_id: accepted.media_id,
+                    ...failure,
+                  })) ?? [],
+                ),
+              };
+      return {
+        index: candidate.index,
+        preview_url: candidate.previewUrl,
+        width: candidate.width,
+        height: candidate.height,
+        mime_type: candidate.mimeType,
+        model: candidate.model,
+        seed: candidate.seed,
+        cost: candidate.cost,
+        ...acceptance,
+      };
+    }),
     created_at: run.createdAt.toISOString(),
   };
 }
@@ -444,7 +482,11 @@ async function importCandidateToAsset(
   ctx: OperationContext,
   run: Awaited<ReturnType<typeof requireGenerationRun>>,
   candidate: GeneratedCandidate,
-): Promise<{ media_id: string; duplicate: boolean }> {
+): Promise<{
+  media_id: string;
+  duplicate: boolean;
+  media_variant_failures?: readonly { media_id: string; preset: string; error: string }[];
+}> {
   const provider = await app.mediaProviders.generation(run.providerId);
   if (provider === null) {
     throw new ApiError(
@@ -488,8 +530,34 @@ async function importCandidateToAsset(
     },
   });
   await recordCandidateAccept(app.pool, run.id, candidate.index, accepted.asset.id);
-  await generateVariantsAfterAccept(app, accepted);
-  return { media_id: accepted.asset.id, duplicate: false };
+  const variantOutcome = await generateVariantsAfterAccept(app, accepted);
+  if (variantOutcome.failures.length > 0) {
+    try {
+      const persisted = await recordCandidateVariantFailures(
+        app.pool,
+        run.id,
+        candidate.index,
+        accepted.asset.id,
+        variantOutcome.failures.map(({ preset, error }) => ({ preset, error })),
+      );
+      if (!persisted) throw new Error("accepted candidate record was not found");
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "media.generation.variant_failures_persist_failed",
+          run_id: run.id,
+          candidate_index: candidate.index,
+          media_id: accepted.asset.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+  return {
+    media_id: accepted.asset.id,
+    duplicate: false,
+    ...mediaVariantFailureField(variantOutcome.failures),
+  };
 }
 
 export async function acceptGeneratedMediaOp(
@@ -523,7 +591,20 @@ export async function acceptGeneratedMediaOp(
   // Replay semantics: a re-accepted candidate returns the original asset.
   const alreadyAccepted = run.accepted[String(candidate.index)];
   if (alreadyAccepted !== undefined) {
-    return { media_id: alreadyAccepted, duplicate: true };
+    const mediaId =
+      typeof alreadyAccepted === "string" ? alreadyAccepted : alreadyAccepted.media_id;
+    const failures =
+      typeof alreadyAccepted === "string"
+        ? []
+        : (alreadyAccepted.media_variant_failures ?? []).map((failure) => ({
+            media_id: mediaId,
+            ...failure,
+          }));
+    return {
+      media_id: mediaId,
+      duplicate: true,
+      ...mediaVariantFailureField(failures),
+    };
   }
   return importCandidateToAsset(app, ctx, run, candidate);
 }

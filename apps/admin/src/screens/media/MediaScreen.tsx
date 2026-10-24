@@ -22,6 +22,7 @@ import { formatDateTime, formatFileSize } from "../../i18n/format.js";
 import { errorText, t } from "../../i18n/index.js";
 import { GeneratePanel, StockPanel, useMediaProviders } from "./acquisition.js";
 import { GenerationStudio } from "./GenerationStudio.js";
+import { type MediaVariantFailureWire, mediaVariantWarning } from "./variant-warning.js";
 
 interface MediaFolder {
   readonly id: string;
@@ -107,7 +108,9 @@ export function MediaScreen() {
     setUploading(true);
     try {
       const bytes = await file.arrayBuffer();
-      await apiRequest("POST", "/media", {
+      const result = await apiRequest<{
+        readonly media_variant_failures?: readonly MediaVariantFailureWire[];
+      }>("POST", "/media", {
         headers: {
           "x-pcms-filename": encodeURIComponent(file.name),
           "x-pcms-mime-type": file.type || "application/octet-stream",
@@ -116,7 +119,8 @@ export function MediaScreen() {
         },
         rawBody: bytes,
       });
-      toast(t("media.upload_success"), "success");
+      const warning = mediaVariantWarning(result.media_variant_failures);
+      toast(warning ?? t("media.upload_success"), warning === null ? "success" : "warning");
       reload();
     } catch (caught) {
       toast(
@@ -147,8 +151,9 @@ export function MediaScreen() {
       />
       {workspace === "stock" ? (
         <StockPanel
-          onImported={(mediaId, _label) => {
-            toast(t("media.acq_imported"), "success");
+          onImported={(mediaId, _label, failures) => {
+            const warning = mediaVariantWarning(failures);
+            toast(warning ?? t("media.acq_imported"), warning === null ? "success" : "warning");
             setWorkspace("library");
             setSelected({ id: mediaId } as MediaItem);
             reload();
@@ -157,8 +162,9 @@ export function MediaScreen() {
       ) : null}
       {workspace === "generate" ? (
         <GeneratePanel
-          onAccepted={(mediaId, _label) => {
-            toast(t("media.acq_accepted"), "success");
+          onAccepted={(mediaId, _label, failures) => {
+            const warning = mediaVariantWarning(failures);
+            toast(warning ?? t("media.acq_accepted"), warning === null ? "success" : "warning");
             setWorkspace("library");
             setSelected({ id: mediaId } as MediaItem);
             reload();
@@ -167,8 +173,9 @@ export function MediaScreen() {
       ) : null}
       {workspace === "studio" ? (
         <GenerationStudio
-          onUsed={(mediaId) => {
-            toast(t("media.acq_accepted"), "success");
+          onUsed={(mediaId, failures) => {
+            const warning = mediaVariantWarning(failures);
+            toast(warning ?? t("media.acq_accepted"), warning === null ? "success" : "warning");
             setWorkspace("library");
             setSelected({ id: mediaId } as MediaItem);
             reload();

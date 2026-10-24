@@ -115,6 +115,42 @@ test("OpenAPI document is internally consistent with the route registry (T003/T0
       );
     }
   }
+
+  for (const [path, operation, successStatus] of [
+    ["/media", document.paths["/media"]?.post, "201"],
+    ["/media/import", document.paths["/media/import"]?.post, "201"],
+    ["/media/stock/import", document.paths["/media/stock/import"]?.post, "200"],
+    [
+      "/media/generations/{generationId}/candidates/{candidateIndex}/accept",
+      document.paths["/media/generations/{generationId}/candidates/{candidateIndex}/accept"]?.post,
+      "200",
+    ],
+  ] as const) {
+    const response = operation?.responses[successStatus] as
+      | { content?: { "application/json"?: { schema?: { properties?: Record<string, unknown> } } } }
+      | undefined;
+    assert.ok(
+      response?.content?.["application/json"]?.schema?.properties?.media_variant_failures,
+      `${path} documents optional per-preset failures`,
+    );
+  }
+  const generation = document.paths["/media/generations/{generationId}"]?.get;
+  const generationResponse = generation?.responses["200"] as
+    | {
+        content?: {
+          "application/json"?: {
+            schema?: {
+              properties?: { candidates?: { items?: { properties?: Record<string, unknown> } } };
+            };
+          };
+        };
+      }
+    | undefined;
+  assert.ok(
+    generationResponse?.content?.["application/json"]?.schema?.properties?.candidates?.items
+      ?.properties?.media_variant_failures,
+    "generation status documents optional per-candidate derivative failures",
+  );
 });
 
 test("OpenAPI breaking-diff gate: minor breaks fail, additive changes pass (T026)", () => {

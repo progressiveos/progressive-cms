@@ -11,6 +11,7 @@ import { Dialog } from "../../design/dialog.js";
 import { Button, EmptyState, Field, Input, Select, Spinner } from "../../design/ui.js";
 import { t } from "../../i18n/index.js";
 import { useCapabilityOperation } from "./capability-binding.js";
+import { type MediaVariantFailureWire, mediaVariantWarning } from "./variant-warning.js";
 
 interface SizeOptionWire {
   readonly ratio: string;
@@ -51,6 +52,7 @@ interface CandidateWire {
   readonly index: number;
   readonly preview_url: string | null;
   readonly media_id?: string;
+  readonly media_variant_failures?: readonly MediaVariantFailureWire[];
   readonly width: number | null;
   readonly height: number | null;
   readonly seed: number | null;
@@ -84,7 +86,9 @@ function formatUsd(value: number): string {
   return `$${value.toFixed(4).replace(/0+$/, "").replace(/\.$/, ".0")}`;
 }
 
-export function GenerationStudio(props: { readonly onUsed: (mediaId: string) => void }) {
+export function GenerationStudio(props: {
+  readonly onUsed: (mediaId: string, failures?: readonly MediaVariantFailureWire[]) => void;
+}) {
   const [models, setModels] = useState<readonly ModelWire[] | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [tier, setTier] = useState<string>("1k");
@@ -474,9 +478,21 @@ export function GenerationStudio(props: { readonly onUsed: (mediaId: string) => 
                     />
                   </span>
                   {candidate.media_id !== undefined ? (
-                    <Button size="sm" onClick={() => props.onUsed(candidate.media_id!)}>
-                      {t("media.studio_use")}
-                    </Button>
+                    <>
+                      {candidate.media_variant_failures !== undefined ? (
+                        <span className="pcms-field__error" role="alert">
+                          {mediaVariantWarning(candidate.media_variant_failures)}
+                        </span>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          props.onUsed(candidate.media_id!, candidate.media_variant_failures)
+                        }
+                      >
+                        {t("media.studio_use")}
+                      </Button>
+                    </>
                   ) : null}
                 </div>
               ))}

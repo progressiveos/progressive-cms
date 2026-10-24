@@ -10,8 +10,11 @@
 export const PACKAGE_NAME = "@pcms/media";
 export type {
   AssetProvenance,
+  GenerationCandidateAcceptance,
+  GenerationCandidateAccepted,
   GenerationRunRecord,
   GenerationRunStatus,
+  GenerationVariantFailure,
   NewGenerationRun,
 } from "./acquisition.js";
 // Media acquisition (ADR-0013): candidate tokens, provenance, generation runs.
@@ -24,6 +27,7 @@ export {
   markGenerationRunReady,
   markGenerationRunRunning,
   recordCandidateAccept,
+  recordCandidateVariantFailures,
   requireGenerationRun,
   setAssetProvenance,
   signStockCandidate,

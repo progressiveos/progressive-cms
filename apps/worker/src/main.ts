@@ -11,6 +11,7 @@ import { hkdfSync } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  createActiveMediaPresetsRefresher,
   createApplicationServices,
   createExtensionJobHandlers,
   createExtensionScheduleService,
@@ -191,10 +192,12 @@ async function startWorker(options: {
     // here for generation jobs, and the API application surface is shared).
     ...(mediaCandidateSigningKey === undefined ? {} : { mediaCandidateSigningKey }),
     ...(runtimeSecretBox === undefined ? {} : { runtimeSecretBox }),
-    // Theme-declared media presets: variant generation for staged media runs
-    // HERE (staging_media → generateVariantsAfterAccept) — without the active
-    // theme's presets the worker would commit every image with zero
-    // derivatives and every theme gallery/hero reference would placeholder.
+    // Boot fallback for theme-declared media presets: variant generation for
+    // staged media runs HERE (staging_media → generateVariantsAfterAccept),
+    // and this seed is only correct while the boot theme is the active one.
+    // refreshActiveMediaPresets below applies the ACTIVE theme's set and
+    // re-checks it before each media job — without it a worker pinned to the
+    // seed silently commits images without the active theme's derivatives.
     mediaPresets: readThemeManifestPresets(config.themes?.renderDir),
     // .pcpub ingest stages media in the worker (ADR-0014 §8; Publication
     // spec §83.5): the same canonical storage volumes the web process uses.
@@ -218,6 +221,29 @@ async function startWorker(options: {
   // ADR-0013 §71.7: media generation executes in the worker (durable queue,
   // bounded retries); a failed run is recorded as failed — never blocking.
   const mediaGenerationHandler = createMediaGenerationJobHandler(application);
+  // The preset set must follow the ACTIVE theme (admin_theme_state), not the
+  // boot seed in themes.renderDir: theme activation does not restart workers,
+  // and .pcpub ingest stages media here — a stale set silently produces zero
+  // derivatives for every preset the active theme declares beyond the seed.
+  // A failed re-resolution keeps serving the previous set and says why.
+  const refreshActiveMediaPresets = createActiveMediaPresetsRefresher({
+    application,
+    configuredDir: config.themes?.renderDir,
+    cmsVersion: readCmsVersionFromRelease(),
+    onApplied: ({ presets }) => {
+      logger.info("worker.media.active_theme_presets_applied", {
+        operation: "worker.media.presets",
+        presets,
+      });
+    },
+    onFallback: (error) => {
+      logger.warn("worker.media.active_theme_presets_fallback", {
+        operation: "worker.media.presets",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  });
+  await refreshActiveMediaPresets();
   const searchIndexing = createSearchIndexingService({
     provider: application.searchProvider,
     source: application.searchSource,
@@ -425,12 +451,15 @@ async function startWorker(options: {
       }
     },
     // .pcpub ingest pipeline (ADR-0014 §8, Publication spec §83): stages run
-    // in the worker; resume-from-stage makes retries idempotent.
+    // in the worker; resume-from-stage makes retries idempotent. The active
+    // theme is re-checked first so a theme activated after boot still gets
+    // its declared derivatives.
     "publication_bundle.ingest": async (payload: unknown) => {
       const ingestId = (payload as { ingest_id?: unknown }).ingest_id;
       if (typeof ingestId !== "string") {
         throw new Error("publication_bundle.ingest payload needs ingest_id");
       }
+      await refreshActiveMediaPresets();
       await processPcpubIngest(application, ingestId);
     },
     // S7 financial safety: durable refund intent execution. The job id is

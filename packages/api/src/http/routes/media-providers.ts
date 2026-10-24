@@ -27,6 +27,7 @@ import {
   testMediaProviderOp,
   updateMediaProviderConfigOp,
 } from "../../media-provider-ops.js";
+import { MEDIA_VARIANT_FAILURES_SCHEMA, mediaResponseSchema } from "../media-response-schemas.js";
 import type { ApiRoute, RouteResult } from "../registry.js";
 
 function jsonBody(request: FastifyRequest): Record<string, unknown> {
@@ -87,6 +88,40 @@ const ACCEPT_PARAMS = {
     candidateIndex: { type: "integer", minimum: 0, maximum: 64 },
   },
 } as const;
+
+const GENERATION_RUN_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    generation_id: { type: "string" },
+    provider_id: { type: "string" },
+    status: { enum: ["pending", "running", "ready", "failed"] },
+    prompt: { type: "string" },
+    error: {
+      type: "object",
+      properties: { code: { type: "string" }, message: { type: ["string", "null"] } },
+    },
+    cost: { type: ["number", "null"] },
+    candidates: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          index: { type: "integer" },
+          preview_url: { type: ["string", "null"] },
+          width: { type: ["integer", "null"] },
+          height: { type: ["integer", "null"] },
+          mime_type: { type: ["string", "null"] },
+          model: { type: ["string", "null"] },
+          seed: { type: ["integer", "null"] },
+          cost: { type: ["number", "null"] },
+          media_id: { type: "string" },
+          media_variant_failures: MEDIA_VARIANT_FAILURES_SCHEMA,
+        },
+      },
+    },
+    created_at: { type: "string", format: "date-time" },
+  },
+};
 
 const STOCK_SEARCH_BODY = {
   type: "object",
@@ -468,12 +503,20 @@ export function makeMediaProviderRoutes(): ApiRoute[] {
         url: "/media/stock/import",
         operationId: "import_stock_candidate",
         summary:
-          "Import a stock candidate through the canonical ingest pipeline; duplicate-safe per provider asset (re-import returns the existing asset).",
+          "Import a stock candidate through the canonical ingest pipeline; a new import includes optional per-preset media_variant_failures, while duplicate-safe re-import returns the existing asset.",
         tag: "media",
         auth: "authenticated",
         permission: "media.stock.import",
         idempotency: "supported",
         bodySchema: STOCK_IMPORT_BODY,
+        responseSchema: mediaResponseSchema(
+          {
+            media_id: { type: "string" },
+            duplicate: { type: "boolean" },
+            duplicate_blob: { type: "boolean" },
+          },
+          ["media_id", "duplicate"],
+        ),
       },
       handle: (app, ctx, request) => {
         const body = jsonBody(request) as Record<string, unknown>;
@@ -527,11 +570,12 @@ export function makeMediaProviderRoutes(): ApiRoute[] {
         url: "/media/generations/:generationId",
         operationId: "get_media_generation",
         summary:
-          "Generation run status and candidates (server-side references only; download URLs never leave the server).",
+          "Generation run status and candidates (server-side references only; download URLs never leave the server). Auto-imported candidates may include media_variant_failures.",
         tag: "media",
         auth: "authenticated",
         permission: "media.generate",
         paramsSchema: GENERATION_ID_PARAM,
+        responseSchema: GENERATION_RUN_RESPONSE_SCHEMA,
       },
       handle: (app, ctx, request) =>
         handle(app, ctx, () =>
@@ -546,13 +590,17 @@ export function makeMediaProviderRoutes(): ApiRoute[] {
         url: "/media/generations/:generationId/candidates/:candidateIndex/accept",
         operationId: "accept_generated_media",
         summary:
-          "Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset.",
+          "Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset and any media_variant_failures.",
         tag: "media",
         auth: "authenticated",
         csrf: true,
         permission: "media.generate",
         idempotency: "supported",
         paramsSchema: ACCEPT_PARAMS,
+        responseSchema: mediaResponseSchema(
+          { media_id: { type: "string" }, duplicate: { type: "boolean" } },
+          ["media_id", "duplicate"],
+        ),
       },
       handle: (app, ctx, request) => {
         const params = request.params as Record<string, unknown>;

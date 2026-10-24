@@ -18728,7 +18728,67 @@
         "description": "Supports the durable Idempotency-Key header (supported); replays of a key return the stored result.",
         "operationId": "upload_media",
         "responses": {
-          "200": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "duplicate_blob": {
+                      "type": "boolean"
+                    },
+                    "media_id": {
+                      "type": "string"
+                    },
+                    "media_variant_failures": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "preset": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "preset",
+                          "error"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "mime_type": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "size_bytes": {
+                      "type": "integer"
+                    },
+                    "version_no": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "media_id",
+                    "version_no",
+                    "sha256",
+                    "size_bytes",
+                    "mime_type",
+                    "duplicate_blob"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -18830,7 +18890,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Direct binary upload (application/octet-stream + X-PCMS-Filename)",
+        "summary": "Direct binary upload; accepted assets include per-preset derivative failures when present (application/octet-stream + X-PCMS-Filename).",
         "tags": [
           "media"
         ],
@@ -19836,6 +19896,136 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "candidates": {
+                      "items": {
+                        "properties": {
+                          "cost": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "height": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "index": {
+                            "type": "integer"
+                          },
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "media_variant_failures": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "error": {
+                                  "type": "string"
+                                },
+                                "media_id": {
+                                  "type": "string"
+                                },
+                                "preset": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "media_id",
+                                "preset",
+                                "error"
+                              ],
+                              "type": "object"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                          },
+                          "mime_type": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "model": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "preview_url": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "seed": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "width": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "cost": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "generation_id": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "provider_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "running",
+                        "ready",
+                        "failed"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -19937,7 +20127,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Generation run status and candidates (server-side references only; download URLs never leave the server).",
+        "summary": "Generation run status and candidates (server-side references only; download URLs never leave the server). Auto-imported candidates may include media_variant_failures.",
         "tags": [
           "media"
         ],
@@ -19968,6 +20158,50 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "duplicate": {
+                      "type": "boolean"
+                    },
+                    "media_id": {
+                      "type": "string"
+                    },
+                    "media_variant_failures": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "preset": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "preset",
+                          "error"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "media_id",
+                    "duplicate"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -20069,7 +20303,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset.",
+        "summary": "Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset and any media_variant_failures.",
         "tags": [
           "media"
         ],
@@ -20101,7 +20335,59 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "duplicate_blob": {
+                      "type": "boolean"
+                    },
+                    "media_id": {
+                      "type": "string"
+                    },
+                    "media_variant_failures": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "preset": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "preset",
+                          "error"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "version_no": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "media_id",
+                    "version_no",
+                    "sha256",
+                    "duplicate_blob"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -20203,7 +20489,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Server-side remote import (SSRF-safe; no bypass parameters)",
+        "summary": "Server-side remote import (SSRF-safe); accepted assets include per-preset derivative failures when present.",
         "tags": [
           "media"
         ],
@@ -21551,6 +21837,53 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "duplicate": {
+                      "type": "boolean"
+                    },
+                    "duplicate_blob": {
+                      "type": "boolean"
+                    },
+                    "media_id": {
+                      "type": "string"
+                    },
+                    "media_variant_failures": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "preset": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "preset",
+                          "error"
+                        ],
+                        "type": "object"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "media_id",
+                    "duplicate"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -21652,7 +21985,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Import a stock candidate through the canonical ingest pipeline; duplicate-safe per provider asset (re-import returns the existing asset).",
+        "summary": "Import a stock candidate through the canonical ingest pipeline; a new import includes optional per-preset media_variant_failures, while duplicate-safe re-import returns the existing asset.",
         "tags": [
           "media"
         ],
@@ -38839,6 +39172,34 @@
         "operationId": "get_served_theme",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "format": "uuid",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "settings_generation": {
+                      "type": "integer"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -39414,6 +39775,60 @@
         "operationId": "list_theme_revisions",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "active_revision_id": {
+                      "format": "uuid",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "revisions": {
+                      "items": {
+                        "properties": {
+                          "activated_at": {
+                            "format": "date-time",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "created_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "package_version": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "theme_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -39570,6 +39985,75 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "candidates": {
+                      "items": {
+                        "properties": {
+                          "last_used_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "package_version": {
+                            "type": "string"
+                          },
+                          "pending_cleanup": {
+                            "type": "boolean"
+                          },
+                          "revision_id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "theme_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "keep_last": {
+                      "type": "integer"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "older_than_days": {
+                      "type": "integer"
+                    },
+                    "pending": {
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "removed": {
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "retained_count": {
+                      "type": "integer"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -39708,6 +40192,42 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "served": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "format": "uuid",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "settings_generation": {
+                          "type": "integer"
+                        },
+                        "theme_generation": {
+                          "type": "integer"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {

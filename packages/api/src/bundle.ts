@@ -17,6 +17,7 @@ import { type LoadedContentType, validateContentPayload } from "@pcms/content";
 import type { DbClient, StableId } from "@pcms/core";
 import { type AcceptedMedia, fetchRemoteMedia, uploadMedia } from "@pcms/media";
 import { parseSeoDocument, type SeoDocument } from "@pcms/seo";
+import type { RevisionRecord } from "@pcms/revisions";
 import {
   type ApplicationServices,
   type OperationContext,
@@ -571,7 +572,7 @@ export async function applyBundle(
         ...(entry.locale === undefined ? {} : { locale: entry.locale }),
         actor: { ...actor, bundleId: bundle.external_id },
       });
-      let sealed;
+      let sealed: RevisionRecord;
       try {
         sealed = await app.revisions.sealRevisionWithinTx(tx, {
           revisionId: revision.id,

@@ -522,29 +522,72 @@ function requireMediaStorage(app: ApplicationServices) {
   };
 }
 
+export interface MediaVariantGenerationFailure {
+  readonly media_id: string;
+  readonly preset: string;
+  readonly error: string;
+}
+
+export interface MediaVariantGenerationOutcome {
+  readonly generated: number;
+  readonly reused: number;
+  readonly failures: readonly MediaVariantGenerationFailure[];
+}
+
+export function mediaVariantFailureField(failures: readonly MediaVariantGenerationFailure[]): {
+  readonly media_variant_failures?: readonly MediaVariantGenerationFailure[];
+} {
+  return failures.length === 0 ? {} : { media_variant_failures: failures };
+}
+
 /**
- * Generates theme-preset derivatives for a freshly accepted/replaced image
+ * Generates theme-preset derivatives for a freshly accepted image
  * (audit gap #2: `generateVariantsForAsset` had no runtime caller). The
  * preset set comes from the active theme via the composition; generation is
  * synchronous and idempotent (existing byte-identical variants are reused).
+ * Derivative generation must never fail the upload itself: the asset is
+ * committed, and any incomplete preset set is returned to its caller.
  */
 // ponytail: inline generation suits the pilot volume (tens of images); move
 // behind the job queue when upload latency or volume says so.
 export async function generateVariantsAfterAccept(
   app: ApplicationServices,
   accepted: AcceptedMedia,
-): Promise<void> {
-  if (app.mediaStorage === null) return;
-  if (app.mediaPresets.listPresets().length === 0) return;
+): Promise<MediaVariantGenerationOutcome> {
+  if (app.mediaStorage === null) return { generated: 0, reused: 0, failures: [] };
+  const presets = app.mediaPresets.listPresets();
+  if (presets.length === 0) return { generated: 0, reused: 0, failures: [] };
+  const deps = { pool: app.pool, storage: app.mediaStorage, maxSourceBytes: 128 * 1024 * 1024 };
   try {
-    await generateVariantsForAsset(
-      { pool: app.pool, storage: app.mediaStorage, maxSourceBytes: 128 * 1024 * 1024 },
-      accepted.asset,
-      app.mediaPresets,
-    );
+    const rows = await generateVariantsForAsset(deps, accepted.asset, app.mediaPresets);
+    return {
+      generated: rows.filter((row) => !row.reused).length,
+      reused: rows.filter((row) => row.reused).length,
+      failures: [],
+    };
   } catch {
-    // Derivative generation must never fail the upload itself: the asset is
-    // committed, a later replace/re-upload regenerates naturally.
+    // One failing derivative must not discard the remaining presets: rerun
+    // the idempotent generation preset-by-preset and keep the typed
+    // failures — a silently incomplete asset looks exactly like a ready one.
+    const failures: MediaVariantGenerationFailure[] = [];
+    let generated = 0;
+    let reused = 0;
+    for (const preset of presets) {
+      try {
+        const rows = await generateVariantsForAsset(deps, accepted.asset, app.mediaPresets, [
+          preset,
+        ]);
+        generated += rows.filter((row) => !row.reused).length;
+        reused += rows.filter((row) => row.reused).length;
+      } catch (error) {
+        failures.push({
+          media_id: accepted.asset.id,
+          preset: preset.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return { generated, reused, failures };
   }
 }
 
@@ -557,7 +600,9 @@ export async function uploadMediaOp(
     readonly declared_mime_type?: string;
     readonly folder_id?: string | null;
   },
-): Promise<AcceptedMedia> {
+): Promise<
+  AcceptedMedia & { readonly media_variant_failures?: readonly MediaVariantGenerationFailure[] }
+> {
   requirePermission(app, ctx, "media.write");
   assertTokenConstraints(ctx.actor, {
     siteKey: app.defaultSiteKey,
@@ -576,8 +621,8 @@ export async function uploadMediaOp(
     // Logical placement right after accept — identity/URLs unchanged.
     await moveMediaAsset(app.pool, { assetId: accepted.asset.id, folderId: input.folder_id });
   }
-  await generateVariantsAfterAccept(app, accepted);
-  return accepted;
+  const variantOutcome = await generateVariantsAfterAccept(app, accepted);
+  return { ...accepted, ...mediaVariantFailureField(variantOutcome.failures) };
 }
 
 /** Remote import through the SSRF-safe M05 fetcher; no bypass parameters. */
@@ -585,7 +630,9 @@ export async function importMediaUrl(
   app: ApplicationServices,
   ctx: OperationContext,
   input: { readonly url: string },
-): Promise<AcceptedMedia> {
+): Promise<
+  AcceptedMedia & { readonly media_variant_failures?: readonly MediaVariantGenerationFailure[] }
+> {
   requirePermission(app, ctx, "media.import");
   const fetched = await fetchRemoteMedia(input.url);
   const accepted = await uploadMedia(requireMediaStorage(app), {
@@ -594,8 +641,8 @@ export async function importMediaUrl(
     ...(fetched.contentType === null ? {} : { declaredMimeType: fetched.contentType }),
     createdBy: `${ctx.actor.type}:${ctx.actor.id}`,
   });
-  await generateVariantsAfterAccept(app, accepted);
-  return accepted;
+  const variantOutcome = await generateVariantsAfterAccept(app, accepted);
+  return { ...accepted, ...mediaVariantFailureField(variantOutcome.failures) };
 }
 
 export async function updateMediaMetadataOp(

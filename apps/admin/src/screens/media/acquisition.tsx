@@ -9,6 +9,7 @@ import { Button, EmptyState, Icon, Input, Select, Spinner } from "../../design/u
 import { t } from "../../i18n/index.js";
 import { loadMediaMeta } from "../content/fields/pickers.js";
 import { useCapabilityOperation } from "./capability-binding.js";
+import { type MediaVariantFailureWire, mediaVariantWarning } from "./variant-warning.js";
 
 export interface MediaProviderWire {
   readonly provider_id: string;
@@ -101,7 +102,11 @@ interface StockSearchWire {
 }
 
 export function StockPanel(props: {
-  readonly onImported: (mediaId: string, label: string) => void;
+  readonly onImported: (
+    mediaId: string,
+    label: string,
+    failures?: readonly MediaVariantFailureWire[],
+  ) => void;
 }) {
   const { providers, reload: reloadProviders } = useMediaProviders();
   const stock = (providers ?? []).filter((entry) => entry.kind === "stock");
@@ -241,7 +246,11 @@ export function StockPanel(props: {
                 onClick={() => {
                   setBusyRef(candidate.candidate_ref);
                   setMessage(null);
-                  apiPost<{ media_id: string; duplicate: boolean }>("/media/stock/import", {
+                  apiPost<{
+                    media_id: string;
+                    duplicate: boolean;
+                    media_variant_failures?: readonly MediaVariantFailureWire[];
+                  }>("/media/stock/import", {
                     candidate_ref: candidate.candidate_ref,
                   })
                     .then(async (result) => {
@@ -249,8 +258,12 @@ export function StockPanel(props: {
                       props.onImported(
                         result.media_id,
                         meta?.title ?? meta?.filenameOriginal ?? result.media_id,
+                        result.media_variant_failures,
                       );
-                      setMessage(t("media.acq_imported"));
+                      setMessage(
+                        mediaVariantWarning(result.media_variant_failures) ??
+                          t("media.acq_imported"),
+                      );
                       reloadProviders();
                     })
                     .catch((cause: unknown) => setMessage(errorText(cause)))
@@ -280,6 +293,7 @@ interface GenerationCandidateWire {
   readonly width: number | null;
   readonly height: number | null;
   readonly media_id?: string;
+  readonly media_variant_failures?: readonly MediaVariantFailureWire[];
 }
 
 interface GenerationRunWire {
@@ -290,7 +304,11 @@ interface GenerationRunWire {
 }
 
 export function GeneratePanel(props: {
-  readonly onAccepted: (mediaId: string, label: string) => void;
+  readonly onAccepted: (
+    mediaId: string,
+    label: string,
+    failures?: readonly MediaVariantFailureWire[],
+  ) => void;
 }) {
   const { providers } = useMediaProviders();
   const generators = (providers ?? []).filter((entry) => entry.kind === "generation");
@@ -392,14 +410,19 @@ export function GeneratePanel(props: {
     if (run === null) return;
     setBusy(true);
     setMessage(null);
-    apiPost<{ media_id: string; duplicate: boolean }>(
-      `/media/generations/${run.generation_id}/candidates/${index}/accept`,
-      {},
-    )
+    apiPost<{
+      media_id: string;
+      duplicate: boolean;
+      media_variant_failures?: readonly MediaVariantFailureWire[];
+    }>(`/media/generations/${run.generation_id}/candidates/${index}/accept`, {})
       .then(async (result) => {
         const meta = await loadMediaMeta(result.media_id).catch(() => null);
-        props.onAccepted(result.media_id, meta?.title ?? meta?.filenameOriginal ?? result.media_id);
-        setMessage(t("media.acq_accepted"));
+        props.onAccepted(
+          result.media_id,
+          meta?.title ?? meta?.filenameOriginal ?? result.media_id,
+          result.media_variant_failures,
+        );
+        setMessage(mediaVariantWarning(result.media_variant_failures) ?? t("media.acq_accepted"));
       })
       .catch((cause: unknown) => setMessage(errorText(cause)))
       .finally(() => setBusy(false));
@@ -511,7 +534,14 @@ export function GeneratePanel(props: {
                 )}
               </span>
               {candidate.media_id !== undefined ? (
-                <span className="pcms-mediagrid__meta">{t("media.acq_accepted")}</span>
+                <>
+                  <span className="pcms-mediagrid__meta">{t("media.acq_accepted")}</span>
+                  {candidate.media_variant_failures !== undefined ? (
+                    <span className="pcms-field__error" role="alert">
+                      {mediaVariantWarning(candidate.media_variant_failures)}
+                    </span>
+                  ) : null}
+                </>
               ) : (
                 <Button size="sm" disabled={busy} onClick={() => accept(candidate.index)}>
                   {t("media.acq_accept")}

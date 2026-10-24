@@ -891,8 +891,9 @@ test("PCPUB validates RichText seal rules and resolves bundled SEO media referen
   );
   const seo = revision?.sidecar?.seo as { social_image: { asset_id: string } };
   assert.equal(seo.social_image.asset_id, status.result.media[0]!.media_id);
+  assert.ok(revision);
   assert.equal(
-    (revision?.payload as { fields: { hero_image: string } }).fields.hero_image,
+    (revision.payload as { fields: { hero_image: string } }).fields.hero_image,
     status.result.media[0]!.media_id,
   );
 

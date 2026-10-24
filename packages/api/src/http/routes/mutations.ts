@@ -50,6 +50,7 @@ import {
   listServiceAccountsOp,
   listTranslationsOp,
   listUsersOp,
+  mediaVariantFailureField,
   moveEntryOp,
   moveMediaAssetOp,
   moveNavigationItem,
@@ -89,6 +90,7 @@ import {
   validateRevision,
   validateThemeOp,
 } from "../../operations.js";
+import { mediaResponseSchema } from "../media-response-schemas.js";
 import { API_BODY_LIMIT_MEDIA_UPLOAD } from "../plugin.js";
 import type { ApiRoute } from "../registry.js";
 import { stableId } from "./helpers.js";
@@ -1794,10 +1796,23 @@ export function makeMutationRoutes(): ApiRoute[] {
         url: "/media",
         operationId: "upload_media",
         idempotency: "supported",
-        summary: "Direct binary upload (application/octet-stream + X-PCMS-Filename)",
+        summary:
+          "Direct binary upload; accepted assets include per-preset derivative failures when present (application/octet-stream + X-PCMS-Filename).",
         tag: "media",
         auth: "authenticated",
         permission: "media.write",
+        successStatus: 201,
+        responseSchema: mediaResponseSchema(
+          {
+            media_id: { type: "string" },
+            version_no: { type: "integer" },
+            sha256: { type: "string" },
+            size_bytes: { type: "integer" },
+            mime_type: { type: "string" },
+            duplicate_blob: { type: "boolean" },
+          },
+          ["media_id", "version_no", "sha256", "size_bytes", "mime_type", "duplicate_blob"],
+        ),
         bodyLimit: API_BODY_LIMIT_MEDIA_UPLOAD,
       },
       async handle(app, ctx, request) {
@@ -1833,6 +1848,7 @@ export function makeMutationRoutes(): ApiRoute[] {
             size_bytes: accepted.asset.sizeBytes,
             mime_type: accepted.asset.mimeType,
             duplicate_blob: accepted.duplicateBlob,
+            ...mediaVariantFailureField(accepted.media_variant_failures ?? []),
           },
         };
       },
@@ -1842,11 +1858,22 @@ export function makeMutationRoutes(): ApiRoute[] {
         method: "POST",
         url: "/media/import",
         operationId: "import_media_url",
-        summary: "Server-side remote import (SSRF-safe; no bypass parameters)",
+        summary:
+          "Server-side remote import (SSRF-safe); accepted assets include per-preset derivative failures when present.",
         tag: "media",
         auth: "authenticated",
         permission: "media.import",
         idempotency: "supported",
+        successStatus: 201,
+        responseSchema: mediaResponseSchema(
+          {
+            media_id: { type: "string" },
+            version_no: { type: "integer" },
+            sha256: { type: "string" },
+            duplicate_blob: { type: "boolean" },
+          },
+          ["media_id", "version_no", "sha256", "duplicate_blob"],
+        ),
         bodySchema: {
           type: "object",
           additionalProperties: false,
@@ -1863,6 +1890,7 @@ export function makeMutationRoutes(): ApiRoute[] {
             version_no: accepted.version.versionNo,
             sha256: accepted.asset.sha256,
             duplicate_blob: accepted.duplicateBlob,
+            ...mediaVariantFailureField(accepted.media_variant_failures ?? []),
           },
         };
       },
@@ -2054,7 +2082,9 @@ export function makeMutationRoutes(): ApiRoute[] {
           media_id: params.mediaId,
           bytes,
           filename,
-        })) as { version?: { versionNo?: number } };
+        })) as {
+          version?: { versionNo?: number };
+        };
         return {
           status: 200,
           body: { media_id: params.mediaId, version_no: result?.version?.versionNo ?? null },

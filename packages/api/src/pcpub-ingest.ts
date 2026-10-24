@@ -586,6 +586,7 @@ export async function processPcpubIngest(
       };
       const assetIdByPath = new Map<string, string>();
       const stagedMedia: { ref: string; media_id: string; duplicate_blob: boolean }[] = [];
+      const mediaVariantFailures: { media_id: string; preset: string; error: string }[] = [];
       for (const [index, asset] of manifest.assets.entries()) {
         const mediaRef = `m${index}`;
         const assetBytes = await verified.archive.readBytes(asset.path);
@@ -615,7 +616,11 @@ export async function processPcpubIngest(
         });
         // Theme-preset derivatives for bundle images, same as REST uploads —
         // without them every gallery/hero reference renders its placeholder.
-        await generateVariantsAfterAccept(app, accepted);
+        // Per-preset failures stay non-fatal but land in the ingest result:
+        // an asset with missing declared derivatives must be visible as
+        // incomplete, never silently presented as ready.
+        const variantOutcome = await generateVariantsAfterAccept(app, accepted);
+        mediaVariantFailures.push(...variantOutcome.failures);
         // Provenance from the manifest grants no trust — it is recorded
         // metadata for the existing provenance columns (Media spec §71.5).
         await pool.query(`UPDATE media_assets SET provenance = $2 WHERE id = $1`, [
@@ -744,6 +749,9 @@ export async function processPcpubIngest(
           entries: result.entries,
           media: result.media,
           published: result.published,
+          ...(mediaVariantFailures.length === 0
+            ? {}
+            : { media_variant_failures: mediaVariantFailures }),
           ...(manifest.external_entries === undefined
             ? {}
             : {

@@ -9,6 +9,7 @@ import {
   acceptGeneratedMediaOp,
   createMediaGenerationJobHandler,
   createMediaGenerationOp,
+  getMediaGenerationOp,
   type OperationContext,
 } from "@pcms/api";
 import { createDbPool, type DbPool, loadMigrations, migrateDatabase } from "@pcms/core";
@@ -174,7 +175,8 @@ test("auto-import: both candidates land in the library; failed sibling does not 
   assert.equal(run.accepted["1"], undefined, "failed import is not recorded as accepted");
 
   // Provenance: origin generated with the run linkage.
-  const assetId = run.accepted["0"]!;
+  const accepted = run.accepted["0"]!;
+  const assetId = typeof accepted === "string" ? accepted : accepted.media_id;
   const provenance = await pool.query(
     `SELECT origin, provider_id, provenance FROM media_assets WHERE id = $1`,
     [assetId],
@@ -204,4 +206,50 @@ test("auto-import: operator accept after auto-import replays the same asset", as
     candidate_index: 0,
   })) as { media_id: string; duplicate: boolean };
   assert.equal(accepted.duplicate, true);
+});
+
+test("auto-import: derivative failures persist in generation status and replay", async (t) => {
+  const pool = await integration(t);
+  if (pool === null) return;
+  const app = fakeApp(pool);
+  const storage = app.mediaStorage as InMemoryMediaStorage;
+  storage.getBuffer = async () => {
+    throw new Error("derivative source read failed");
+  };
+  const preset = {
+    id: "thumbnail",
+    width: 64,
+    height: 64,
+    fit: "inside",
+    crop: "center",
+    formats: ["webp"],
+    quality: 80,
+    loading: "lazy",
+  } as const;
+  app.mediaPresets = { listPresets: () => [preset], getPreset: () => preset };
+
+  const created = (await createMediaGenerationOp(app, ctx, {
+    prompt: "derivative failure",
+    provider_id: "autogen",
+    count: 1,
+  })) as { generation_id: string };
+  await markGenerationRunRunning(pool, created.generation_id);
+  await createMediaGenerationJobHandler(app)({ run_id: created.generation_id });
+
+  const status = await getMediaGenerationOp(app, ctx, { generation_id: created.generation_id });
+  const candidate = status.candidates[0];
+  assert.ok(candidate?.media_id);
+  assert.deepEqual(candidate?.media_variant_failures, [
+    {
+      media_id: candidate?.media_id,
+      preset: "thumbnail",
+      error: "derivative source read failed",
+    },
+  ]);
+  const replay = await acceptGeneratedMediaOp(app, ctx, {
+    generation_id: created.generation_id,
+    candidate_index: 0,
+  });
+  assert.equal(replay.duplicate, true);
+  assert.deepEqual(replay.media_variant_failures, candidate?.media_variant_failures);
 });

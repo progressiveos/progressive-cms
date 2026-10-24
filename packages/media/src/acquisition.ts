@@ -133,6 +133,18 @@ export async function findAssetIdByProviderAsset(
 
 export type GenerationRunStatus = "pending" | "running" | "ready" | "failed";
 
+export interface GenerationVariantFailure {
+  readonly preset: string;
+  readonly error: string;
+}
+
+export interface GenerationCandidateAcceptance {
+  readonly media_id: string;
+  readonly media_variant_failures?: readonly GenerationVariantFailure[];
+}
+
+export type GenerationCandidateAccepted = string | GenerationCandidateAcceptance;
+
 export interface GenerationRunRecord {
   readonly id: string;
   readonly providerId: string;
@@ -147,8 +159,8 @@ export interface GenerationRunRecord {
   readonly cost: number | null;
   readonly errorCode: string | null;
   readonly errorMessage: string | null;
-  /** candidate index → accepted MediaAsset id (replay-safe accept). */
-  readonly accepted: Record<string, string>;
+  /** candidate index → accepted MediaAsset and any derivative failures. */
+  readonly accepted: Record<string, GenerationCandidateAccepted>;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly completedAt: Date | null;
@@ -169,7 +181,7 @@ function rowToRun(row: Record<string, unknown>): GenerationRunRecord {
     cost: row["cost"] === null || row["cost"] === undefined ? null : Number(row["cost"]),
     errorCode: (row["error_code"] as string | null) ?? null,
     errorMessage: (row["error_message"] as string | null) ?? null,
-    accepted: (row["accepted"] as Record<string, string>) ?? {},
+    accepted: (row["accepted"] as Record<string, GenerationCandidateAccepted>) ?? {},
     createdBy: String(row["created_by"]),
     createdAt: row["created_at"] as Date,
     completedAt: (row["completed_at"] as Date | null) ?? null,
@@ -267,13 +279,43 @@ export async function recordCandidateAccept(
 ): Promise<string | null> {
   const run = await requireGenerationRun(pool, runId);
   const existing = run.accepted[String(candidateIndex)];
-  if (existing !== undefined) return existing;
+  if (existing !== undefined) {
+    return typeof existing === "string" ? existing : existing.media_id;
+  }
   const merged = { ...run.accepted, [String(candidateIndex)]: mediaId };
   await pool.query(`UPDATE media_generation_runs SET accepted = $2 WHERE id = $1`, [
     runId,
     JSON.stringify(merged),
   ]);
   return null;
+}
+
+/** Adds derivative diagnostics without changing legacy string accept records. */
+export async function recordCandidateVariantFailures(
+  pool: DbPool,
+  runId: string,
+  candidateIndex: number,
+  mediaId: string,
+  failures: readonly GenerationVariantFailure[],
+): Promise<boolean> {
+  if (failures.length === 0) return true;
+  const result = await pool.query(
+    `UPDATE media_generation_runs
+     SET accepted = jsonb_set(
+       accepted,
+       ARRAY[$2::text],
+       jsonb_build_object('media_id', $3, 'media_variant_failures', $4::jsonb),
+       true
+     )
+     WHERE id = $1
+       AND CASE jsonb_typeof(accepted -> $2::text)
+         WHEN 'string' THEN accepted ->> $2::text
+         WHEN 'object' THEN accepted -> $2::text ->> 'media_id'
+         ELSE NULL
+       END = $3`,
+    [runId, String(candidateIndex), mediaId, JSON.stringify(failures)],
+  );
+  return (result.rowCount ?? 0) === 1;
 }
 
 /** TTL sweep: unaccepted runs (and their candidates) expire together. */

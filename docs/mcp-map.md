@@ -189,15 +189,15 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_list_payment_events](#cms_list_payment_events) | Append-only payment timeline (payments.events.read). | `payments.events.read` | true |
 | [cms_list_media_providers](#cms_list_media_providers) | List installed, enabled media acquisition providers (stock/generation) with configured state. No credential material. | `media.read` | true |
 | [cms_search_stock_media](#cms_search_stock_media) | Provider-neutral stock image search. Returns candidates with opaque candidate_ref handles (import these; never construct URLs). | `media.stock.search` | true |
-| [cms_import_stock_candidate](#cms_import_stock_candidate) | Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. Duplicate-safe per provider asset. | `media.stock.import` | false |
+| [cms_import_stock_candidate](#cms_import_stock_candidate) | Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. On a new import, if a theme derivative fails, the accepted asset is returned with media_variant_failures; duplicate-safe re-import returns the existing asset without rerunning derivatives. | `media.stock.import` | false |
 | [cms_generate_media](#cms_generate_media) | Generate ONE image (cost-bearing; requires media.generate). Agent contract: read cms_get_media_provider_capabilities for models/sizes first, call cms_estimate_media_generation for the price, then generate with aspect+resolution from the model's size options (never raw pixels). count is clamped to 1 for agents. Poll cms_get_media_generation until ready — every candidate already carries media_id in the library; accept is optional replay. | `media.generate` | false |
-| [cms_get_media_generation](#cms_get_media_generation) | Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed. Never reference preview URLs; use media_id. | `media.generate` | true |
+| [cms_get_media_generation](#cms_get_media_generation) | Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed, and optional media_variant_failures. Never reference preview URLs; use media_id. | `media.generate` | true |
 | [cms_get_media_provider_capabilities](#cms_get_media_provider_capabilities) | Models configured on a generation provider with their contracts: size options (aspect+pixels), resolution tiers, limits, negative/seed support, reference-image caps and published prices. Read this BEFORE generating. | `media.read` | true |
 | [cms_estimate_media_generation](#cms_estimate_media_generation) | Approximate generation cost for model+aspect+resolution+count BEFORE paying. Token-priced or unpublished-price models return an explicit refusal instead of a number. | `media.generate` | true |
 | [cms_validate_redirect_import](#cms_validate_redirect_import) | Dry-run a legacy-URL redirect batch before importing (site migrations, SEO). Per-row report (invalid path, reserved, collision with a live route, duplicates, self-redirects, open-redirect targets) plus redirect-graph issues (loops, chains) checked against EXISTING history. Writes nothing. Workflow: validate first, show the owner the report, only then apply. Rows: source (old path), target (new site path or stable entry id; omit for 410 gone), status_code (301 default; 410 = permanently gone), reason. | `routing.redirects.import` | true |
 | [cms_apply_redirect_import](#cms_apply_redirect_import) | Validate and apply a legacy-URL redirect batch atomically (any row or redirect-graph error aborts the whole batch). Sources must not shadow live routes; absolute/javascript targets are refused; loops and >3-hop chains across the batch AND existing history are refused. Requests go to old URLs from sitemaps, external links and search indexes afterwards resolve 301/410. | `routing.redirects.import` | false |
-| [cms_import_media_url](#cms_import_media_url) | Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks, sha256 dedupe — an already-imported file returns the existing media_id with duplicate_blob true, so repeated references to the same source image cost nothing — and variants generated on accept. Returns media_id; reference it in content instead of the source URL. | `media.import` | false |
-| [cms_accept_generated_media](#cms_accept_generated_media) | Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true). | `media.generate` | false |
+| [cms_import_media_url](#cms_import_media_url) | Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks and sha256 dedupe. Returns media_id; if a theme derivative fails, the accepted asset also includes media_variant_failures. Reference the media_id in content instead of the source URL. | `media.import` | false |
+| [cms_accept_generated_media](#cms_accept_generated_media) | Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true), including any media_variant_failures. | `media.generate` | false |
 | [cms_list_site_domains](#cms_list_site_domains) | Domain bindings of a site (?site= key, default site). Requires domains.manage. | `domains.manage` | true |
 | [cms_add_site_domain](#cms_add_site_domain) | Add a domain binding (hostname normalized/validated; first binding becomes primary; single-primary invariant). Requires domains.manage. | `domains.manage` | false |
 | [cms_set_primary_domain](#cms_set_primary_domain) | Atomic canonical-primary switch for a domain binding; sitemap/canonical pick it up immediately (no restart). Requires domains.manage. | `domains.manage` | false |
@@ -4566,7 +4566,7 @@ return operations.searchStockMedia(ctx, args);
 
 ### cms_import_stock_candidate
 
-Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. Duplicate-safe per provider asset.
+Import a stock candidate (from cms_search_stock_media) into the Media Library as a canonical asset. On a new import, if a theme derivative fails, the accepted asset is returned with media_variant_failures; duplicate-safe re-import returns the existing asset without rerunning derivatives.
 
 Permission annotation: `media.stock.import`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -4675,7 +4675,7 @@ return operations.createMediaGeneration(ctx, { ...args, count: 1 });
 
 ### cms_get_media_generation
 
-Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed. Never reference preview URLs; use media_id.
+Inspect a generation run: status, actual cost, and candidates — each with media_id (auto-imported into the library), preview_url, model, seed, and optional media_variant_failures. Never reference preview URLs; use media_id.
 
 Permission annotation: `media.generate`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -4934,7 +4934,7 @@ return operations.applyRedirectImport(ctx, args);
 
 ### cms_import_media_url
 
-Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks, sha256 dedupe — an already-imported file returns the existing media_id with duplicate_blob true, so repeated references to the same source image cost nothing — and variants generated on accept. Returns media_id; reference it in content instead of the source URL.
+Server-side pull of one remote image/file into the media library (site migrations, content imports). SSRF-safe fetch with per-hop checks and sha256 dedupe. Returns media_id; if a theme derivative fails, the accepted asset also includes media_variant_failures. Reference the media_id in content instead of the source URL.
 
 Permission annotation: `media.import`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -4967,7 +4967,7 @@ return operations.importMediaUrl(ctx, { url: args["url"] });
 
 ### cms_accept_generated_media
 
-Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true).
+Optional replay path: candidates are already auto-imported into the library. Accepting again returns the existing asset (duplicate: true), including any media_variant_failures.
 
 Permission annotation: `media.generate`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 

@@ -11536,7 +11536,7 @@ Manage assets, folders, providers and acquisition. Import/accept before referenc
 |---|---|---|
 | `GET /api/v1/discovery/media/presets` | [list_media_presets](#list_media_presets) | Registered media presets |
 | `GET /api/v1/media` | [search_media](#search_media) | Bounded, paginated media search (typed filters only) |
-| `POST /api/v1/media` | [upload_media](#upload_media) | Direct binary upload (application/octet-stream + X-PCMS-Filename) |
+| `POST /api/v1/media` | [upload_media](#upload_media) | Direct binary upload; accepted assets include per-preset derivative failures when present (application/octet-stream + X-PCMS-Filename). |
 | `GET /api/v1/media/{mediaId}` | [get_media](#get_media) | Full media diagnostic view (asset + versions + variants) |
 | `PATCH /api/v1/media/{mediaId}` | [update_media_metadata](#update_media_metadata) | Update descriptive metadata and the image focal point |
 | `POST /api/v1/media/{mediaId}/archive` | [archive_media](#archive_media) | Archive the asset (usage-aware hard delete is a privileged domain op) |
@@ -11550,10 +11550,10 @@ Manage assets, folders, providers and acquisition. Import/accept before referenc
 | `DELETE /api/v1/media/folders/{folderId}` | [delete_media_folder](#delete_media_folder) | Delete an empty folder (MEDIA_FOLDER_NOT_EMPTY otherwise) |
 | `PATCH /api/v1/media/folders/{folderId}` | [update_media_folder](#update_media_folder) | Rename and/or move a folder (cycle-protected) |
 | `POST /api/v1/media/generations` | [create_media_generation](#create_media_generation) | Start an image generation run (provider-neutral; does not block on the provider — poll get_media_generation). |
-| `GET /api/v1/media/generations/{generationId}` | [get_media_generation](#get_media_generation) | Generation run status and candidates (server-side references only; download URLs never leave the server). |
-| `POST /api/v1/media/generations/{generationId}/candidates/{candidateIndex}/accept` | [accept_generated_media](#accept_generated_media) | Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset. |
+| `GET /api/v1/media/generations/{generationId}` | [get_media_generation](#get_media_generation) | Generation run status and candidates (server-side references only; download URLs never leave the server). Auto-imported candidates may include media_variant_failures. |
+| `POST /api/v1/media/generations/{generationId}/candidates/{candidateIndex}/accept` | [accept_generated_media](#accept_generated_media) | Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset and any media_variant_failures. |
 | `POST /api/v1/media/generations/estimate` | [estimate_media_generation](#estimate_media_generation) | Approximate generation cost for the given settings before any cost-bearing call (token-priced models return an honest refusal). |
-| `POST /api/v1/media/import` | [import_media_url](#import_media_url) | Server-side remote import (SSRF-safe; no bypass parameters) |
+| `POST /api/v1/media/import` | [import_media_url](#import_media_url) | Server-side remote import (SSRF-safe); accepted assets include per-preset derivative failures when present. |
 | `GET /api/v1/media/providers` | [list_media_providers](#list_media_providers) | Installed, enabled media acquisition providers (safe metadata, no credentials). |
 | `GET /api/v1/media/providers/{providerId}` | [get_media_provider](#get_media_provider) | One media provider: safe state, config schema (secret slots included as schema), non-secret config, secret slot names. |
 | `GET /api/v1/media/providers/{providerId}/capabilities` | [get_media_provider_capabilities](#get_media_provider_capabilities) | Runtime capability surface: configured models with size options, tiers, limits and prices (agent-safe; no credentials). |
@@ -11564,7 +11564,7 @@ Manage assets, folders, providers and acquisition. Import/accept before referenc
 | `DELETE /api/v1/media/providers/{providerId}/secrets/{slot}` | [clear_media_provider_secret](#clear_media_provider_secret) | Delete a stored provider credential (provider becomes unconfigured). Audited. |
 | `PUT /api/v1/media/providers/{providerId}/secrets/{slot}` | [set_media_provider_secret](#set_media_provider_secret) | Store a provider credential VALUE (write-only, encrypted at rest, audited, never returned). Requires media.providers.manage. |
 | `POST /api/v1/media/providers/{providerId}/test` | [test_media_provider](#test_media_provider) | Run the provider connection test with the stored credentials (typed safe outcome, no raw provider errors). |
-| `POST /api/v1/media/stock/import` | [import_stock_candidate](#import_stock_candidate) | Import a stock candidate through the canonical ingest pipeline; duplicate-safe per provider asset (re-import returns the existing asset). |
+| `POST /api/v1/media/stock/import` | [import_stock_candidate](#import_stock_candidate) | Import a stock candidate through the canonical ingest pipeline; a new import includes optional per-preset media_variant_failures, while duplicate-safe re-import returns the existing asset. |
 | `POST /api/v1/media/stock/search` | [search_stock_media](#search_stock_media) | Search enabled stock providers (provider-neutral; tolerates partial provider failure; candidates are opaque signed references). |
 
 <a id="list_media_presets"></a>
@@ -11676,7 +11676,7 @@ return {
 
 ### POST /api/v1/media
 
-**upload_media** — Direct binary upload (application/octet-stream + X-PCMS-Filename)
+**upload_media** — Direct binary upload; accepted assets include per-preset derivative failures when present (application/octet-stream + X-PCMS-Filename).
 
 | Contract | Value |
 |---|---|
@@ -11695,7 +11695,65 @@ Query schema: not declared by the registry; inspect the operation-specific notes
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
-Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Declared response schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_id",
+    "version_no",
+    "sha256",
+    "size_bytes",
+    "mime_type",
+    "duplicate_blob"
+  ],
+  "properties": {
+    "media_id": {
+      "type": "string"
+    },
+    "version_no": {
+      "type": "integer"
+    },
+    "sha256": {
+      "type": "string"
+    },
+    "size_bytes": {
+      "type": "integer"
+    },
+    "mime_type": {
+      "type": "string"
+    },
+    "duplicate_blob": {
+      "type": "boolean"
+    },
+    "media_variant_failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_id",
+          "preset",
+          "error"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 Response construction:
 ```javascript
@@ -11717,7 +11775,8 @@ return {
     sha256: accepted.asset.sha256,
     size_bytes: accepted.asset.sizeBytes,
     mime_type: accepted.asset.mimeType,
-    duplicate_blob: accepted.duplicateBlob
+    duplicate_blob: accepted.duplicateBlob,
+    ...mediaVariantFailureField(accepted.media_variant_failures ?? [])
   }
 };
 ```
@@ -12379,7 +12438,7 @@ return handle(
 
 ### GET /api/v1/media/generations/{generationId}
 
-**get_media_generation** — Generation run status and candidates (server-side references only; download URLs never leave the server).
+**get_media_generation** — Generation run status and candidates (server-side references only; download URLs never leave the server). Auto-imported candidates may include media_variant_failures.
 
 | Contract | Value |
 |---|---|
@@ -12413,7 +12472,135 @@ Query schema: not declared by the registry; inspect the operation-specific notes
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
-Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Declared response schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "generation_id": {
+      "type": "string"
+    },
+    "provider_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "running",
+        "ready",
+        "failed"
+      ]
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "cost": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "preview_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mime_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "media_id": {
+            "type": "string"
+          },
+          "media_variant_failures": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "media_id",
+                "preset",
+                "error"
+              ],
+              "properties": {
+                "media_id": {
+                  "type": "string"
+                },
+                "preset": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+```
 
 Response construction (the shared `handle` wrapper returns HTTP 200 with its callback result):
 ```javascript
@@ -12430,7 +12617,7 @@ return handle(
 
 ### POST /api/v1/media/generations/{generationId}/candidates/{candidateIndex}/accept
 
-**accept_generated_media** — Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset.
+**accept_generated_media** — Accept a generated candidate: ingests through the canonical pipeline into a MediaAsset; replay returns the original asset and any media_variant_failures.
 
 | Contract | Value |
 |---|---|
@@ -12470,7 +12657,49 @@ Query schema: not declared by the registry; inspect the operation-specific notes
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
-Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Declared response schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_id",
+    "duplicate"
+  ],
+  "properties": {
+    "media_id": {
+      "type": "string"
+    },
+    "duplicate": {
+      "type": "boolean"
+    },
+    "media_variant_failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_id",
+          "preset",
+          "error"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 Response construction (the shared `handle` wrapper returns HTTP 200 with its callback result):
 ```javascript
@@ -12563,7 +12792,7 @@ return handle(
 
 ### POST /api/v1/media/import
 
-**import_media_url** — Server-side remote import (SSRF-safe; no bypass parameters)
+**import_media_url** — Server-side remote import (SSRF-safe); accepted assets include per-preset derivative failures when present.
 
 | Contract | Value |
 |---|---|
@@ -12595,7 +12824,57 @@ JSON body schema:
 }
 ```
 
-Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Declared response schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_id",
+    "version_no",
+    "sha256",
+    "duplicate_blob"
+  ],
+  "properties": {
+    "media_id": {
+      "type": "string"
+    },
+    "version_no": {
+      "type": "integer"
+    },
+    "sha256": {
+      "type": "string"
+    },
+    "duplicate_blob": {
+      "type": "boolean"
+    },
+    "media_variant_failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_id",
+          "preset",
+          "error"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 Response construction:
 ```javascript
@@ -12606,7 +12885,8 @@ return {
     media_id: accepted.asset.id,
     version_no: accepted.version.versionNo,
     sha256: accepted.asset.sha256,
-    duplicate_blob: accepted.duplicateBlob
+    duplicate_blob: accepted.duplicateBlob,
+    ...mediaVariantFailureField(accepted.media_variant_failures ?? [])
   }
 };
 ```
@@ -13193,7 +13473,7 @@ return handle(
 
 ### POST /api/v1/media/stock/import
 
-**import_stock_candidate** — Import a stock candidate through the canonical ingest pipeline; duplicate-safe per provider asset (re-import returns the existing asset).
+**import_stock_candidate** — Import a stock candidate through the canonical ingest pipeline; a new import includes optional per-preset media_variant_failures, while duplicate-safe re-import returns the existing asset.
 
 | Contract | Value |
 |---|---|
@@ -13230,7 +13510,52 @@ JSON body schema:
 }
 ```
 
-Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Declared response schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "media_id",
+    "duplicate"
+  ],
+  "properties": {
+    "media_id": {
+      "type": "string"
+    },
+    "duplicate": {
+      "type": "boolean"
+    },
+    "duplicate_blob": {
+      "type": "boolean"
+    },
+    "media_variant_failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "media_id",
+          "preset",
+          "error"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "preset": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 Response construction (the shared `handle` wrapper returns HTTP 200 with its callback result):
 ```javascript

@@ -297,6 +297,42 @@ test("stock import: pipeline ingest, provenance, duplicate-safe re-import", asyn
   assert.equal(count.rows[0]?.n, "1");
 });
 
+test("stock import returns derivative failures with the accepted asset", async (t) => {
+  const pool = await integration(t);
+  if (pool === null) return;
+  const app = fakeApp(pool, new Set<string>(["media.stock.import"]));
+  const storage = app.mediaStorage as InMemoryMediaStorage;
+  storage.getBuffer = async () => {
+    throw new Error("derivative source read failed");
+  };
+  const preset = {
+    id: "thumbnail",
+    width: 64,
+    height: 64,
+    fit: "inside",
+    crop: "center",
+    formats: ["webp"],
+    quality: 80,
+    loading: "lazy",
+  } as const;
+  app.mediaPresets = { listPresets: () => [preset], getPreset: () => preset };
+
+  const result = (await importStockCandidateOp(app, ctx, {
+    candidate_ref: signStockCandidate(await stockTokenCandidate(), SIGNING_KEY),
+  })) as {
+    media_id: string;
+    duplicate: boolean;
+    media_variant_failures?: readonly { media_id: string; preset: string; error: string }[];
+  };
+  assert.equal(result.duplicate, false);
+  assert.equal(result.media_variant_failures?.length, 1);
+  assert.deepEqual(result.media_variant_failures?.[0], {
+    media_id: result.media_id,
+    preset: "thumbnail",
+    error: "derivative source read failed",
+  });
+});
+
 async function stockTokenCandidate() {
   const result = await stockProvider.search(
     { requestId: "seed" },

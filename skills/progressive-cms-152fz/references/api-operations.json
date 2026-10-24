@@ -4925,6 +4925,31 @@
         "operationId": "get_served_theme",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "revision_id": {
+                      "format": "uuid",
+                      "type": ["string", "null"]
+                    },
+                    "settings_generation": {
+                      "type": "integer"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -5391,6 +5416,54 @@
         "operationId": "list_theme_revisions",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "active_revision_id": {
+                      "format": "uuid",
+                      "type": ["string", "null"]
+                    },
+                    "revisions": {
+                      "items": {
+                        "properties": {
+                          "activated_at": {
+                            "format": "date-time",
+                            "type": ["string", "null"]
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "created_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "package_version": {
+                            "type": "string"
+                          },
+                          "revision_id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "theme_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -5525,6 +5598,39 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "served": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "format": "uuid",
+                          "type": ["string", "null"]
+                        },
+                        "settings_generation": {
+                          "type": "integer"
+                        },
+                        "theme_generation": {
+                          "type": "integer"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
@@ -5679,6 +5785,75 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "candidates": {
+                      "items": {
+                        "properties": {
+                          "last_used_at": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "package_version": {
+                            "type": "string"
+                          },
+                          "pending_cleanup": {
+                            "type": "boolean"
+                          },
+                          "revision_id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "theme_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    },
+                    "keep_last": {
+                      "type": "integer"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "older_than_days": {
+                      "type": "integer"
+                    },
+                    "pending": {
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "removed": {
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "retained_count": {
+                      "type": "integer"
+                    },
+                    "theme_generation": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
             "description": "Success"
           },
           "400": {
