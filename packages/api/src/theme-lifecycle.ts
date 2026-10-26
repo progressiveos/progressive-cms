@@ -203,8 +203,8 @@ function inputOf(app: ApplicationServices): LifecycleInput {
 }
 export type ThemeMutation =
   | { kind: "SETTINGS"; values: unknown; expectedGeneration: number }
-  | { kind: "ACTIVATE"; themeKey: string; themeVersion?: string }
-  | { kind: "UPDATE"; packageBytes: Buffer }
+  | { kind: "ACTIVATE"; themeKey: string; themeVersion?: string; expectedGeneration?: number }
+  | { kind: "UPDATE"; packageBytes: Buffer; expectedGeneration?: number }
   | { kind: "ROLLBACK"; revisionId: string; expectedGeneration: number };
 export async function changeTheme(
   app: ApplicationServices,
@@ -247,6 +247,20 @@ export async function changeTheme(
           throw new ApiError("THEME_REVISION_STALE", "theme was changed concurrently", {
             status: 409,
           });
+        // Caller CAS for update/activate (CORE-THEME-REMOTE-PACKAGE-CYCLE §4):
+        // checked inside the lifecycle lock, after recovery, BEFORE the lazy
+        // baseline, snapshots, catalog writes or the pointer move. Generation
+        // 0 is a real value, so the check is on `undefined`, not falsiness.
+        if (
+          (mutation.kind === "UPDATE" || mutation.kind === "ACTIVATE") &&
+          mutation.expectedGeneration !== undefined &&
+          Number(state?.theme_generation ?? 0) !== mutation.expectedGeneration
+        )
+          throw new ApiError(
+            "THEME_REVISION_STALE",
+            `theme generation is ${Number(state?.theme_generation ?? 0)}, not ${mutation.expectedGeneration}; read the served theme again`,
+            { status: 409 },
+          );
         phase = "SNAPSHOT";
         // Baseline registration is lazy; it preserves the exact existing settings.
         if (!state?.active_revision_id) {

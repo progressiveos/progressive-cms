@@ -81,6 +81,7 @@ const outRoot = resolve(repoRoot, arg("--out") ?? "build/release");
 // standalone Skills require it for mandatory artifact byte comparisons.
 const docsDirArg = arg("--docs-dir");
 let docsSummary = null;
+let docsOfficialSkills = null;
 const fail = (message) => {
   console.error(`build-release: ${message}`);
   process.exit(1);
@@ -106,7 +107,7 @@ if (docsDirArg !== undefined) {
   if (!existsSync(resolvedDocsDir)) fail(`docs directory not found: ${resolvedDocsDir}`);
   try {
     const probe = stageDocsDirectory(resolvedDocsDir, resolve(outRoot, ".docs-probe"));
-    readPreparedOfficialSkillFiles(resolvedDocsDir);
+    docsOfficialSkills = readPreparedOfficialSkillFiles(resolvedDocsDir);
     docsSummary = { source: resolvedDocsDir, ...probe };
     rmSync(resolve(outRoot, ".docs-probe"), { recursive: true, force: true });
   } catch (error) {
@@ -458,6 +459,11 @@ const copySkillFiles = (sourceDir, relativeDir = "") => {
   }
 };
 copySkillFiles(join(repoRoot, "skills"));
+for (const [relativePath, bytes] of docsOfficialSkills) {
+  const destination = join(stage, relativePath);
+  mkdirSync(join(destination, ".."), { recursive: true });
+  writeFileSync(destination, bytes);
+}
 const packagedSkillIndex = join(stage, "skills/references/INDEX.md");
 writeFileSync(
   packagedSkillIndex,

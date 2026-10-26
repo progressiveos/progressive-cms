@@ -9,6 +9,11 @@ export async function themeUpdateCommand(invocation: {
 }) {
   const { args, options, env } = invocation;
   const [command, file, ...rest] = args;
+  // Optional lifecycle CAS for update-active: `--expected-generation N`.
+  const casFlag =
+    rest.length === 2 && rest[0] === "--expected-generation" && /^\d+$/.test(rest[1] ?? "")
+      ? Number(rest[1])
+      : undefined;
   if (
     !["active", "update-active", "revisions", "rollback", "install", "uninstall"].includes(
       command ?? "",
@@ -19,14 +24,18 @@ export async function themeUpdateCommand(invocation: {
         rest[0] !== "--expected-generation" ||
         !/^\d+$/.test(rest[1] ?? "") ||
         !Number.isSafeInteger(Number(rest[1]))
-      : rest.length !== 0 ||
-        (command === "active" || command === "revisions" ? file !== undefined : file === undefined))
+      : command === "update-active"
+        ? file === undefined || (rest.length !== 0 && casFlag === undefined)
+        : rest.length !== 0 ||
+          (command === "active" || command === "revisions"
+            ? file !== undefined
+            : file === undefined))
   ) {
     return {
       exitCode: 2,
       stdout: "",
       stderr:
-        "usage: cms theme active | revisions [--json] | install <package.pcTheme> | uninstall <theme-id> --environment <env> --yes [--json] | update-active <package.pcTheme> --environment <env> --yes [--json] | rollback <revision-id> --expected-generation N --environment <env> --yes [--json]\n",
+        "usage: cms theme active | revisions [--json] | install <package.pcTheme> | uninstall <theme-id> --environment <env> --yes [--json] | update-active <package.pcTheme> [--expected-generation N] --environment <env> --yes [--json] | rollback <revision-id> --expected-generation N --environment <env> --yes [--json]\n",
     };
   }
   if (
@@ -62,7 +71,9 @@ export async function themeUpdateCommand(invocation: {
               : await apiCall(
                   client,
                   "POST",
-                  command === "install" ? "/themes/install" : "/themes/active/update",
+                  command === "install"
+                    ? "/themes/install"
+                    : `/themes/active/update${casFlag === undefined ? "" : `?expected_generation=${casFlag}`}`,
                   readFileSync(file ?? ""),
                 );
     if (!response.ok) return response.result;

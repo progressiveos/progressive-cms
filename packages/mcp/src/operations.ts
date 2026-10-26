@@ -56,6 +56,35 @@ export interface McpOperations {
     },
   ): Promise<unknown>;
   listThemeRevisions(ctx: OperationContextLike): Promise<unknown>;
+  // Remote theme package cycle: binary bytes travel over REST, MCP carries
+  // only refs, identity and CAS generations.
+  getActiveTheme(ctx: OperationContextLike): Promise<unknown>;
+  exportThemeSource(ctx: OperationContextLike): Promise<unknown>;
+  listInstalledThemes(ctx: OperationContextLike): Promise<unknown>;
+  validateThemePackage(
+    ctx: OperationContextLike,
+    input: { readonly package_ref: string },
+  ): Promise<unknown>;
+  installThemePackage(
+    ctx: OperationContextLike,
+    input: { readonly package_ref: string },
+  ): Promise<unknown>;
+  updateActiveTheme(
+    ctx: OperationContextLike,
+    input: { readonly package_ref: string; readonly expected_generation: number },
+  ): Promise<unknown>;
+  activateTheme(
+    ctx: OperationContextLike,
+    input: {
+      readonly theme_key: string;
+      readonly theme_version?: string;
+      readonly expected_generation: number;
+    },
+  ): Promise<unknown>;
+  rollbackTheme(
+    ctx: OperationContextLike,
+    input: { readonly revision_id: string; readonly expected_generation: number },
+  ): Promise<unknown>;
   cleanupThemeRevisions(
     ctx: OperationContextLike,
     input: {

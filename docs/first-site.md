@@ -55,6 +55,8 @@ Activation needs `theme.activate`; installation needs `theme.write`. The persist
 
 Set page sections and parentage deliberately. Use `company_page` for assembled sections; use `company_news`/`company_project` for editor-authored prose. Keep images optional. [Content Contract](content-contract.md) provides valid v2 RichText and v1 Block Document examples.
 
+If the site needs news/project lists, declare and scope them as theme collections rather than hard-coding URLs or queries. Follow [Published feeds and related-content cards](collections.md); keep feed templates limited to the pages intended to show those cards.
+
 Create the contact form first using [the complete example](reference/examples/contact-form.json), then insert the returned form definition id into a discovered form block. Build your design, header/footer, desktop/mobile menus and page banner with ordinary theme composition.
 
 ## 4. Create and publish

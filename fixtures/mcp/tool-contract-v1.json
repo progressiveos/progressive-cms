@@ -293,6 +293,172 @@
       }
     },
     {
+      "name": "cms_get_active_theme",
+      "description": "Identity and generations of the theme the public renderer actually serves (served version, installed catalog head, revision_id, theme_generation). Read this before editing: the next update must be newer than installed_head_version, and expected_generation is what CAS wants.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_export_theme",
+      "description": "Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_list_installed_themes",
+      "description": "Installed theme packages in the catalog with their versions and whether each is the render target or the active theme.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.read"
+      }
+    },
+    {
+      "name": "cms_validate_theme_package",
+      "description": "Validate a staged package (package_ref from the REST upload) without changing the site: identity, version, digest, typed diagnostics and a candidate render-stack build. Nothing is installed, activated or registered.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "package_ref": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "package_ref"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "permission": "theme.validate"
+      }
+    },
+    {
+      "name": "cms_install_theme_package",
+      "description": "Install a staged package (package_ref) as a catalog candidate. Never activates: use cms_activate_theme with expected_generation.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "package_ref": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          }
+        },
+        "required": [
+          "package_ref"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "theme.write"
+      }
+    },
+    {
+      "name": "cms_update_active_theme",
+      "description": "Apply a staged package (package_ref) over the active theme of the SAME id and a NEWER version, with lifecycle CAS on expected_generation (from cms_get_active_theme). Requires theme.write AND theme.activate. A stale generation fails with THEME_REVISION_STALE and changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "package_ref": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "package_ref",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "theme.write"
+      }
+    },
+    {
+      "name": "cms_activate_theme",
+      "description": "Activate an installed theme candidate by theme_key (optional exact theme_version), with lifecycle CAS on expected_generation. Requires theme.activate.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "theme_key": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "theme_version": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "theme_key",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "theme.activate"
+      }
+    },
+    {
+      "name": "cms_rollback_theme",
+      "description": "Live activation of a retained revision (revision_id from cms_list_theme_revisions) with lifecycle CAS on expected_generation. Requires theme.write AND theme.activate.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f-]{36}$"
+          },
+          "expected_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "revision_id",
+          "expected_generation"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "permission": "theme.write"
+      }
+    },
+    {
       "name": "cms_get_server_info",
       "description": "Server identity and subsystem contract versions.",
       "inputSchema": {

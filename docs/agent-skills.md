@@ -4,7 +4,7 @@ Skills provide guidance, not permissions. Three official self-contained Agent Sk
 
 | Skill | Purpose | Version |
 |---|---|---|
-| [progressive-cms-site-builder](skills/progressive-cms-site-builder/SKILL.md) | Build an editable site from a brief, using local workflow, API schemas, examples and theme assets | 1.3.1 |
+| [progressive-cms-site-builder](skills/progressive-cms-site-builder/SKILL.md) | Build an editable site from a brief, using local workflow, API schemas, examples and theme assets | 1.3.2 |
 | [progressive-cms-152fz](skills/progressive-cms-152fz/SKILL.md) | Technical personal-data readiness of an existing site: data flows, consent, access, retention and verified controls; owner-selected consent/retention and addressed tools; owner handles legal documents/RKN | 1.1.0 |
 | [progressive-cms-seo](skills/progressive-cms-seo/SKILL.md) | Thorough applicable Google/Yandex SEO fixes, metadata/H1/duplicates, crawl/rendering and performance evidence | 1.0.2 |
 

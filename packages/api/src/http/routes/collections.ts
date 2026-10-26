@@ -13,6 +13,7 @@ import {
   queryCollectionFeed,
 } from "../../collection-source.js";
 import { ApiError } from "../../errors.js";
+import { readBindingFeedOptions } from "../../feed-options.js";
 import type { ApiRoute } from "../registry.js";
 import { createRateLimiter } from "./search.js";
 
@@ -143,6 +144,7 @@ export function makeCollectionsRoutes(): ApiRoute[] {
         const { page, pageSize, tag } = parseCollectionFeedQuery(query, {
           pageSize: binding.page_size ?? COLLECTION_DEFAULT_PAGE_SIZE,
         });
+        const site = await app.routes.ensureSite(app.defaultSiteKey);
         const feed = await queryCollectionFeed(
           {
             pool: app.pool,
@@ -152,6 +154,12 @@ export function makeCollectionsRoutes(): ApiRoute[] {
             context,
             contentTypes: binding.content_types,
             sectionEntryId,
+            // REST keeps its declared semantics: no `section` = the whole
+            // site, `section` = its direct children. The manifest's
+            // template-context scope has no meaning here.
+            scope: sectionEntryId === null ? "site" : "section",
+            order: readBindingFeedOptions(binding).order,
+            siteId: site.id,
             tagField: binding.tag_field ?? "tags",
             tag,
             page,

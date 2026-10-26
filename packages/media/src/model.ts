@@ -376,6 +376,20 @@ export async function getAsset(pool: DbPool, id: StableId): Promise<MediaAssetRe
   return result.rows[0] === undefined ? null : toAsset(result.rows[0]);
 }
 
+/** Batch read for feed cards: one statement, unknown/malformed ids skipped. */
+export async function getAssetsByIds(
+  pool: DbPool,
+  ids: readonly string[],
+): Promise<MediaAssetRecord[]> {
+  const valid = [...new Set(ids)].filter((id) => isStableId(id as never));
+  if (valid.length === 0) return [];
+  const result = await pool.query<AssetRow>(
+    `SELECT * FROM media_assets WHERE id = ANY($1::uuid[]) ORDER BY id`,
+    [valid],
+  );
+  return result.rows.map(toAsset);
+}
+
 export async function listVersions(pool: DbPool, assetId: StableId): Promise<MediaVersionRecord[]> {
   assertAssetId(assetId);
   const result = await pool.query<VersionRow>(

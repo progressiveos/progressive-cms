@@ -19,7 +19,7 @@ Set `PCMS_CORE_VERSION` to `server.cms_version` from `cms agent bootstrap --json
 - `nav['header.primary'].items` and other declared placements contain resolved navigation items. Do not compute internal URLs from slugs.
 - `breadcrumbs` is the Content Tree trail described in [Navigation](navigation.md).
 - `media[asset_id]` supplies discovered preset derivatives; guard missing assets/presets. A principal image is optional.
-- `collections.<key>` exposes only declared, published feeds on their permitted templates. The sample manifest declares `news`/`projects`; their items supply Core-resolved hrefs and titles.
+- `collections.<key>` exposes only declared, published feeds on their permitted templates. See [Published feeds and related-content cards](collections.md) for feed scopes, ordering, projection, `related_content` and the public REST query.
 - `head_html`/Core head composition protects authoritative SEO. Do not replace canonical, robots or OG metadata in a template. A default component layout for Extension views is separate from an entry template.
 
 A banner is ordinary markup/CSS over available H1, background media and breadcrumb data. It has no special Page Hero subsystem or required content entity. RichText tables render through Core and require no theme-specific table renderer.
@@ -45,11 +45,30 @@ For an active same-id theme, prepare a newer package and use:
 
 ```sh
 cms theme active --json
-cms theme update-active ./company-starter.pcTheme --environment qa --yes --json
+cms theme update-active ./company-starter.pcTheme --expected-generation "$THEME_GENERATION" --environment qa --yes --json
 cms theme active --json
 ```
 
-The task needs `theme.write` and `theme.activate`. On success, Core records the installed `theme_key` and `theme_version` in `admin_theme_state`; when updating the existing row, it leaves `settings` and `settings_generation` unchanged. Wrong id, non-newer version or incompatible settings fail without replacing the served theme. Do not overwrite an active directory via `cms theme install`.
+Set `THEME_GENERATION` to the observed value from the first command. The task needs `theme.write` and `theme.activate`. On success, Core records the installed `theme_key` and `theme_version` in `admin_theme_state`; when updating the existing row, it leaves `settings` and `settings_generation` unchanged. Wrong id, non-newer version or incompatible settings fail without replacing the served theme. Do not overwrite an active directory via `cms theme install`.
+
+## Edit the served theme through a remote package cycle
+
+An agent without SSH can export, edit, upload, validate and compare-and-swap apply one `.pcTheme` package. Start from `cms theme active --json`, then `cms theme export --output ./site.pcTheme --json`. Export reads the renderer's served snapshot, returns its generation and digest, verifies the downloaded archive, and does not create a revision. Keep the same id for an active update and bump above the **installed head** version.
+
+Stage and validate the edited package:
+
+```sh
+cms theme upload ./site.pcTheme --json
+cms theme validate-package <package-ref> --json
+```
+
+Upload requires `theme.write`; validation requires `theme.validate` and does not change the site. A `package_ref` is bound to the uploading actor/site/environment, is not authorization by itself and expires after one hour. Apply a staged package with REST `POST /api/v1/themes/active/update` and `{"package_ref":"<package-ref>","expected_generation":N}`, or MCP `cms_update_active_theme`. Both `theme.write` and `theme.activate` are required. Read the current `theme_generation` first; a stale CAS returns 409 `THEME_REVISION_STALE` without changes. For raw local bytes, the CLI also supports `cms theme update-active <package.pcTheme> --expected-generation N --environment <env> --yes --json`; it does not apply an existing staged reference. After an interrupted response, reread the actual active theme before retrying. The [site-builder Skill workflow](skills/progressive-cms-site-builder/references/theme-package-cycle.md) has the full remote sequence and REST/MCP alternatives.
+
+The source catalogue is complete in the [REST map](rest-api-map.md), [CLI map](cli-map.md) and [MCP map](mcp-map.md). MCP can return the served-theme descriptor but not binary bytes; obtain the archive through the generation-pinned REST download operation and verify its SHA-256.
+
+## Recover a crashed staged-package lock
+
+Staged uploads serialize on `<themes root>/.pcms-theme-packages/.lock`. The server never breaks a stale lock automatically. If package upload, validation or apply returns retryable `503 THEME_PACKAGE_STORE_BUSY`, stop **all Web processes that share this themes root** and wait for them to exit. Then remove exactly `<themes root>/.pcms-theme-packages/.lock`, restart those Web processes, and retry. Do not remove staged `.pcTheme` packages or their `.json` receipts, and do not delete the lock while any sharing process can accept an upload. A package that expires during recovery must be uploaded again. Do not edit theme revisions, active state, catalog or database rows to recover the store.
 
 Core retains confirmed immutable theme revisions. Read `GET /api/v1/themes/revisions` (`theme.read`) or `cms theme revisions --json`: `theme_generation`, `active_revision_id` and up to 100 active/newest records with revision id, theme id/version, hash and timestamps; no filesystem paths. `GET /themes/active` also exposes `revision_id` (nullable before a baseline exists) and `theme_generation`.
 

@@ -151,6 +151,22 @@ function extractZipEntries(
   });
 }
 
+/** Root-level files a package may carry besides `theme.json`. */
+const ALLOWED_ROOT_FILES = new Set(["theme.json", "THEME.md", "README.md", "CHANGELOG.md"]);
+
+/**
+ * One package-allowlist decision, shared by install validation and the
+ * export builder so a round trip can never produce a package the installer
+ * would refuse (or export something the installer would reject).
+ */
+export function isAllowedThemeEntryName(name: string): boolean {
+  if (name.startsWith("/") || name.includes("..") || name.includes("\\")) return false;
+  const top = name.includes("/") ? `${name.split("/")[0]}/` : name;
+  if (!ALLOWED_ROOTS.includes(top) && !ALLOWED_ROOTS.includes(name)) return false;
+  if (!name.endsWith("/") && !name.includes("/")) return ALLOWED_ROOT_FILES.has(name);
+  return true;
+}
+
 /** Entry-path gate: traversal/absolute/backslash names and unknown roots are
  * rejected before anything is extracted. */
 export function validateThemeEntryNames(names: readonly string[]): void {
@@ -158,17 +174,14 @@ export function validateThemeEntryNames(names: readonly string[]): void {
     if (name.startsWith("/") || name.includes("..") || name.includes("\\")) {
       throw new ThemeInstallError("THEME_PACKAGE_INVALID", `unsafe entry path: ${name}`);
     }
-    const top = name.includes("/") ? `${name.split("/")[0]}/` : name;
-    if (!ALLOWED_ROOTS.includes(top) && !ALLOWED_ROOTS.includes(name)) {
-      throw new ThemeInstallError("THEME_PACKAGE_INVALID", `unknown package root: ${top}`);
-    }
-    if (!name.endsWith("/") && !name.includes("/")) {
-      // A stray root-level file outside the allowlist slipped past the prefix
-      // check above (defence in depth).
-      const allowedRootFiles = new Set(["theme.json", "THEME.md", "README.md", "CHANGELOG.md"]);
-      if (!allowedRootFiles.has(name)) {
-        throw new ThemeInstallError("THEME_PACKAGE_INVALID", `unknown package file: ${name}`);
-      }
+    if (!isAllowedThemeEntryName(name)) {
+      const top = name.includes("/") ? `${name.split("/")[0]}/` : name;
+      throw new ThemeInstallError(
+        "THEME_PACKAGE_INVALID",
+        ALLOWED_ROOTS.includes(top)
+          ? `unknown package file: ${name}`
+          : `unknown package root: ${top}`,
+      );
     }
   }
 }

@@ -118,6 +118,7 @@ export {
   deleteAssetRows,
   ensureBlobRow,
   getAsset,
+  getAssetsByIds,
   getBlobByHash,
   listVersions,
   MEDIA_KINDS,
@@ -216,6 +217,7 @@ export {
   generateVariantsForAsset,
   getVariant,
   listVariants,
+  listVariantsForAssets,
   readVariantBytes,
 } from "./variants.js";
 export type {

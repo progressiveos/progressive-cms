@@ -29,6 +29,14 @@ import {
   rollbackTheme,
   type ThemeCleanupInput,
 } from "../../theme-lifecycle.js";
+import {
+  downloadThemeSourceOp,
+  getThemeSourceOp,
+  installThemePackageOp,
+  updateActiveThemeOp,
+  uploadThemePackageOp,
+  validateThemePackageOp,
+} from "../../theme-package-ops.js";
 import type { ApiRoute } from "../registry.js";
 
 function themesRootOf(app: ApplicationServices): { root: string; renderDirId: string } {
@@ -84,6 +92,127 @@ const SERVED_THEME_SCHEMA = {
 
 export function makeThemeManageRoutes(): ApiRoute[] {
   return [
+    {
+      spec: {
+        method: "GET",
+        url: "/themes/source",
+        operationId: "get_theme_source",
+        summary:
+          "Descriptor of the package of the theme the renderer ACTUALLY serves: identity, served/installed versions, revision, generation and archive digest (theme.read)",
+        tag: "themes",
+        auth: "authenticated",
+        permission: "theme.read",
+        responseSchema: {
+          type: "object",
+          properties: {
+            theme_id: { type: "string" },
+            served_version: { type: "string" },
+            installed_head_version: { type: ["string", "null"] },
+            revision_id: { type: ["string", "null"], format: "uuid" },
+            theme_generation: { type: "integer" },
+            package_sha256: { type: "string" },
+            size_bytes: { type: "integer" },
+            download_path: { type: "string" },
+          },
+        },
+      },
+      async handle(app, ctx) {
+        return { status: 200, body: await getThemeSourceOp(app, ctx) };
+      },
+    },
+    {
+      spec: {
+        method: "GET",
+        url: "/themes/source/package",
+        operationId: "download_theme_source_package",
+        summary:
+          "Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
+        tag: "themes",
+        auth: "authenticated",
+        permission: "theme.read",
+        querySchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["expected_generation"],
+          properties: {
+            expected_generation: { type: "string", pattern: "^[0-9]+$" },
+          },
+        },
+      },
+      async handle(app, ctx, request) {
+        const query = request.query as { expected_generation?: string };
+        const generation = Number(query.expected_generation);
+        if (!Number.isSafeInteger(generation)) {
+          throw new ApiError(
+            "API_REQUEST_INVALID",
+            "expected_generation must be a nonnegative safe integer",
+            { status: 400 },
+          );
+        }
+        const result = await downloadThemeSourceOp(app, ctx, {
+          expected_generation: generation,
+        });
+        return {
+          status: 200,
+          body: result.bytes,
+          headers: {
+            "content-type": "application/vnd.progressive-cms.theme+zip",
+            "content-disposition": `attachment; filename="${result.filename}"`,
+            "content-length": String(result.size_bytes),
+            "x-pcms-package-sha256": result.sha256,
+          },
+        };
+      },
+    },
+    {
+      spec: {
+        method: "POST",
+        url: "/themes/packages",
+        operationId: "upload_theme_package",
+        summary:
+          "Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
+        tag: "themes",
+        auth: "authenticated",
+        permission: "theme.write",
+        csrf: true,
+        bodyLimit: 64 * 1024 * 1024 + 64 * 1024,
+      },
+      async handle(app, ctx, request) {
+        if (!Buffer.isBuffer(request.body)) {
+          throw new ApiError(
+            "API_REQUEST_INVALID",
+            "send the theme package as application/octet-stream",
+            { status: 400 },
+          );
+        }
+        return { status: 201, body: await uploadThemePackageOp(app, ctx, request.body) };
+      },
+    },
+    {
+      spec: {
+        method: "POST",
+        url: "/themes/packages/:ref/validate",
+        operationId: "validate_theme_package",
+        summary:
+          "Validate a staged package without changing the site: identity, version, digest and typed diagnostics; the candidate render stack is built and discarded (theme.validate)",
+        tag: "themes",
+        auth: "authenticated",
+        permission: "theme.validate",
+        csrf: true,
+        paramsSchema: {
+          type: "object",
+          required: ["ref"],
+          properties: { ref: { type: "string", maxLength: 64 } },
+        },
+      },
+      async handle(app, ctx, request) {
+        const params = request.params as { ref: string };
+        return {
+          status: 200,
+          body: await validateThemePackageOp(app, ctx, { package_ref: params.ref }),
+        };
+      },
+    },
     {
       spec: {
         method: "POST",
@@ -251,12 +380,17 @@ export function makeThemeManageRoutes(): ApiRoute[] {
         url: "/themes/active/update",
         operationId: "update_active_theme",
         summary:
-          "Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate)",
+          "Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate). Body: raw ZIP (optional ?expected_generation=N) or JSON {package_ref, expected_generation}.",
         tag: "themes",
         auth: "authenticated",
         permission: "theme.write",
         csrf: true,
         bodyLimit: 64 * 1024 * 1024 + 64 * 1024,
+        querySchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: { expected_generation: { type: "string", pattern: "^[0-9]+$" } },
+        },
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "theme.activate");
@@ -267,10 +401,44 @@ export function makeThemeManageRoutes(): ApiRoute[] {
             { status: 409 },
           );
         }
+        // Staged-package body: the whole cycle (CAS, guards, journal, switch)
+        // lives in the shared operation, never here.
         if (!Buffer.isBuffer(request.body)) {
+          const body = (request.body ?? {}) as {
+            package_ref?: unknown;
+            expected_generation?: unknown;
+          };
+          if (typeof body.package_ref !== "string") {
+            throw new ApiError(
+              "API_REQUEST_INVALID",
+              "body must be {package_ref, expected_generation} JSON or the raw package as application/octet-stream",
+              { status: 400 },
+            );
+          }
+          if (
+            !Number.isSafeInteger(body.expected_generation) ||
+            (body.expected_generation as number) < 0
+          ) {
+            throw new ApiError(
+              "API_REQUEST_INVALID",
+              "expected_generation is required for a staged package and must be a nonnegative safe integer",
+              { status: 400 },
+            );
+          }
+          return {
+            status: 200,
+            body: await updateActiveThemeOp(app, ctx, {
+              package_ref: body.package_ref,
+              expected_generation: body.expected_generation as number,
+            }),
+          };
+        }
+        const raw = (request.query as { expected_generation?: string } | undefined)
+          ?.expected_generation;
+        if (raw !== undefined && !Number.isSafeInteger(Number(raw))) {
           throw new ApiError(
             "API_REQUEST_INVALID",
-            "send the theme package as application/octet-stream",
+            "expected_generation must be a nonnegative safe integer",
             { status: 400 },
           );
         }
@@ -282,6 +450,7 @@ export function makeThemeManageRoutes(): ApiRoute[] {
           const result = await changeTheme(app, ctx, {
             kind: "UPDATE",
             packageBytes: request.body,
+            ...(raw === undefined ? {} : { expectedGeneration: Number(raw) }),
           });
           const info = result.info!;
           try {
@@ -335,7 +504,7 @@ export function makeThemeManageRoutes(): ApiRoute[] {
         url: "/themes/install",
         operationId: "install_theme",
         summary:
-          "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact) or the raw package as application/octet-stream. The renderDir theme can never be overwritten.",
+          "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
         tag: "themes",
         auth: "authenticated",
         permission: "theme.write",
@@ -357,12 +526,20 @@ export function makeThemeManageRoutes(): ApiRoute[] {
           const disposition = request.headers["content-disposition"];
           if (typeof disposition === "string") source = disposition;
         } else {
-          const body = (raw ?? {}) as { download_url?: unknown };
+          const body = (raw ?? {}) as { download_url?: unknown; package_ref?: unknown };
+          if (typeof body.package_ref === "string") {
+            // A package the agent uploaded from its own machine: same
+            // installer, same gates, no second install mechanism.
+            return {
+              status: 201,
+              body: await installThemePackageOp(app, ctx, { package_ref: body.package_ref }),
+            };
+          }
           const url = typeof body.download_url === "string" ? body.download_url : "";
           if (url.length === 0) {
             throw new ApiError(
               "API_REQUEST_INVALID",
-              "body must be {download_url} JSON or the raw package as application/octet-stream",
+              "body must be {download_url} or {package_ref} JSON, or the raw package as application/octet-stream",
               { status: 400 },
             );
           }

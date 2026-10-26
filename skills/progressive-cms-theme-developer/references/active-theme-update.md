@@ -21,7 +21,9 @@ writes, config changes or web restart are required.
      --environment production --yes --json
    ```
 
-   Required scopes: **theme.write + theme.activate**. Ordinary
+   Required scopes: **theme.write + theme.activate**. Add
+   `--expected-generation <theme_generation>` from `cms theme active --json`
+   to make the update fail closed if the theme changed in between. Ordinary
    `cms theme install` / `POST /themes/install` continue to reject overwriting
    the active render target. `update-active` cannot switch to another id or
    install an older/equal version.
@@ -39,6 +41,113 @@ before replacing files. Templates and assets switch from a complete staged
 copy; an invalid package, wrong id/version or incompatible settings leaves
 the previous theme serving. Existing settings, content, routes and
 publication pointers are not rewritten.
+
+## Edit a remote theme without SSH (package cycle)
+
+No server file access is needed. The unit of exchange is one `.pcTheme` ZIP;
+the agent edits it on its own machine.
+
+```sh
+# 1. Read what is ACTUALLY served, and its basis generation.
+cms theme active --json          # id, version, revision_id, theme_generation
+
+# 2. Download that exact basis (checksum verified, atomic local write).
+cms theme export --output ./site.pcTheme --json
+
+# 3. Edit locally: Liquid, CSS, binary assets. Keep the same theme id and
+#    bump the version ABOVE the installed head printed by the export
+#    (installed_head_version), not just above served_version.
+
+# 4. Stage the package on the server, then validate it there.
+cms theme upload ./site.pcTheme --json            # -> package_ref
+cms theme validate-package <package-ref> --json   # identity, version, diagnostics
+
+# 5. Apply with the basis generation you exported.
+cms theme update-active ./site.pcTheme \
+  --expected-generation <theme_generation> \
+  --environment production --yes --json
+```
+
+`export` returns `theme_id`, `served_version`, `installed_head_version`,
+`revision_id` (null before the first lifecycle mutation), `theme_generation`,
+`package_sha256`, `size_bytes` and `download_path`. The archive contains the
+package-layout files of the served theme and never instance state
+(`.pcms-install.json`, snapshots, receipts, settings). Export is read-only: it
+creates no baseline and does not change the generation.
+
+REST: `GET /api/v1/themes/source` (descriptor, `theme.read`) and
+`GET /api/v1/themes/source/package?expected_generation=N` (binary,
+`theme.read`, `Content-Type: application/vnd.progressive-cms.theme+zip`,
+`X-PCMS-Package-SHA256`). A changed basis returns `409 THEME_REVISION_STALE`
+instead of another archive.
+
+Staged packages: `POST /api/v1/themes/packages` (raw ZIP, `theme.write`)
+returns an opaque `package_ref` with a one-hour TTL; the ref is not a
+capability — only the actor/site/environment that uploaded it can use it, and
+another actor's or an expired ref is a 404. `POST /api/v1/themes/packages/:ref/validate`
+(`theme.validate`) checks identity, version, digest and the candidate render
+stack without installing, activating or registering anything.
+
+Apply either with JSON `{"package_ref":"...","expected_generation":N}` on
+`POST /api/v1/themes/active/update`, or with the raw ZIP plus
+`?expected_generation=N`. The raw body without the parameter keeps the old
+contract. `POST /api/v1/themes/install` also accepts `{"package_ref"}` and
+still installs a candidate without activating it.
+
+`expected_generation` is a lifecycle CAS checked inside the theme lock, after
+recovery and before any baseline, snapshot, catalog or pointer write.
+`0` is a valid value. A stale basis fails with `409 THEME_REVISION_STALE` and
+changes nothing; there is no automatic rebase or retry. Re-read
+`cms theme active` after an interrupted response instead of bumping the
+version blindly.
+
+MCP mirrors the cycle without binary data: `cms_get_active_theme`,
+`cms_export_theme` (descriptor only), `cms_list_installed_themes`,
+`cms_validate_theme_package`, `cms_install_theme_package`,
+`cms_update_active_theme`, `cms_activate_theme`, `cms_rollback_theme`. The
+upload itself is REST/CLI; MCP only ever sees a `package_ref`. Update and
+rollback require `theme.write` + `theme.activate` at the application layer.
+
+The server never executes npm/build/shell from an uploaded theme and never
+reads a caller-supplied filesystem path.
+
+### Recovering a crashed staged-package upload
+
+Staged uploads serialize on one lock file in the theme store:
+
+```
+<themes root>/.pcms-theme-packages/.lock
+```
+
+The server never breaks that lock automatically. Every automatic scheme
+(rename it away, expire it by age, drop it when the recorded pid is gone) opens
+a window in which another process enters the quota section and publishes one
+package too many, so the quota would no longer hold. The cost of that choice is
+one manual step in a rare failure.
+
+Symptom: every `POST /api/v1/themes/packages`, `.../validate` and
+`.../apply` answers `503 THEME_PACKAGE_STORE_BUSY` (retryable) with details
+`holder_pid`, `lock_age_seconds` and a `hint`. Retrying the request, calling
+REST or MCP again, and restarting the Web process do NOT clear it — the lock is
+a file, not process memory.
+
+Safe recovery, in this order:
+
+1. Stop every Web process that shares this themes root and wait for them to
+   exit. Checking `holder_pid` alone is not enough: a new upload can start
+   between a process check and lock removal.
+2. Remove exactly that one file, from the themes root:
+   `rm <themes root>/.pcms-theme-packages/.lock`
+   Do not touch anything else in that directory: `.pcTheme` files are staged
+   packages (they expire on their own TTL), and `.json` files are their
+   receipts. Removing them by hand only loses an in-flight package.
+3. Start the Web processes again, then retry the upload. A package staged
+   before the crash is still valid until its `expires_at`; otherwise upload it
+   again.
+
+Never delete or edit theme revisions, `theme_operations`, `admin_theme_state`
+or the catalog to work around a busy store: those are the lifecycle's own
+recovery sources.
 
 ## Retained revisions and live rollback
 

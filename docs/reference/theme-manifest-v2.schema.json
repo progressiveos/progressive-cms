@@ -67,7 +67,12 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "enum": ["scripts", "styles", "locales", "tests"]
+        "enum": [
+          "scripts",
+          "styles",
+          "locales",
+          "tests"
+        ]
       }
     },
     "templates": {
@@ -134,7 +139,9 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["content_types"],
+        "required": [
+          "content_types"
+        ],
         "properties": {
           "content_types": {
             "type": "array",
@@ -223,7 +230,11 @@
     "template": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "file", "accepts_content_types"],
+      "required": [
+        "id",
+        "file",
+        "accepts_content_types"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -297,7 +308,10 @@
     "component": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "file"],
+      "required": [
+        "id",
+        "file"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -312,7 +326,10 @@
     "block_renderer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["block", "file"],
+      "required": [
+        "block",
+        "file"
+      ],
       "properties": {
         "block": {
           "type": "string",
@@ -337,7 +354,11 @@
     "navigation_placement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "max_depth", "supported_item_types"],
+      "required": [
+        "id",
+        "max_depth",
+        "supported_item_types"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -366,7 +387,14 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["internal_entry", "external_url", "anchor", "group", "separator", "action"]
+            "enum": [
+              "internal_entry",
+              "external_url",
+              "anchor",
+              "group",
+              "separator",
+              "action"
+            ]
           }
         },
         "fallback": {
@@ -381,7 +409,10 @@
     "media_preset": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "width"],
+      "required": [
+        "id",
+        "width"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -399,11 +430,24 @@
         },
         "fit": {
           "type": "string",
-          "enum": ["cover", "contain", "fill", "inside", "outside"]
+          "enum": [
+            "cover",
+            "contain",
+            "fill",
+            "inside",
+            "outside"
+          ]
         },
         "crop": {
           "type": "string",
-          "enum": ["center", "top", "bottom", "left", "right", "entropy"]
+          "enum": [
+            "center",
+            "top",
+            "bottom",
+            "left",
+            "right",
+            "entropy"
+          ]
         },
         "formats": {
           "type": "array",
@@ -412,7 +456,12 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["avif", "webp", "jpeg", "png"]
+            "enum": [
+              "avif",
+              "webp",
+              "jpeg",
+              "png"
+            ]
           }
         },
         "quality": {
@@ -422,14 +471,20 @@
         },
         "loading": {
           "type": "string",
-          "enum": ["lazy", "eager"]
+          "enum": [
+            "lazy",
+            "eager"
+          ]
         }
       }
     },
     "setting": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "type"],
+      "required": [
+        "key",
+        "type"
+      ],
       "properties": {
         "key": {
           "type": "string",
@@ -437,7 +492,14 @@
         },
         "type": {
           "type": "string",
-          "enum": ["boolean", "string", "enum", "number", "color", "media"]
+          "enum": [
+            "boolean",
+            "string",
+            "enum",
+            "number",
+            "color",
+            "media"
+          ]
         },
         "label": {
           "type": "string",
@@ -508,7 +570,9 @@
             }
           },
           "then": {
-            "required": ["choices"],
+            "required": [
+              "choices"
+            ],
             "properties": {
               "default": {
                 "type": "string"
@@ -586,12 +650,17 @@
           "if": {
             "properties": {
               "type": {
-                "enum": ["color", "media"]
+                "enum": [
+                  "color",
+                  "media"
+                ]
               }
             }
           },
           "then": {
-            "required": ["token"]
+            "required": [
+              "token"
+            ]
           }
         }
       ]

@@ -176,6 +176,130 @@ export const TOOLS: readonly McpTool[] = [
       return operations.cleanupThemeRevisions(ctx, args);
     },
   },
+  // --- remote theme package cycle (CORE-THEME-REMOTE-PACKAGE-CYCLE) ---
+  {
+    name: "cms_get_active_theme",
+    description:
+      "Identity and generations of the theme the public renderer actually serves (served version, installed catalog head, revision_id, theme_generation). Read this before editing: the next update must be newer than installed_head_version, and expected_generation is what CAS wants.",
+    permission: "theme.read",
+    mutation: false,
+    inputSchema: objectSchema({}),
+    async run(operations, ctx) {
+      return operations.getActiveTheme(ctx);
+    },
+  },
+  {
+    name: "cms_export_theme",
+    description:
+      "Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64.",
+    permission: "theme.read",
+    mutation: false,
+    inputSchema: objectSchema({}),
+    async run(operations, ctx) {
+      return operations.exportThemeSource(ctx);
+    },
+  },
+  {
+    name: "cms_list_installed_themes",
+    description:
+      "Installed theme packages in the catalog with their versions and whether each is the render target or the active theme.",
+    permission: "theme.read",
+    mutation: false,
+    inputSchema: objectSchema({}),
+    async run(operations, ctx) {
+      return operations.listInstalledThemes(ctx);
+    },
+  },
+  {
+    name: "cms_validate_theme_package",
+    description:
+      "Validate a staged package (package_ref from the REST upload) without changing the site: identity, version, digest, typed diagnostics and a candidate render-stack build. Nothing is installed, activated or registered.",
+    permission: "theme.validate",
+    mutation: false,
+    inputSchema: objectSchema({ package_ref: STR_ID }, ["package_ref"]),
+    async run(operations, ctx, args) {
+      return operations.validateThemePackage(ctx, {
+        package_ref: args["package_ref"] as string,
+      });
+    },
+  },
+  {
+    name: "cms_install_theme_package",
+    description:
+      "Install a staged package (package_ref) as a catalog candidate. Never activates: use cms_activate_theme with expected_generation.",
+    permission: "theme.write",
+    mutation: true,
+    inputSchema: objectSchema({ package_ref: STR_ID }, ["package_ref"]),
+    async run(operations, ctx, args) {
+      return operations.installThemePackage(ctx, {
+        package_ref: args["package_ref"] as string,
+      });
+    },
+  },
+  {
+    name: "cms_update_active_theme",
+    description:
+      "Apply a staged package (package_ref) over the active theme of the SAME id and a NEWER version, with lifecycle CAS on expected_generation (from cms_get_active_theme). Requires theme.write AND theme.activate. A stale generation fails with THEME_REVISION_STALE and changes nothing.",
+    permission: "theme.write",
+    mutation: true,
+    inputSchema: objectSchema(
+      {
+        package_ref: STR_ID,
+        expected_generation: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+      },
+      ["package_ref", "expected_generation"],
+    ),
+    async run(operations, ctx, args) {
+      return operations.updateActiveTheme(ctx, {
+        package_ref: args["package_ref"] as string,
+        expected_generation: args["expected_generation"] as number,
+      });
+    },
+  },
+  {
+    name: "cms_activate_theme",
+    description:
+      "Activate an installed theme candidate by theme_key (optional exact theme_version), with lifecycle CAS on expected_generation. Requires theme.activate.",
+    permission: "theme.activate",
+    mutation: true,
+    inputSchema: objectSchema(
+      {
+        theme_key: { type: "string", maxLength: 64 },
+        theme_version: { type: "string", maxLength: 32 },
+        expected_generation: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+      },
+      ["theme_key", "expected_generation"],
+    ),
+    async run(operations, ctx, args) {
+      return operations.activateTheme(ctx, {
+        theme_key: args["theme_key"] as string,
+        ...(args["theme_version"] === undefined
+          ? {}
+          : { theme_version: args["theme_version"] as string }),
+        expected_generation: args["expected_generation"] as number,
+      });
+    },
+  },
+  {
+    name: "cms_rollback_theme",
+    description:
+      "Live activation of a retained revision (revision_id from cms_list_theme_revisions) with lifecycle CAS on expected_generation. Requires theme.write AND theme.activate.",
+    permission: "theme.write",
+    mutation: true,
+    inputSchema: objectSchema(
+      {
+        revision_id: STR_ID,
+        expected_generation: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+      },
+      ["revision_id", "expected_generation"],
+    ),
+    async run(operations, ctx, args) {
+      return operations.rollbackTheme(ctx, {
+        revision_id: args["revision_id"] as string,
+        expected_generation: args["expected_generation"] as number,
+      });
+    },
+  },
   // --- general discovery (spec §20) ---
   {
     name: "cms_get_server_info",

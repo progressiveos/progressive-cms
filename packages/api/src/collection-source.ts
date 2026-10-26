@@ -13,6 +13,7 @@
 // site entry ids. The REST surface passes the section explicitly.
 
 import { ApiError } from "./errors.js";
+import { FEED_FIELD_PATTERN } from "./feed-options.js";
 
 /** Hard page-size maximum — one page never exceeds the DSL feed bound. */
 export const COLLECTION_MAX_PAGE_SIZE = 100;
@@ -48,6 +49,22 @@ export interface CollectionFeedInput {
   readonly tag: string | null;
   readonly page: number;
   readonly pageSize: number;
+  /**
+   * Feed scope (additive): "section" (default — children of sectionEntryId,
+   * or the whole site when null), "subtree" (every non-archived descendant,
+   * the root excluded; requires sectionEntryId) or "site" (no tree filter).
+   */
+  readonly scope?: "section" | "subtree" | "site";
+  /** Explicit ordering; default published_at DESC + entry_id tie-break. */
+  readonly order?: {
+    readonly by: "published_at" | "field";
+    readonly direction: "asc" | "desc";
+    readonly field?: string;
+  };
+  /** Entry ids removed before counting/paging/facets. */
+  readonly excludeEntryIds?: readonly string[];
+  /** Restricts the canonical-route join to one site; null keeps the legacy join. */
+  readonly siteId?: string | null;
 }
 
 export interface CollectionFeedResult {
@@ -134,9 +151,72 @@ export function parseCollectionFeedQuery(
 }
 
 /**
- * One deterministic feed page. Order: published_at DESC with entry_id as the
- * stable tie-breaker; pagination is bounded offset paging (page/page_size —
- * feeds need total + stable pages, not keyset cursors).
+ * Pinned-id cards in one statement: entry (locale translation) → published
+ * revision → canonical route, mirroring the collection projection so both
+ * paths hand the renderer the same row shape. Unknown, translated-away,
+ * unpublished or unrouted ids simply do not appear; the returned order is the
+ * caller's requested order.
+ */
+export async function queryPublishedCardRows(
+  deps: CollectionFeedDeps,
+  input: {
+    readonly context: string;
+    readonly entryIds: readonly string[];
+    readonly siteId?: string | null;
+  },
+): Promise<readonly CollectionFeedItemRow[]> {
+  const ids = [...new Set(input.entryIds)].filter((id) => STABLE_ID_RE.test(id));
+  if (ids.length === 0) return [];
+  const routeLocale = input.context === "default" ? "x-default" : input.context;
+  const sql = `
+    WITH requested AS (
+      SELECT t.idx,
+             CASE WHEN $3::text = 'default' THEN t.entry_id ELSE (
+               SELECT translation.id FROM entries translation
+               WHERE COALESCE(translation.translation_group_id, translation.id) = (
+                       SELECT COALESCE(source.translation_group_id, source.id)
+                       FROM entries source WHERE source.id = t.entry_id)
+                 AND translation.locale = $3 AND translation.archived_at IS NULL
+               ORDER BY translation.id LIMIT 1
+             ) END AS entry_id
+      FROM unnest($1::uuid[]) WITH ORDINALITY AS t(entry_id, idx)
+    )
+    SELECT p.entity_id::text AS entry_id, e.content_type_id AS content_type,
+           -- The row contract promises an ISO instant (the collection feed
+           -- gets it as JSON text); a raw timestamptz would arrive as a Date.
+           to_jsonb(p.published_at) #>> '{}' AS published_at,
+           rev.payload->'fields' AS fields, rev.payload->'blocks' AS blocks,
+           rt.path AS route_path, rt.locale AS route_locale
+    FROM requested q
+    JOIN publications p ON p.entity_type = 'entry' AND p.entity_id = q.entry_id
+      AND p.state = 'PUBLISHED' AND p.context = $2
+    JOIN revisions rev ON rev.id = p.current_revision_id
+    JOIN entries e ON e.id = p.entity_id AND e.archived_at IS NULL
+    JOIN LATERAL (
+      SELECT r.path, r.locale FROM routes r
+      WHERE r.target_type = 'entry' AND r.target_id = p.entity_id::text
+        AND r.retired_at IS NULL AND r.is_canonical AND r.locale = $4
+        AND ($5::uuid IS NULL OR r.site_id = $5::uuid)
+      ORDER BY r.path
+      LIMIT 1
+    ) rt ON true
+    ORDER BY q.idx`;
+  const { rows } = await deps.pool.query<CollectionFeedItemRow & Record<string, unknown>>(sql, [
+    ids,
+    input.context,
+    input.context,
+    routeLocale,
+    input.siteId ?? null,
+  ]);
+  return rows;
+}
+
+/**
+ * One deterministic feed page. Default order: published_at DESC with
+ * entry_id as the stable tie-breaker; an explicit `order` may switch to an
+ * integer content field, both directions using NULLS LAST. Pagination is
+ * bounded offset paging (page/page_size — feeds need total + stable pages,
+ * not keyset cursors).
  */
 export async function queryCollectionFeed(
   deps: CollectionFeedDeps,
@@ -156,16 +236,75 @@ export async function queryCollectionFeed(
       status: 400,
     });
   }
+  const scope = input.scope ?? "section";
+  // An explicit subtree without a root must fail loudly — silently widening
+  // to the whole site would publish a different feed than the caller asked for.
+  if (scope === "subtree" && input.sectionEntryId === null) {
+    throw new ApiError("COLLECTION_SECTION_INVALID", "subtree scope requires a section", {
+      status: 400,
+    });
+  }
+  const excluded = input.excludeEntryIds ?? [];
+  for (const id of excluded) {
+    if (!STABLE_ID_RE.test(id)) {
+      throw new ApiError(
+        "COLLECTION_EXCLUDE_INVALID",
+        "excluded entry ids must be stable entry ids",
+        { status: 400 },
+      );
+    }
+  }
+  const order = input.order ?? { by: "published_at" as const, direction: "desc" as const };
+  if (
+    order.by === "field" &&
+    (order.field === undefined || !FEED_FIELD_PATTERN.test(order.field))
+  ) {
+    throw new ApiError("COLLECTION_ORDER_INVALID", "field ordering requires a canonical field id", {
+      status: 400,
+    });
+  }
   // Routes carry the publication locale ('x-default' for the default
   // context — the same mapping publishedCard resolves by).
   const routeLocale = input.context === "default" ? "x-default" : input.context;
   const tagJson = input.tag === null ? null : JSON.stringify([input.tag]);
   const offset = (input.page - 1) * input.pageSize;
+  // Tree filter: the recursive CTE walks non-archived descendants by ID
+  // (UNION — not UNION ALL — so a historical cycle terminates) and never
+  // includes the root itself. An archived node ends its branch because only
+  // non-archived children are joined.
+  const treeFilter =
+    scope === "subtree"
+      ? "e.id IN (SELECT id FROM subtree) AND e.id <> $4::uuid"
+      : scope === "site"
+        ? "TRUE"
+        : "($4::uuid IS NULL OR e.parent_entry_id = $4::uuid)";
+  const direction = order.direction === "asc" ? "ASC" : "DESC";
+  // Field ordering is integer-only: a non-number JSON value, a non-integer
+  // number or historical malformed JSON is NULL (NULLS LAST), never a cast
+  // error. The direction literal comes from the enum above, never from input.
+  // $11 stays in both branches so PostgreSQL can infer its type when the
+  // order is by publication (an unused parameter has no type).
+  const orderBy =
+    order.by === "field"
+      ? `CASE WHEN jsonb_typeof(fields->$11::text) = 'number'
+               AND fields->>$11::text ~ '^-?[0-9]+$'
+              THEN (fields->>$11::text)::numeric END ${direction} NULLS LAST,
+         entry_id ASC`
+      : `published_at ${direction} NULLS LAST, entry_id ASC, $11::text`;
   // Base: everything the collection could ever return for this context;
   // feed: base under the active tag filter; facets intentionally read BASE so
   // the UI can always offer every tag plus a reset (Theme Contract §43).
   const sql = `
-    WITH base AS (
+    WITH RECURSIVE subtree AS (
+      SELECT child.id FROM entries child
+      WHERE $4::uuid IS NOT NULL AND child.parent_entry_id = $4::uuid
+        AND child.archived_at IS NULL
+      UNION
+      SELECT next.id FROM entries next
+      JOIN subtree parent ON next.parent_entry_id = parent.id
+      WHERE next.archived_at IS NULL
+    ),
+    base AS (
       SELECT p.entity_id::text AS entry_id, e.content_type_id AS content_type,
              p.published_at, rev.payload->'fields' AS fields, rev.payload->'blocks' AS blocks,
              rt.path AS route_path, rt.locale AS route_locale
@@ -176,12 +315,14 @@ export async function queryCollectionFeed(
         SELECT r.path, r.locale FROM routes r
         WHERE r.target_type = 'entry' AND r.target_id = p.entity_id::text
           AND r.retired_at IS NULL AND r.is_canonical AND r.locale = $1
+          AND ($12::uuid IS NULL OR r.site_id = $12::uuid)
         ORDER BY r.path
         LIMIT 1
       ) rt ON true
       WHERE p.entity_type = 'entry' AND p.state = 'PUBLISHED' AND p.context = $2
         AND e.content_type_id = ANY($3::text[])
-        AND ($4::uuid IS NULL OR e.parent_entry_id = $4::uuid)
+        AND ${treeFilter}
+        AND e.id <> ALL($10::uuid[])
     ),
     feed AS (
       SELECT * FROM base
@@ -210,7 +351,7 @@ export async function queryCollectionFeed(
                  'route_locale', f.route_locale))
         FROM (
           SELECT * FROM feed
-          ORDER BY published_at DESC, entry_id ASC
+          ORDER BY ${orderBy}
           LIMIT $8 OFFSET $9
         ) f
       ), '[]'::jsonb) AS items`;
@@ -224,6 +365,9 @@ export async function queryCollectionFeed(
     tagJson,
     input.pageSize,
     offset,
+    excluded,
+    order.by === "field" ? (order.field ?? null) : null,
+    input.siteId ?? null,
   ]);
   const row = rows[0];
   if (row === undefined) {

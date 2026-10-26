@@ -218,6 +218,7 @@ export {
 } from "./figma.js";
 export {
   installThemePackage,
+  isAllowedThemeEntryName,
   listInstalledThemes,
   resolveInstalledThemeDirectory,
   stageThemePackage,

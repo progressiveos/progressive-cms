@@ -35,6 +35,7 @@ export * from "./extension-operations.js";
 export { buildExtensionSourceContext } from "./extension-platform.js";
 export { createExtensionScheduleService } from "./extension-schedules.js";
 export * from "./extensions-ops.js";
+export * from "./feed-options.js";
 export * from "./http/auth.js";
 export * from "./http/idempotency.js";
 export * from "./http/openapi.js";
@@ -107,8 +108,34 @@ export {
 export {
   cleanupThemeRevisions,
   getConfirmedThemeRevision,
+  listThemeRevisions,
   readThemeLifecycleState,
   recoverThemeLifecycle,
+  rollbackTheme,
   type ThemeCleanupInput,
   withThemeLifecycleLock,
 } from "./theme-lifecycle.js";
+export {
+  downloadThemeSourceOp,
+  getActiveThemeOp,
+  getThemeSourceOp,
+  installThemePackageOp,
+  listInstalledThemesOp,
+  updateActiveThemeOp,
+  uploadThemePackageOp,
+  validateThemePackageOp,
+} from "./theme-package-ops.js";
+export {
+  readStagedThemePackage,
+  stageThemePackageUpload,
+  THEME_PACKAGE_TTL_MS,
+  themesRootOf,
+} from "./theme-package-store.js";
+export {
+  buildThemeArchive,
+  describeThemeSource,
+  readThemeSourceFiles,
+  resolveServedThemeSource,
+  type ServedThemeSource,
+  type ThemeSourceDescriptor,
+} from "./theme-source.js";

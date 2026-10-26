@@ -3,7 +3,7 @@ name: progressive-cms-site-builder
 description: Build or redesign an editable website on Progressive CMS from a brief, including content types, Liquid theme, navigation, forms, media, SEO and publishing. Use for creating a CMS-managed company site or landing pages through public CMS CLI, REST or discovered MCP tools.
 metadata:
   author: Progressive CMS
-  version: "1.3.1"
+  version: "1.3.2"
 ---
 
 # Progressive CMS Site Builder
@@ -31,7 +31,7 @@ Read actual `server.cms_version`, target identity, contracts/scopes and preview 
 ## Build in this order
 
 1. Read [workflow](references/workflow.md) for the executable path, then make a short page/content plan matching the brief.
-2. Before creating content, read [content and theme](references/content-and-theme.md). Reuse discovered types or declare compatible types/bodyPolicy, then adapt the bundled Liquid theme in a new workspace.
+2. Before creating content, read [content and theme](references/content-and-theme.md). Reuse discovered types or declare compatible types/bodyPolicy, then adapt the bundled Liquid theme in a new workspace. For published feeds, use [collections](references/collections.md); to update an already served theme remotely, use [theme package cycle](references/theme-package-cycle.md).
 3. Create form definitions before referencing them. Write real declared content, upload authorized media, create page parentage and menu bindings. Use returned IDs and generations.
 4. Validate and preview each target revision, resolve blockers, seal, then publish if authorized. Complete [site and editor checks](references/checks.md) and report observed results and remaining blockers.
 

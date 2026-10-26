@@ -86,6 +86,7 @@ import {
 import { estimateMediaGenerationOp, getMediaProviderCapabilitiesV2Op } from "./media-model-ops.js";
 import { getMediaProviderOp, listMediaProvidersOp } from "./media-provider-ops.js";
 import {
+  activateTheme,
   addChangesetItem,
   applyChangeset,
   archiveEntry,
@@ -134,8 +135,17 @@ import { applyRedirectImportOp, validateRedirectImportOp } from "./redirect-impo
 import {
   cleanupThemeRevisions,
   listThemeRevisions,
+  rollbackTheme,
   type ThemeCleanupInput,
 } from "./theme-lifecycle.js";
+import {
+  getActiveThemeOp,
+  getThemeSourceOp,
+  installThemePackageOp,
+  listInstalledThemesOp,
+  updateActiveThemeOp,
+  validateThemePackageOp,
+} from "./theme-package-ops.js";
 
 /** Actor-visible, permission-filtered capability report (spec §20/§55). */
 export function buildCapabilities(app: ApplicationServices, ctx: OperationContext) {
@@ -178,6 +188,11 @@ export function buildCapabilities(app: ApplicationServices, ctx: OperationContex
       // available whenever a theme source is configured (aligns with REST).
       activate: has("theme.activate"),
       activation_available: app.themeDiscovery !== null,
+      // Remote package cycle: export the served source, upload/validate a
+      // package over REST, apply it with lifecycle CAS. No SSH/file access.
+      write: has("theme.write"),
+      package_cycle: app.themeDiscovery !== null,
+      package_cycle_cas: true,
     },
     navigation: { installed: true, read: has("navigation.read") },
     media: {
@@ -233,6 +248,25 @@ export function bindOperations(app: ApplicationServices) {
       await app.authorization.authorizeSite(ctx.actor, site ?? app.defaultSiteKey);
     },
     listThemeRevisions: (ctx: OperationContext) => listThemeRevisions(app, ctx),
+    getActiveTheme: (ctx: OperationContext) => getActiveThemeOp(app, ctx),
+    exportThemeSource: (ctx: OperationContext) => getThemeSourceOp(app, ctx),
+    listInstalledThemes: (ctx: OperationContext) => listInstalledThemesOp(app, ctx),
+    validateThemePackage: (ctx: OperationContext, input: { package_ref: string }) =>
+      validateThemePackageOp(app, ctx, input),
+    installThemePackage: (ctx: OperationContext, input: { package_ref: string }) =>
+      installThemePackageOp(app, ctx, input),
+    updateActiveTheme: (
+      ctx: OperationContext,
+      input: { package_ref: string; expected_generation: number },
+    ) => updateActiveThemeOp(app, ctx, input),
+    activateTheme: (
+      ctx: OperationContext,
+      input: { theme_key: string; theme_version?: string; expected_generation: number },
+    ) => activateTheme(app, ctx, input),
+    rollbackTheme: (
+      ctx: OperationContext,
+      input: { revision_id: string; expected_generation: number },
+    ) => rollbackTheme(app, ctx, input),
     cleanupThemeRevisions: (ctx: OperationContext, input: ThemeCleanupInput) =>
       cleanupThemeRevisions(app, ctx, input),
     getCurrentActor(ctx: OperationContext) {

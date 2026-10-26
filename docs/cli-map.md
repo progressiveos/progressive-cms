@@ -106,7 +106,10 @@ Bare `cms publication` is dispatched with an empty subcommand by the current mai
 |---|---|---|
 | `cms theme validate <directory> [--cms-version <version>]` | Validates theme manifest, file/layout/assets contract and supplied compatibility target. Explicit version checks a package against that version; it does not attest the running instance. | Local files, no DB. |
 | `cms theme active` | Reports actual in-memory theme used by the running renderer. Prefer this over reading configuration. | API read. |
-| `cms theme update-active <package.pcTheme> --environment <env> --yes` | Updates newer same-id installed package head, preserving settings/generation, retaining confirmed revisions with journaled recovery. Reread active/history after an ambiguous response. | API mutation, theme.write + theme.activate. |
+| `cms theme export --output <file.pcTheme> [--json]` | Downloads the package the renderer actually serves, pins it to `theme_generation`, verifies the descriptor SHA-256 and writes atomically. | API read, theme.read. |
+| `cms theme upload <file.pcTheme> [--json]` | Stages package bytes and returns actor/site/environment-bound `package_ref`, SHA-256 and one-hour expiration. The reference is not a capability. | API mutation, theme.write. |
+| `cms theme validate-package <package-ref> [--json]` | Validates the staged package and candidate render stack without installing, activating or changing settings. | API validation, theme.validate. |
+| `cms theme update-active <package.pcTheme> [--expected-generation <N>] --environment <env> --yes` | Applies raw local ZIP bytes to the same active id at a newer installed-head version. Optional lifecycle CAS rejects a stale basis; preserves settings/generation and retains confirmed revisions. It does not apply a staged `package_ref`. | API mutation, theme.write + theme.activate. |
 | `cms theme cleanup [--dry-run] [--keep-last <5..100>] [--older-than-days <1..36500>]` | Previews up to 100 eligible old/pending snapshots, default keep-last 5 / age 1 day. Requires theme.read; inspect has_more and candidate IDs. | API read-only preview despite POST. |
 | `cms theme cleanup --apply --environment <env> --yes [--keep-last <5..100>] [--older-than-days <1..36500>]` | Previews, then sends exactly those IDs + theme_generation; theme.write. Protected active/last-good/latest/recent/recovery snapshots survive. No silent stale retry; partial physical removal returns ok=false, pending IDs, exit 7. Irreversible old asset/rollback removal. | API destructive operation; explicit target/confirmation. |
 | `cms theme list` | Reads installed themes using the local configured path. Its `active` flag is derived from the legacy render-path target and is not authoritative for persistent runtime activation. | Local files/config. |
@@ -115,6 +118,8 @@ Bare `cms publication` is dispatched with an empty subcommand by the current mai
 | `cms site validate [--theme <directory>] [--content <corpus.json>]` | Validates a **local theme against a local content corpus**; defaults are `themes/reference-theme-v1` and `fixtures/content/reference-content-types.json`. It does not inspect active remote pages. If the default corpus is absent, it reports a skipped content pass and exits 0. Pass an explicit real corpus and read diagnostics. | Local; no runtime-site acceptance. |
 
 Theme history: `cms theme revisions --json` reads active/newest confirmed snapshots and theme_generation (up to 100); `cms theme rollback <revision-id> --expected-generation <N> --environment <env> --yes --json` selects a compatible retained site snapshot. CAS is theme_generation, not settings_generation. Requires theme.write + theme.activate; stale generation is 409. No restart/reinstall. Explicit history cleanup is now available separately and is irreversible. See [themes](themes.md).
+
+To apply a staged reference from `cms theme upload`, use REST `POST /api/v1/themes/active/update` with `package_ref` and `expected_generation`, or MCP `cms_update_active_theme`; this CLI currently has no staged-reference apply command. On `503 THEME_PACKAGE_STORE_BUSY`, follow the stop-all-sharing-Web / remove-only-lock / restart sequence in [Themes](themes.md).
 
 ## Navigation, routes and domains
 
@@ -252,7 +257,7 @@ These commands operate on the configured DB, outside the HTTP surface. Restrict 
 The following appendix records selectors, literal flags, environment keys and HTTP calls from every imported command implementation and shared dispatcher/client. It is an audit aid, not an instruction to use every flag in every command. Conditions and call expressions are reproduced completely, without shortening. The explanations above describe operand ordering, effective behavior and known gaps that a literal help string cannot establish.
 
 <!-- interface-map:start -->
-Audited implementation files: **39**. Paths are relative to the supplied source tree; consumers do not need that tree to use the commands.
+Audited implementation files: **40**. Paths are relative to the supplied source tree; consumers do not need that tree to use the commands.
 
 ### packages/cli/src/api-client.ts
 
@@ -272,6 +277,15 @@ fetch(`${client.baseUrl}/api/v1${path}`, {
         ...body === void 0 ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }
       },
       ...body === void 0 ? {} : { body: binary ? Uint8Array.from(body) : JSON.stringify(body) }
+    })
+
+fetch(`${client.baseUrl}/api/v1${path}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${client.token}`,
+        "x-pcms-site": client.siteKey,
+        "x-pcms-environment": client.environment
+      }
     })
 ```
 
@@ -1151,6 +1165,32 @@ Command/operand selection conditions:
 subcommand === "list"
 ```
 
+### packages/cli/src/commands/theme-package.ts
+
+Literal parsed flags: `--expected-generation`, `--json`, `--output`.
+
+Environment keys read directly: none; shared loaders may read configuration/environment.
+
+Command/operand selection conditions:
+```javascript
+subcommand === "export"
+subcommand === "upload"
+subcommand === "validate-package"
+```
+
+HTTP client calls (source expressions, including complete request construction):
+```javascript
+apiCall(
+        client,
+        "POST",
+        `/themes/packages/${encodeURIComponent(ref)}/validate`
+      )
+
+apiCall(client, "GET", "/themes/source")
+
+apiCall(client, "POST", "/themes/packages", bytes)
+```
+
 ### packages/cli/src/commands/theme-update.ts
 
 Literal parsed flags: `--expected-generation`.
@@ -1178,7 +1218,7 @@ apiCall(
 apiCall(
       client,
       "POST",
-      command === "install" ? "/themes/install" : "/themes/active/update",
+      command === "install" ? "/themes/install" : `/themes/active/update${casFlag === void 0 ? "" : `?expected_generation=${casFlag}`}`,
       readFileSync(file ?? "")
     )
 
@@ -1298,6 +1338,7 @@ command === "update"
 command === "user"
 subcommand === "active"
 subcommand === "cleanup"
+subcommand === "export"
 subcommand === "install"
 subcommand === "list"
 subcommand === "migrate"
@@ -1305,7 +1346,9 @@ subcommand === "revisions"
 subcommand === "rollback"
 subcommand === "uninstall"
 subcommand === "update-active"
+subcommand === "upload"
 subcommand === "validate"
+subcommand === "validate-package"
 ```
 <!-- interface-map:end -->
 

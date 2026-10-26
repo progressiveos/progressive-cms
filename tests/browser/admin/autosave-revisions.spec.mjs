@@ -28,7 +28,9 @@ async function login(page) {
 
 test("autosave persists edits without clicking save and reports state", async ({ page }) => {
   await login(page);
-  const titleField = page.getByTestId("entry-workspace").getByLabel("Заголовок", { exact: true });
+  const titleField = page
+    .getByTestId("entry-workspace")
+    .getByRole("textbox", { name: "Заголовок *", exact: true });
   await titleField.fill(`${TITLE} — автосохранение`);
   await expect(page.getByTestId("save-state")).toHaveText(/Сохранение…|Сохранено/, {
     timeout: 10_000,
@@ -37,13 +39,17 @@ test("autosave persists edits without clicking save and reports state", async ({
 
   // Reload proves the autosave hit the server.
   await page.reload();
-  const reloaded = page.getByTestId("entry-workspace").getByLabel("Заголовок", { exact: true });
+  const reloaded = page
+    .getByTestId("entry-workspace")
+    .getByRole("textbox", { name: "Заголовок *", exact: true });
   await expect(reloaded).toHaveValue(`${TITLE} — автосохранение`, { timeout: 10_000 });
 });
 
 test("revisions tab lists revisions and shows a semantic diff", async ({ page }) => {
   await login(page);
-  const titleField = page.getByTestId("entry-workspace").getByLabel("Заголовок", { exact: true });
+  const titleField = page
+    .getByTestId("entry-workspace")
+    .getByRole("textbox", { name: "Заголовок *", exact: true });
   await titleField.fill(`${TITLE} — ред.1`);
   await page.getByRole("button", { name: "Сохранить черновик" }).click();
   await expect(page.getByTestId("save-state")).toHaveText(/Сохранено/, { timeout: 10_000 });
@@ -79,7 +85,9 @@ test("revisions tab lists revisions and shows a semantic diff", async ({ page })
   await expect(workspace).toBeVisible({ timeout: 10_000 });
 
   // Change the branched draft so the semantic diff has something to show.
-  await workspace.getByLabel("Заголовок", { exact: true }).fill(`${TITLE} — ред.2`);
+  await workspace
+    .getByRole("textbox", { name: "Заголовок *", exact: true })
+    .fill(`${TITLE} — ред.2`);
   await expect(page.getByTestId("save-state")).toHaveText(/Сохранено/, { timeout: 10_000 });
   await page.getByRole("tab", { name: "Ревизии" }).click();
   const table = page.getByTestId("revisions-table");

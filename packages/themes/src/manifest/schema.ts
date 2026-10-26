@@ -167,6 +167,29 @@ export const THEME_MANIFEST_JSON_SCHEMA = {
           },
           tag_field: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
           page_size: { type: "integer", minimum: 1, maximum: 100 },
+          /**
+           * Feed scope (Theme Contract §43, additive): "self" = children of
+           * the rendered page (historical default), "subtree" = every
+           * non-archived descendant, "site" = the whole site/locale.
+           */
+          section: { type: "string", enum: ["self", "subtree", "site"] },
+          /** Explicit ordering; default published_at DESC + entry_id tie-break. */
+          order: {
+            type: "object",
+            additionalProperties: false,
+            required: ["by"],
+            properties: {
+              by: { type: "string", enum: ["published_at", "field"] },
+              direction: { type: "string", enum: ["asc", "desc"] },
+              field: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+            },
+            allOf: [
+              {
+                if: { properties: { by: { const: "field" } } },
+                then: { required: ["field"] },
+              },
+            ],
+          },
           templates: {
             type: "array",
             maxItems: 50,
@@ -472,8 +495,18 @@ export interface ThemeManifestCollection {
   readonly tag_field?: string;
   /** Page size for feed rendering; default 12, hard maximum 100. */
   readonly page_size?: number;
+  /** Feed scope; "self" (page children) is the historical default. */
+  readonly section?: "self" | "subtree" | "site";
+  /** Explicit ordering; default published_at DESC, entry_id tie-break. */
+  readonly order?: ThemeManifestFeedOrder;
   /** Template ids receiving the `collections.<key>` scope; default none. */
   readonly templates?: readonly string[];
+}
+
+export interface ThemeManifestFeedOrder {
+  readonly by: "published_at" | "field";
+  readonly direction?: "asc" | "desc";
+  readonly field?: string;
 }
 export interface ThemeManifest {
   readonly id: string;

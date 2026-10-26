@@ -1,5 +1,6 @@
 import type { AdminRequestOptions } from "@pcms/extensions";
 import { ApiError, apiRequest } from "../api/client.js";
+import { t } from "../i18n/index.js";
 
 /** Trusted contributions share the host client, never its auth state. */
 export async function requestExtensionApi<T>(
@@ -31,8 +32,7 @@ export async function requestExtensionApi<T>(
     throw new ApiError({
       code: "API_REQUEST_INVALID",
       status: 0,
-      message:
-        "Admin extensions require a normalized /api/v1-relative data path and host-managed authentication",
+      message: t("extensions.api_request_invalid"),
     });
   }
   return apiRequest<T>(method.toUpperCase(), path, { ...options, redirect: "error" });

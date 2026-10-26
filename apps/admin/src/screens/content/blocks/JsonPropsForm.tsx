@@ -104,7 +104,7 @@ function PropField(props: {
         label={label}
         itemSchema={schema.items}
         required={props.required}
-        value={Array.isArray(props.value) ? (props.value as Record<string, unknown>[]) : []}
+        value={Array.isArray(props.value) ? (props.value as unknown[]) : []}
         {...(props.disabled === true ? { disabled: true } : {})}
         context={props.context}
         onChange={props.onChange}
@@ -327,12 +327,19 @@ function EntryRefField(props: {
   );
 }
 
+/** Initial value for one row of a scalar-item array (string ids, enums). */
+function emptyScalarValue(schema: BlockPropSchema): unknown {
+  if (schema.type === "boolean") return false;
+  if (schema.type === "integer" || schema.type === "number") return undefined;
+  return "";
+}
+
 function ArrayField(props: {
   readonly name: string;
   readonly label: string;
   readonly itemSchema: BlockPropSchema;
   readonly required: boolean;
-  readonly value: readonly Record<string, unknown>[];
+  readonly value: readonly unknown[];
   readonly disabled?: boolean;
   readonly context: PathContext;
   readonly onChange: (value: unknown) => void;
@@ -340,8 +347,12 @@ function ArrayField(props: {
   const rows = props.value;
   const hasId = props.itemSchema.properties?.id !== undefined;
   const nestedPrefix = `${props.context.path}[].`;
+  // Arrays of scalars (field ids, content-type keys, entry ids) are rows of
+  // ONE control, not objects with properties — an object form would render no
+  // input at all for them.
+  const scalarItems = props.itemSchema.type !== "object";
 
-  const update = (next: readonly Record<string, unknown>[]) => props.onChange(next);
+  const update = (next: readonly unknown[]) => props.onChange(next);
   return (
     <fieldset className="pcms-fieldset">
       <legend>
@@ -352,14 +363,27 @@ function ArrayField(props: {
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are identified by their id prop when present
           <fieldset key={index} className="pcms-fieldset">
             <legend>{index + 1}</legend>
-            <JsonPropsForm
-              schema={props.itemSchema}
-              value={row}
-              onChange={(value) => update(rows.with(index, value as Record<string, unknown>))}
-              references={props.context.references}
-              pathPrefix={nestedPrefix}
-              {...(props.disabled === true ? { disabled: true } : {})}
-            />
+            {scalarItems ? (
+              <ScalarField
+                name={`${props.name}_${index}`}
+                schema={props.itemSchema}
+                label={String(index + 1)}
+                required={false}
+                value={row}
+                {...(props.disabled === true ? { disabled: true } : {})}
+                context={{ references: props.context.references, path: `${props.context.path}[]` }}
+                onChange={(value) => update(rows.with(index, value))}
+              />
+            ) : (
+              <JsonPropsForm
+                schema={props.itemSchema}
+                value={(row ?? {}) as Record<string, unknown>}
+                onChange={(value) => update(rows.with(index, value as Record<string, unknown>))}
+                references={props.context.references}
+                pathPrefix={nestedPrefix}
+                {...(props.disabled === true ? { disabled: true } : {})}
+              />
+            )}
             <div className="pcms-row__actions">
               <Button
                 size="sm"
@@ -395,7 +419,12 @@ function ArrayField(props: {
       <Button
         size="sm"
         disabled={props.disabled}
-        onClick={() => update([...rows, hasId ? { id: stableId() } : {}])}
+        onClick={() =>
+          update([
+            ...rows,
+            scalarItems ? emptyScalarValue(props.itemSchema) : hasId ? { id: stableId() } : {},
+          ])
+        }
       >
         {t("repeater_add")}
       </Button>

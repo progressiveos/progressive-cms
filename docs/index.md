@@ -1,7 +1,7 @@
 # Progressive CMS documentation
 
 <!-- cms-current:start -->
-Current Progressive CMS release: **RC32** (`1.0.0-rc.32`).
+Current Progressive CMS release: **RC33** (`1.0.0-rc.33`).
 <!-- cms-current:end -->
 
 Public Markdown documentation, agent workflows and official Skills for the current Progressive CMS release. Start with the task guides below; historical introductions and compatibility boundaries are retained in [versioning and compatibility](compatibility.md). Release-specific source and documentation pins are recorded in immutable release metadata. Read the installed target’s reported version before authoring.
@@ -19,7 +19,7 @@ English is the primary documentation language. [Russian translation is partial](
 ## Contracts and tasks
 
 - [Requirements](requirements.md) · [Installation](installation.md) · [Configuration](configuration.md) · [Configuration reference](configuration-reference.md)
-- [Content Model](content-model.md) · [RichText AST v2](richtext.md) · [Block Document](blocks.md) · [Combined Content Contract](content-contract.md)
+- [Content Model](content-model.md) · [RichText AST v2](richtext.md) · [Block Document](blocks.md) · [Combined Content Contract](content-contract.md) · [Published feeds and related-content cards](collections.md)
 - [Themes and Liquid](themes.md) · [Navigation and breadcrumbs](navigation.md) · [Media](media.md) · [Forms](forms.md) · [Addressed personal-data tools](personal-data-tools.md)
 - [SEO, image inheritance and ownership verification](seo.md) · [Search](search.md) · [Draft, preview, seal, publish and rollback](publishing.md)
 - [Admin editing and Analytics](admin.md) · [REST API](rest-api.md) · [API operations](api-reference.md) · [CLI](cli.md) · [MCP and agents](agents.md)

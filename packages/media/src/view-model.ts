@@ -9,11 +9,11 @@
 // (§63). Full-resolution originals are deliberately absent.
 import type { DbPool } from "@pcms/core";
 import { MediaError } from "./errors.js";
-import { getAsset, type MediaAssetRecord } from "./model.js";
+import { getAsset, getAssetsByIds, type MediaAssetRecord } from "./model.js";
 import type { MediaPresetRegistry } from "./presets.js";
 import { assertMediaId } from "./presets.js";
 import type { MediaVariantRecord } from "./variants.js";
-import { listVariants } from "./variants.js";
+import { listVariants, listVariantsForAssets } from "./variants.js";
 
 /** Extension for a generated output format. */
 const FORMAT_EXTENSION: Readonly<Record<string, string>> = {
@@ -269,6 +269,57 @@ export interface MediaViewModelProvider {
     mediaId: string,
     options?: { readonly altOverride?: string | null; readonly decorative?: boolean },
   ) => Promise<MediaAssetPublicViewModel | null>;
+  /**
+   * Batch port (feed cards): one assets query + one variants query for many
+   * ids. Archived assets and unknown ids resolve to null — a public card
+   * never surfaces a retired asset. The single-item port keeps its own
+   * semantics (callers there already check archived state).
+   */
+  readonly getAssetViewModels: (
+    mediaIds: readonly string[],
+  ) => Promise<Record<string, MediaAssetPublicViewModel | null>>;
+}
+
+function publicViewModel(
+  asset: MediaAssetRecord,
+  variants: readonly MediaVariantRecord[],
+): MediaAssetPublicViewModel {
+  const derivatives = variants
+    .map((variant) => ({
+      preset: variant.presetId,
+      url: variantPublicUrl({
+        assetId: asset.id,
+        versionNo: variant.versionNo,
+        presetId: variant.presetId,
+        variantKey: variant.variantKey,
+        format: variant.format,
+      }),
+      width: variant.width,
+      height: variant.height,
+      mime: FORMAT_MIME[variant.format] ?? `image/${variant.format}`,
+    }))
+    .sort((a, b) => a.preset.localeCompare(b.preset) || a.url.localeCompare(b.url));
+  const download =
+    asset.kind === "image"
+      ? null
+      : {
+          href: documentCurrentUrl({ assetId: asset.id, filename: asset.filenameOriginal }),
+          versionedHref: documentDownloadUrl({
+            assetId: asset.id,
+            versionNo: asset.currentVersionNo,
+            filename: asset.filenameOriginal,
+          }),
+        };
+  return {
+    id: asset.id,
+    kind: asset.kind,
+    alt: resolveAlt({ asset }),
+    caption: asset.captionDefault ?? null,
+    width: asset.width,
+    height: asset.height,
+    derivatives,
+    download,
+  };
 }
 
 export function createMediaViewModelProvider(input: {
@@ -280,46 +331,36 @@ export function createMediaViewModelProvider(input: {
       const asset = await getAsset(input.pool, mediaId as never);
       if (asset === null) return null;
       const variants = await listVariants(input.pool, asset.id, asset.currentVersionNo);
-      const derivatives = variants
-        .map((variant) => ({
-          preset: variant.presetId,
-          url: variantPublicUrl({
-            assetId: asset.id,
-            versionNo: variant.versionNo,
-            presetId: variant.presetId,
-            variantKey: variant.variantKey,
-            format: variant.format,
-          }),
-          width: variant.width,
-          height: variant.height,
-          mime: FORMAT_MIME[variant.format] ?? `image/${variant.format}`,
-        }))
-        .sort((a, b) => a.preset.localeCompare(b.preset) || a.url.localeCompare(b.url));
-      const download =
-        asset.kind === "image"
-          ? null
-          : {
-              href: documentCurrentUrl({ assetId: asset.id, filename: asset.filenameOriginal }),
-              versionedHref: documentDownloadUrl({
-                assetId: asset.id,
-                versionNo: asset.currentVersionNo,
-                filename: asset.filenameOriginal,
-              }),
-            };
+      const model = publicViewModel(asset, variants);
+      if (options?.altOverride === undefined && options?.decorative === undefined) return model;
       return {
-        id: asset.id,
-        kind: asset.kind,
+        ...model,
         alt: resolveAlt({
           asset,
           ...(options?.altOverride === undefined ? {} : { altOverride: options.altOverride }),
           ...(options?.decorative === undefined ? {} : { decorative: options.decorative }),
         }),
-        caption: asset.captionDefault ?? null,
-        width: asset.width,
-        height: asset.height,
-        derivatives,
-        download,
       };
+    },
+    async getAssetViewModels(mediaIds) {
+      const ids = [...new Set(mediaIds)];
+      const out: Record<string, MediaAssetPublicViewModel | null> = {};
+      for (const id of ids) out[id] = null;
+      if (ids.length === 0) return out;
+      const assets = await getAssetsByIds(input.pool, ids);
+      const live = assets.filter((asset) => asset.archivedAt === null);
+      if (live.length === 0) return out;
+      const variantsByAsset = await listVariantsForAssets(
+        input.pool,
+        live.map((asset) => ({ assetId: asset.id, versionNo: asset.currentVersionNo })),
+      );
+      for (const asset of live) {
+        out[asset.id] = publicViewModel(
+          asset,
+          variantsByAsset.filter((variant) => variant.assetId === asset.id),
+        );
+      }
+      return out;
     },
   };
 }

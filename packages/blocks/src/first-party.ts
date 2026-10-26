@@ -578,6 +578,49 @@ const RELATED_CONTENT_BLOCK: BlockTypeDescriptor = {
       collection_key: { type: "string", pattern: "^[a-z][a-z0-9_-]{0,63}$" },
       limit: { type: "integer", minimum: 1, maximum: 100 },
       title: { type: "string", maxLength: 500 },
+      // Feed scope/ordering/projection (Theme Contract §43, additive): all
+      // optional — a block that declares none keeps its historical semantics.
+      // Semantic checks (field/preset existence, manual-mode content_types)
+      // live in the application entry adapter, not this structural schema.
+      scope: { type: "string", enum: ["section", "subtree", "site"] },
+      content_types: {
+        type: "array",
+        minItems: 1,
+        maxItems: 10,
+        uniqueItems: true,
+        items: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+      },
+      fields: {
+        type: "array",
+        minItems: 1,
+        maxItems: 20,
+        uniqueItems: true,
+        items: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+      },
+      image_preset: { type: "string", pattern: "^[a-z][a-z0-9_-]{0,63}$" },
+      image_field: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+      exclude_entry_ids: {
+        type: "array",
+        maxItems: 100,
+        uniqueItems: true,
+        items: { type: "string", pattern: STABLE_ID_PATTERN },
+      },
+      order: {
+        type: "object",
+        additionalProperties: false,
+        required: ["by"],
+        properties: {
+          by: { type: "string", enum: ["published_at", "field"] },
+          direction: { type: "string", enum: ["asc", "desc"] },
+          field: { type: "string", pattern: "^[a-z][a-z0-9_]{0,63}$" },
+        },
+        allOf: [
+          {
+            if: { properties: { by: { const: "field" } } },
+            then: { required: ["field"] },
+          },
+        ],
+      },
     },
     required: ["mode"],
     allOf: [

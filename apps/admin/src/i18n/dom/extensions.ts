@@ -8,6 +8,8 @@ import { defineFragment } from "../fragment.js";
 export const extensions = defineFragment(
   {
     "extensions.title": "Расширения",
+    "extensions.api_request_invalid":
+      "Запрос расширения должен использовать нормализованный путь API и авторизацию Admin.",
     "extensions.subtitle":
       "Дополнительные возможности Progressive CMS, установленные оператором или разработчиком.",
     "extensions.tabs_label": "Разделы расширений",
@@ -412,6 +414,8 @@ export const extensions = defineFragment(
   },
   {
     "extensions.title": "Extensions",
+    "extensions.api_request_invalid":
+      "Extension requests must use a normalized API path and Admin-managed authentication.",
     "extensions.subtitle":
       "Additional Progressive CMS capabilities installed by the operator or the developer.",
     "extensions.tabs_label": "Extension sections",

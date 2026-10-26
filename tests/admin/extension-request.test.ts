@@ -20,6 +20,7 @@ import { extensionContributions } from "../../apps/admin/src/extension/contribut
 import { refreshExtensionContributions } from "../../apps/admin/src/extension/contributions.js";
 import { unregisterExtensionContributions } from "../../apps/admin/src/extension/registry.js";
 import { requestExtensionApi } from "../../apps/admin/src/extension/request.js";
+import { getLocale, setLocale, t as translate } from "../../apps/admin/src/i18n/index.js";
 import { contribution, editNavigation } from "../fixtures/admin-request-contribution/index.js";
 import { rollbackApiFixture } from "../helpers/rollback-api-fixture.js";
 
@@ -54,6 +55,21 @@ test("Admin extension requests reject external, non-normalized and auth-state pa
     );
   }
   assert.equal(fetch.mock.callCount(), 0);
+});
+
+test("Admin extension request errors follow the active Admin locale", async (t) => {
+  const previousLocale = getLocale();
+  t.after(() => setLocale(previousLocale));
+  for (const locale of ["ru", "en"] as const) {
+    setLocale(locale);
+    await assert.rejects(
+      () => requestExtensionApi("GET", "https://evil.example/api/v1"),
+      (error: unknown) =>
+        error instanceof ApiError &&
+        error.code === "API_REQUEST_INVALID" &&
+        error.message === translate("extensions.api_request_invalid"),
+    );
+  }
 });
 
 test("Admin extension uploads reuse host rawBody precedence and current CSRF", async (t) => {

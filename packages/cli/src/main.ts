@@ -31,6 +31,7 @@ import { siteValidate } from "./commands/site-validate.js";
 import { skillsCommand } from "./commands/skills.js";
 import { themeCleanupCommand } from "./commands/theme-cleanup.js";
 import { themeManage } from "./commands/theme-manage.js";
+import { themePackageCommand } from "./commands/theme-package.js";
 import { themeUpdateCommand } from "./commands/theme-update.js";
 import { themeValidate } from "./commands/theme-validate.js";
 import { updateCommand } from "./commands/update.js";
@@ -66,7 +67,10 @@ const USAGE = [
   "  theme revisions [--json]                     retained confirmed theme revisions",
   "  theme rollback <revision-id> --expected-generation N --environment <env> --yes [--json]",
   "  theme active [--json]                         actual theme served by the running API",
-  "  theme update-active <package> --environment <env> --yes [--json]",
+  "  theme update-active <package> [--expected-generation N] --environment <env> --yes [--json]",
+  "  theme export --output <file.pcTheme> [--json]  download the SERVED theme package",
+  "  theme upload <file.pcTheme> [--json]           stage an edited package (package_ref)",
+  "  theme validate-package <package-ref> [--json]  validate a staged package remotely",
   "  site validate [--theme <dir>] [--content <f>] [--json]",
   "",
   "Local operator recovery (M08; audited, no HTTP surface):",
@@ -142,6 +146,16 @@ export async function runCli(argv: readonly string[]): Promise<CliResult> {
       return result;
     }
     if (command === "theme" && subcommand === "cleanup") return themeCleanupCommand(invocation);
+    if (
+      command === "theme" &&
+      (subcommand === "export" || subcommand === "upload" || subcommand === "validate-package")
+    ) {
+      return themePackageCommand({
+        args: [subcommand, ...rest],
+        options,
+        env: process.env,
+      });
+    }
     if (
       command === "theme" &&
       (subcommand === "install" ||

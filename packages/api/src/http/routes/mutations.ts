@@ -927,11 +927,16 @@ export function makeMutationRoutes(): ApiRoute[] {
           properties: {
             theme_key: { type: "string", maxLength: 64 },
             theme_version: { type: "string", maxLength: 32 },
+            expected_generation: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
           },
         },
       },
       async handle(app, ctx, request) {
-        const body = (request.body ?? {}) as { theme_key?: unknown; theme_version?: unknown };
+        const body = (request.body ?? {}) as {
+          theme_key?: unknown;
+          theme_version?: unknown;
+          expected_generation?: unknown;
+        };
         if (typeof body.theme_key !== "string") {
           throw new ApiError("API_REQUEST_INVALID", "theme_key is required", { status: 400 });
         }
@@ -942,6 +947,9 @@ export function makeMutationRoutes(): ApiRoute[] {
             ...(typeof body.theme_version === "string"
               ? { theme_version: body.theme_version }
               : {}),
+            ...(body.expected_generation === undefined
+              ? {}
+              : { expected_generation: body.expected_generation as number }),
           }),
         };
       },

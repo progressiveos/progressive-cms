@@ -75,6 +75,21 @@ export async function listVariants(
   return result.rows.map(toVariant);
 }
 
+/** Batch read of the CURRENT-version variants of many assets, one statement. */
+export async function listVariantsForAssets(
+  pool: DbPool,
+  assets: readonly { readonly assetId: string; readonly versionNo: number }[],
+): Promise<MediaVariantRecord[]> {
+  if (assets.length === 0) return [];
+  const result = await pool.query<VariantRow>(
+    `SELECT * FROM media_variants
+     WHERE (asset_id, version_no) IN (SELECT * FROM unnest($1::uuid[], $2::int[]))
+     ORDER BY asset_id, preset_id, format, width`,
+    [assets.map((asset) => asset.assetId), assets.map((asset) => asset.versionNo)],
+  );
+  return result.rows.map(toVariant);
+}
+
 export async function getVariant(
   pool: DbPool,
   assetId: string,

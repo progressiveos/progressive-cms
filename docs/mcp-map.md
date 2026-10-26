@@ -69,7 +69,7 @@ Names are `cms_ext_<sanitized-extension-id>_<sanitized-operation-id>`. Sanitizat
 Only operations from deployed, **enabled** extensions appear. Their title becomes the description; their manifest input schema, permission and mutation flag become the tool contract. Calls use the same typed extension invocation as REST. `tools/list` does not publish the extension output schema, so this map includes it from the shipped manifest for reference. Discover the actual instance again after enable/disable, update or capability changes. Do not hard-code an optional provider id in a generic consumer.
 
 <!-- interface-map:start -->
-## Built-in tools: 133
+## Built-in tools: 141
 
 | Tool | Purpose | Permission | Read-only hint |
 |---|---|---|---|
@@ -79,6 +79,14 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_acknowledge_interaction_privacy](#cms_acknowledge_interaction_privacy) | Record external processor action evidence or an explicit owner exception; this does not contact a processor. | `privacy.manage` | false |
 | [cms_list_theme_revisions](#cms_list_theme_revisions) | List retained theme revisions for the current site; excludes pruned snapshots. | `theme.read` | true |
 | [cms_cleanup_theme_revisions](#cms_cleanup_theme_revisions) | Preview old theme snapshots (default dry_run=true, theme.read); apply with dry_run=false, explicit revision_ids and expected_generation (theme.write). Keeps active, previous good, latest five and snapshots used within one day. At most 100 per batch. Pruning is irreversible; retry pending file removal with the same IDs. | `theme.read` | false |
+| [cms_get_active_theme](#cms_get_active_theme) | Identity and generations of the theme the public renderer actually serves (served version, installed catalog head, revision_id, theme_generation). Read this before editing: the next update must be newer than installed_head_version, and expected_generation is what CAS wants. | `theme.read` | true |
+| [cms_export_theme](#cms_export_theme) | Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64. | `theme.read` | true |
+| [cms_list_installed_themes](#cms_list_installed_themes) | Installed theme packages in the catalog with their versions and whether each is the render target or the active theme. | `theme.read` | true |
+| [cms_validate_theme_package](#cms_validate_theme_package) | Validate a staged package (package_ref from the REST upload) without changing the site: identity, version, digest, typed diagnostics and a candidate render-stack build. Nothing is installed, activated or registered. | `theme.validate` | true |
+| [cms_install_theme_package](#cms_install_theme_package) | Install a staged package (package_ref) as a catalog candidate. Never activates: use cms_activate_theme with expected_generation. | `theme.write` | false |
+| [cms_update_active_theme](#cms_update_active_theme) | Apply a staged package (package_ref) over the active theme of the SAME id and a NEWER version, with lifecycle CAS on expected_generation (from cms_get_active_theme). Requires theme.write AND theme.activate. A stale generation fails with THEME_REVISION_STALE and changes nothing. | `theme.write` | false |
+| [cms_activate_theme](#cms_activate_theme) | Activate an installed theme candidate by theme_key (optional exact theme_version), with lifecycle CAS on expected_generation. Requires theme.activate. | `theme.activate` | false |
+| [cms_rollback_theme](#cms_rollback_theme) | Live activation of a retained revision (revision_id from cms_list_theme_revisions) with lifecycle CAS on expected_generation. Requires theme.write AND theme.activate. | `theme.write` | false |
 | [cms_get_server_info](#cms_get_server_info) | Server identity and subsystem contract versions. | actor/domain checks | true |
 | [cms_get_capabilities](#cms_get_capabilities) | Capability report for the current actor: installed subsystems, allowed operation classes, contract versions. | actor/domain checks | true |
 | [cms_get_current_actor](#cms_get_current_actor) | Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows (spec §53). | actor/domain checks | true |
@@ -578,6 +586,274 @@ Complete argument schema:
 Adapter input/result mapping:
 ```javascript
 return operations.cleanupThemeRevisions(ctx, args);
+```
+
+<a id="cms_get_active_theme"></a>
+
+### cms_get_active_theme
+
+Identity and generations of the theme the public renderer actually serves (served version, installed catalog head, revision_id, theme_generation). Read this before editing: the next update must be newer than installed_head_version, and expected_generation is what CAS wants.
+
+Permission annotation: `theme.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.getActiveTheme(ctx);
+```
+
+<a id="cms_export_theme"></a>
+
+### cms_export_theme
+
+Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64.
+
+Permission annotation: `theme.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.exportThemeSource(ctx);
+```
+
+<a id="cms_list_installed_themes"></a>
+
+### cms_list_installed_themes
+
+Installed theme packages in the catalog with their versions and whether each is the render target or the active theme.
+
+Permission annotation: `theme.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.listInstalledThemes(ctx);
+```
+
+<a id="cms_validate_theme_package"></a>
+
+### cms_validate_theme_package
+
+Validate a staged package (package_ref from the REST upload) without changing the site: identity, version, digest, typed diagnostics and a candidate render-stack build. Nothing is installed, activated or registered.
+
+Permission annotation: `theme.validate`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "package_ref": {
+      "type": "string",
+      "pattern": "^[0-9a-f-]{36}$"
+    }
+  },
+  "required": [
+    "package_ref"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.validateThemePackage(ctx, {
+  package_ref: args["package_ref"]
+});
+```
+
+<a id="cms_install_theme_package"></a>
+
+### cms_install_theme_package
+
+Install a staged package (package_ref) as a catalog candidate. Never activates: use cms_activate_theme with expected_generation.
+
+Permission annotation: `theme.write`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "package_ref": {
+      "type": "string",
+      "pattern": "^[0-9a-f-]{36}$"
+    }
+  },
+  "required": [
+    "package_ref"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.installThemePackage(ctx, {
+  package_ref: args["package_ref"]
+});
+```
+
+<a id="cms_update_active_theme"></a>
+
+### cms_update_active_theme
+
+Apply a staged package (package_ref) over the active theme of the SAME id and a NEWER version, with lifecycle CAS on expected_generation (from cms_get_active_theme). Requires theme.write AND theme.activate. A stale generation fails with THEME_REVISION_STALE and changes nothing.
+
+Permission annotation: `theme.write`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "package_ref": {
+      "type": "string",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "package_ref",
+    "expected_generation"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.updateActiveTheme(ctx, {
+  package_ref: args["package_ref"],
+  expected_generation: args["expected_generation"]
+});
+```
+
+<a id="cms_activate_theme"></a>
+
+### cms_activate_theme
+
+Activate an installed theme candidate by theme_key (optional exact theme_version), with lifecycle CAS on expected_generation. Requires theme.activate.
+
+Permission annotation: `theme.activate`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "theme_key": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "theme_version": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "theme_key",
+    "expected_generation"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.activateTheme(ctx, {
+  theme_key: args["theme_key"],
+  ...args["theme_version"] === void 0 ? {} : { theme_version: args["theme_version"] },
+  expected_generation: args["expected_generation"]
+});
+```
+
+<a id="cms_rollback_theme"></a>
+
+### cms_rollback_theme
+
+Live activation of a retained revision (revision_id from cms_list_theme_revisions) with lifecycle CAS on expected_generation. Requires theme.write AND theme.activate.
+
+Permission annotation: `theme.write`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "revision_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "revision_id",
+    "expected_generation"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.rollbackTheme(ctx, {
+  revision_id: args["revision_id"],
+  expected_generation: args["expected_generation"]
+});
 ```
 
 <a id="cms_get_server_info"></a>

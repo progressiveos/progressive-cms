@@ -83,7 +83,7 @@ The complete fixed registry follows below. Enabled extensions can additionally c
 HTTP routes outside `/api/v1` are listed after the registry. They include health, signed preview, public files/site rendering, Admin assets and extension dispatch. They are not all REST JSON endpoints. Fastify also supplies HEAD handling for GET routes; this is not a separate application operation.
 
 <!-- interface-map:start -->
-## Fixed REST registry: 316 operations
+## Fixed REST registry: 320 operations
 
 | Area | Operations | Purpose |
 |---|---:|---|
@@ -101,7 +101,7 @@ HTTP routes outside `/api/v1` are listed after the registry. They include health
 | [publication](#rest-publication) | 23 | Coordinate sealed revisions, routes, changesets, plans and public visibility. |
 | [search](#rest-search) | 7 | Query public/admin search, inspect index health and explicitly run reindexing. |
 | [server](#rest-server) | 3 | Identify the target and diagnose the running instance. |
-| [themes](#rest-themes) | 13 | Inspect, validate, install and activate presentation packages/settings. |
+| [themes](#rest-themes) | 17 | Inspect, validate, install and activate presentation packages/settings. |
 
 <a id="rest-actor"></a>
 
@@ -980,6 +980,7 @@ const sectionEntryId = null;
 const { page, pageSize, tag } = parseCollectionFeedQuery(query, {
   pageSize: binding.page_size ?? COLLECTION_DEFAULT_PAGE_SIZE
 });
+const site = await app.routes.ensureSite(app.defaultSiteKey);
 const feed = await queryCollectionFeed(
   {
     pool: app.pool,
@@ -989,6 +990,12 @@ const feed = await queryCollectionFeed(
     context,
     contentTypes: binding.content_types,
     sectionEntryId,
+    // REST keeps its declared semantics: no `section` = the whole
+    // site, `section` = its direct children. The manifest's
+    // template-context scope has no meaning here.
+    scope: sectionEntryId === null ? "site" : "section",
+    order: readBindingFeedOptions(binding).order,
+    siteId: site.id,
     tagField: binding.tag_field ?? "tags",
     tag,
     page,
@@ -16486,13 +16493,17 @@ Inspect, validate, install and activate presentation packages/settings.
 | `PUT /api/v1/theme/settings` | [save_theme_settings](#save_theme_settings) | Save the working theme settings (CAS generation; theme.write) |
 | `POST /api/v1/theme/settings/seal` | [seal_theme_settings](#seal_theme_settings) | Seal the working settings as a theme_settings revision (theme.write) |
 | `GET /api/v1/themes/active` | [get_served_theme](#get_served_theme) | Actual in-memory theme id/version used by the public renderer (theme.read) |
-| `POST /api/v1/themes/active/update` | [update_active_theme](#update_active_theme) | Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate) |
-| `POST /api/v1/themes/install` | [install_theme](#install_theme) | Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact) or the raw package as application/octet-stream. The renderDir theme can never be overwritten. |
+| `POST /api/v1/themes/active/update` | [update_active_theme](#update_active_theme) | Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate). Body: raw ZIP (optional ?expected_generation=N) or JSON {package_ref, expected_generation}. |
+| `POST /api/v1/themes/install` | [install_theme](#install_theme) | Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten. |
 | `GET /api/v1/themes/installed` | [list_themes_installed](#list_themes_installed) | Installed themes in the themes root (theme.read). active = admin_theme_state row; isRenderTarget = the theme themes.renderDir actually serves. |
 | `DELETE /api/v1/themes/installed/{name}` | [uninstall_theme](#uninstall_theme) | Uninstall an installed theme (theme.write). The renderDir theme is refused — switch themes.renderDir first. |
+| `POST /api/v1/themes/packages` | [upload_theme_package](#upload_theme_package) | Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability. |
+| `POST /api/v1/themes/packages/{ref}/validate` | [validate_theme_package](#validate_theme_package) | Validate a staged package without changing the site: identity, version, digest and typed diagnostics; the candidate render stack is built and discarded (theme.validate) |
 | `GET /api/v1/themes/revisions` | [list_theme_revisions](#list_theme_revisions) | Retained confirmed theme revisions for this site (active plus newest, at most 100) |
 | `POST /api/v1/themes/revisions/cleanup` | [cleanup_theme_revisions](#cleanup_theme_revisions) | Preview old snapshots (theme.read) or remove explicit candidates (theme.write); preserves active, last-good, newest five and recovery revisions |
 | `POST /api/v1/themes/rollback` | [rollback_theme_revision](#rollback_theme_revision) | Live activation of a retained revision, with lifecycle CAS (theme.write + theme.activate) |
+| `GET /api/v1/themes/source` | [get_theme_source](#get_theme_source) | Descriptor of the package of the theme the renderer ACTUALLY serves: identity, served/installed versions, revision, generation and archive digest (theme.read) |
+| `GET /api/v1/themes/source/package` | [download_theme_source_package](#download_theme_source_package) | Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis |
 | `POST /api/v1/themes/validate` | [validate_theme](#validate_theme) | Validate the configured theme source against the theme contract |
 
 <a id="create_preview"></a>
@@ -16663,6 +16674,11 @@ JSON body schema:
     "theme_version": {
       "type": "string",
       "maxLength": 32
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
     }
   }
 }
@@ -16677,7 +16693,8 @@ return {
   status: 200,
   body: await activateTheme(app, ctx, {
     theme_key: body.theme_key,
-    ...typeof body.theme_version === "string" ? { theme_version: body.theme_version } : {}
+    ...typeof body.theme_version === "string" ? { theme_version: body.theme_version } : {},
+    ...body.expected_generation === void 0 ? {} : { expected_generation: body.expected_generation }
   })
 };
 ```
@@ -16824,7 +16841,7 @@ return { status: 200, body: app.themeRuntime.served() };
 
 ### POST /api/v1/themes/active/update
 
-**update_active_theme** — Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate)
+**update_active_theme** — Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate). Body: raw ZIP (optional ?expected_generation=N) or JSON {package_ref, expected_generation}.
 
 Verified behavior: Journaled same-id newer-package update: persists theme identity, preserves settings/settings_generation and retains confirmed immutable revisions. Failed changes restore the prior confirmed renderer/catalog head; recovery fails closed if authority is unavailable. Re-read served state after an ambiguous response; do not repair DB/files manually.
 
@@ -16841,7 +16858,19 @@ Verified behavior: Journaled same-id newer-package update: persists theme identi
 
 Path parameters: none.
 
-Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Query schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "expected_generation": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    }
+  }
+}
+```
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
@@ -16849,11 +16878,21 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 
 Response construction:
 ```javascript
+const body = request.body ?? {};
+const raw = request.query?.expected_generation;
 const result = await changeTheme(app, ctx, {
   kind: "UPDATE",
-  packageBytes: request.body
+  packageBytes: request.body,
+  ...raw === void 0 ? {} : { expectedGeneration: Number(raw) }
 });
 const info = result.info;
+return {
+  status: 200,
+  body: await updateActiveThemeOp(app, ctx, {
+    package_ref: body.package_ref,
+    expected_generation: body.expected_generation
+  })
+};
 return { status: 200, body: { ...info, served: app.themeRuntime.served?.() } };
 ```
 
@@ -16861,7 +16900,7 @@ return { status: 200, body: { ...info, served: app.themeRuntime.served?.() } };
 
 ### POST /api/v1/themes/install
 
-**install_theme** — Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact) or the raw package as application/octet-stream. The renderDir theme can never be overwritten.
+**install_theme** — Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.
 
 Verified behavior: Installs a new catalog package; ordinary install protects the currently rendered theme. Persistent activation can override the configured boot/render path. Use active-update for a newer package of the same served id.
 
@@ -16895,6 +16934,10 @@ const options = {
   cmsVersion: readCmsVersionFromRelease()
 };
 const info = await installThemePackage(bytes, options);
+return {
+  status: 201,
+  body: await installThemePackageOp(app, ctx, { package_ref: body.package_ref })
+};
 return { status: 201, body: { id: info.id, version: info.version, sha256: info.sha256 } };
 ```
 
@@ -16975,6 +17018,83 @@ Response construction:
 const params = request.params;
 const name = String(params.name ?? "");
 return { status: 200, body: { uninstalled: name } };
+```
+
+<a id="upload_theme_package"></a>
+
+### POST /api/v1/themes/packages
+
+**upload_theme_package** — Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `theme.write` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 67174400 bytes |
+| Source | `packages/api/src/http/routes/themes-manage.ts` |
+| Handler-local error codes (not the whole domain error set) | `API_REQUEST_INVALID` |
+
+Path parameters: none.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+return { status: 201, body: await uploadThemePackageOp(app, ctx, request.body) };
+```
+
+<a id="validate_theme_package"></a>
+
+### POST /api/v1/themes/packages/{ref}/validate
+
+**validate_theme_package** — Validate a staged package without changing the site: identity, version, digest and typed diagnostics; the candidate render stack is built and discarded (theme.validate)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `theme.validate` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/themes-manage.ts` |
+
+Path parameters: `ref`.
+
+Explicit path schema:
+```json
+{
+  "type": "object",
+  "required": [
+    "ref"
+  ],
+  "properties": {
+    "ref": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}
+```
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const params = request.params;
+return {
+  status: 200,
+  body: await validateThemePackageOp(app, ctx, { package_ref: params.ref })
+};
 ```
 
 <a id="list_theme_revisions"></a>
@@ -17282,6 +17402,130 @@ return {
     ctx,
     request.body
   )
+};
+```
+
+<a id="get_theme_source"></a>
+
+### GET /api/v1/themes/source
+
+**get_theme_source** — Descriptor of the package of the theme the renderer ACTUALLY serves: identity, served/installed versions, revision, generation and archive digest (theme.read)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `theme.read` |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/themes-manage.ts` |
+
+Path parameters: none.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "theme_id": {
+      "type": "string"
+    },
+    "served_version": {
+      "type": "string"
+    },
+    "installed_head_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "theme_generation": {
+      "type": "integer"
+    },
+    "package_sha256": {
+      "type": "string"
+    },
+    "size_bytes": {
+      "type": "integer"
+    },
+    "download_path": {
+      "type": "string"
+    }
+  }
+}
+```
+
+Response construction:
+```javascript
+return { status: 200, body: await getThemeSourceOp(app, ctx) };
+```
+
+<a id="download_theme_source_package"></a>
+
+### GET /api/v1/themes/source/package
+
+**download_theme_source_package** — Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `theme.read` |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/themes-manage.ts` |
+| Handler-local error codes (not the whole domain error set) | `API_REQUEST_INVALID` |
+
+Path parameters: none.
+
+Query schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expected_generation"
+  ],
+  "properties": {
+    "expected_generation": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    }
+  }
+}
+```
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const query = request.query;
+const generation = Number(query.expected_generation);
+const result = await downloadThemeSourceOp(app, ctx, {
+  expected_generation: generation
+});
+return {
+  status: 200,
+  body: result.bytes,
+  headers: {
+    "content-type": "application/vnd.progressive-cms.theme+zip",
+    "content-disposition": `attachment; filename="${result.filename}"`,
+    "content-length": String(result.size_bytes),
+    "x-pcms-package-sha256": result.sha256
+  }
 };
 ```
 

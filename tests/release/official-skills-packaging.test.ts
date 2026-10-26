@@ -34,10 +34,10 @@ const context = {
 };
 const paths = OFFICIAL_DOCS_SKILL_FILES;
 
-test("official resource classification admits exactly 32/9/8 resources and only the declared starter fixture", () => {
-  assert.equal(paths.length, 49);
+test("official resource classification admits exactly 34/9/8 resources and only the declared starter fixture", () => {
+  assert.equal(paths.length, 51);
   for (const [id, count] of [
-    ["progressive-cms-site-builder", 32],
+    ["progressive-cms-site-builder", 34],
     ["progressive-cms-152fz", 9],
     ["progressive-cms-seo", 8],
   ] as const)
@@ -106,13 +106,13 @@ function fixture(t: { after(work: () => void): void }) {
   return { prepared, entries, pack, ctx: { ...context, preparedDocsDir: prepared } };
 }
 
-test("artifact gate requires all 49 native resources and both copies match accepted prepared bytes", async (t) => {
+test("artifact gate requires all 51 native resources and both copies match accepted prepared bytes", async (t) => {
   const f = fixture(t);
-  assert.equal(readPreparedOfficialSkillFiles(f.prepared).size, 49);
+  assert.equal(readPreparedOfficialSkillFiles(f.prepared).size, 51);
   assert.deepEqual(checkReleaseZip(await f.pack(), releaseId, f.ctx), []);
   for (const path of paths) f.entries.delete(path);
   const failures = checkReleaseZip(await f.pack(), releaseId, f.ctx);
-  assert.equal(failures.length, 49, "omitting entire Skill directories cannot pass");
+  assert.equal(failures.length, 51, "omitting entire Skill directories cannot pass");
   for (const path of paths)
     assert.ok(
       failures.some((issue) => issue.startsWith(`${path}:`)),

@@ -830,10 +830,6 @@ export async function replaceMediaVersionOp(
       createdBy: `${ctx.actor.type}:${ctx.actor.id}`,
     },
   );
-  const accepted = (result as { asset?: unknown }).asset;
-  if (accepted) {
-    await generateVariantsAfterAccept(app, accepted as AcceptedMedia);
-  }
   return result;
 }
 
@@ -2409,7 +2405,11 @@ export async function saveThemeSettings(
 export async function activateTheme(
   app: ApplicationServices,
   ctx: OperationContext,
-  input: { readonly theme_key: string; readonly theme_version?: string },
+  input: {
+    readonly theme_key: string;
+    readonly theme_version?: string;
+    readonly expected_generation?: number;
+  },
 ): Promise<{ ok: true }> {
   requirePermission(app, ctx, "theme.activate");
   assertTokenConstraints(ctx.actor, {
@@ -2420,10 +2420,22 @@ export async function activateTheme(
     throw new ApiError("THEME_RUNTIME_UNAVAILABLE", "public theme renderer is not registered", {
       status: 409,
     });
+  if (
+    input.expected_generation !== undefined &&
+    (!Number.isSafeInteger(input.expected_generation) || input.expected_generation < 0)
+  )
+    throw new ApiError(
+      "API_REQUEST_INVALID",
+      "expected_generation must be a nonnegative safe integer",
+      { status: 400 },
+    );
   await changeTheme(app, ctx, {
     kind: "ACTIVATE",
     themeKey: input.theme_key,
     ...(input.theme_version === undefined ? {} : { themeVersion: input.theme_version }),
+    ...(input.expected_generation === undefined
+      ? {}
+      : { expectedGeneration: input.expected_generation }),
   });
   return { ok: true };
 }

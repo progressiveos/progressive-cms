@@ -132,6 +132,71 @@ export async function apiCall(
   return { ok: true, status: response.status, body: parsed };
 }
 
+/**
+ * One binary GET (theme export). Same credential/site/environment handling and
+ * the same typed error surface as apiCall — the JSON path stays the default.
+ */
+export async function apiBinary(
+  client: ApiClientOptions,
+  path: string,
+): Promise<
+  | { ok: true; status: number; bytes: Buffer; headers: Headers }
+  | { ok: false; result: CliCommandResult }
+> {
+  let response: Response;
+  try {
+    response = await fetch(`${client.baseUrl}/api/v1${path}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${client.token}`,
+        "x-pcms-site": client.siteKey,
+        "x-pcms-environment": client.environment,
+      },
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      result: {
+        exitCode: 7,
+        stdout: client.json
+          ? jsonPayload({
+              ok: false,
+              error: { code: "API_UNAVAILABLE", message: "API unreachable" },
+            })
+          : "",
+        stderr: `error: API unreachable: ${error instanceof Error ? error.message : String(error)}\n`,
+      },
+    };
+  }
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    let envelope: ApiEnvelope = {};
+    try {
+      envelope = JSON.parse(text) as ApiEnvelope;
+    } catch {
+      envelope = {};
+    }
+    const code = envelope.error?.code ?? "API_ERROR";
+    const message = envelope.error?.message ?? `HTTP ${response.status}`;
+    return {
+      ok: false,
+      result: {
+        exitCode: response.status === 401 || response.status === 403 ? 5 : 7,
+        stdout: client.json
+          ? jsonPayload({ ok: false, error: envelope.error ?? { code, message } })
+          : "",
+        stderr: `error: [${code}] ${message}\n`,
+      },
+    };
+  }
+  return {
+    ok: true,
+    status: response.status,
+    bytes: Buffer.from(await response.arrayBuffer()),
+    headers: response.headers,
+  };
+}
+
 export function machineResult(payload: unknown, exitCode = 0): CliCommandResult {
   return { exitCode, stdout: jsonPayload(payload), stderr: "" };
 }

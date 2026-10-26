@@ -23,6 +23,9 @@ import {
   mapEntryRichText,
   type OperationContext,
   queryCollectionFeed,
+  queryPublishedCardRows,
+  readBindingFeedOptions,
+  readRelatedFeedOptions,
   readThemeLifecycleState,
   recoverThemeLifecycle,
 } from "@pcms/api";
@@ -71,6 +74,14 @@ import {
   validateThemeManifest,
 } from "@pcms/themes";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import {
+  blockNodesOf,
+  buildFeedCards,
+  collectFieldMediaIds,
+  type FeedCard,
+  plainText,
+  STABLE_ID_RE,
+} from "./feed-cards.js";
 import { publicSecurityHeaders } from "./public-headers.js";
 import { registerRichTextAssets, withRichTextStyles } from "./richtext-assets.js";
 import { createSearchPageHandler, registerSearchPageRoute, wrapSearchPage } from "./search-page.js";
@@ -95,12 +106,14 @@ interface RelatedCard {
   readonly entry_id: string;
   readonly href: string;
   readonly title: string;
+  readonly description: string | null;
   readonly note: string | null;
   readonly tag: string | null;
   readonly tags: readonly string[];
   readonly date: string | null;
   readonly image: string | null;
   readonly image_alt: string | null;
+  readonly fields: Record<string, unknown>;
 }
 
 /** Feed item view model (Theme Contract §43): the published-collection card
@@ -109,15 +122,17 @@ interface CollectionFeedItem {
   readonly entry_id: string;
   readonly href: string;
   readonly title: string;
+  readonly description: string | null;
   readonly teaser: string | null;
   /** ISO instant of the publication; themes format it for display. */
   readonly date: string;
   readonly tags: readonly string[];
   readonly image: string | null;
   readonly image_alt: string | null;
+  readonly fields: Record<string, unknown>;
 }
 
-const STABLE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+export { collectFieldMediaIds, selectCardImage } from "./feed-cards.js";
 
 /** Collects declared media references from a block tree (Content spec §60). */
 export function collectBlockMediaIds(blocks: unknown, app: ApplicationServices, into: Set<string>) {
@@ -159,71 +174,6 @@ export function collectBlockMediaIds(blocks: unknown, app: ApplicationServices, 
   for (const block of blocks as Record<string, unknown>[]) visit(block);
 }
 
-/** Walk declared media fields, including nested objects and repeaters. */
-export function collectFieldMediaIds(
-  fields: Readonly<Record<string, unknown>>,
-  schema: Readonly<Record<string, FieldSchema>>,
-  into: Set<string>,
-): void {
-  const visit = (value: unknown, field: FieldSchema): void => {
-    if (field.type === "media") {
-      if (typeof value === "string" && STABLE_ID_RE.test(value)) into.add(value);
-    } else if (field.type === "media_list" && Array.isArray(value)) {
-      for (const id of value) if (typeof id === "string" && STABLE_ID_RE.test(id)) into.add(id);
-    } else if (
-      field.type === "object" &&
-      "fields" in field &&
-      typeof value === "object" &&
-      value !== null
-    ) {
-      collectFieldMediaIds(value as Record<string, unknown>, field.fields, into);
-    } else if (
-      field.type === "repeater" &&
-      "item" in field &&
-      "fields" in field.item &&
-      Array.isArray(value)
-    ) {
-      for (const row of value) {
-        if (typeof row === "object" && row !== null)
-          collectFieldMediaIds(row, field.item.fields, into);
-      }
-    } else if (
-      field.type === "list" &&
-      "item" in field &&
-      "type" in field.item &&
-      Array.isArray(value)
-    ) {
-      for (const item of value) visit(item, field.item);
-    }
-  };
-  for (const [key, field] of Object.entries(schema)) visit(fields[key], field);
-}
-
-/** Published payloads carry a snake_case BlockDocument (`{schema_version,
- * blocks}`); the theme pipeline consumes the normalized camelCase node array
- * (view-model shape). The seal already validated the document — a failed
- * re-validation here degrades to an empty document, never a broken page. */
-function blockNodesOf(
-  blocks: unknown,
-  app: ApplicationServices,
-  onInvalid?: (issues: readonly { readonly code: string; readonly path: string }[]) => void,
-): unknown[] {
-  const parsed = validateBlockDocument(blocks, app.blocks);
-  if (parsed.ok) return parsed.value.blocks;
-  // One unsupported block must never silently empty the page (2026-10-01
-  // site-developer report: an installed candidate's variant dropped EVERY
-  // block from live and preview renders with HTTP 200). Keep the
-  // individually-valid top-level blocks; report the dropped ones.
-  const nodes = (blocks as { blocks?: unknown } | null)?.blocks;
-  const kept = Array.isArray(nodes)
-    ? nodes.filter(
-        (node) => validateBlockDocument({ schema_version: 1, blocks: [node] }, app.blocks).ok,
-      )
-    : [];
-  onInvalid?.(parsed.issues.map((issue) => ({ code: issue.code, path: issue.path })));
-  return kept;
-}
-
 /**
  * Core-owned head section as one trusted fragment (R14, 2026-10-02 site
  * developer report): the engine escapes plain strings unconditionally, so a
@@ -235,81 +185,6 @@ function blockNodesOf(
  */
 function headHtmlScope(head: Parameters<typeof assembleHeadHtml>[0]): SafeHtml {
   return safeHtml(assembleHeadHtml(head));
-}
-
-/** Ordered image/gallery candidates from the published, normalized document. */
-export async function selectCardImage(
-  hero: unknown,
-  blocks: unknown[],
-  getMedia: (id: string) => Promise<import("@pcms/media").MediaAssetPublicViewModel | null>,
-): Promise<{ image: string | null; image_alt: string | null }> {
-  const empty = { image: null, image_alt: null };
-  const candidates: { id: unknown; alt?: unknown }[] = [];
-  const explicit = typeof hero === "string" && hero.trim() !== "";
-  const visit = (nodes: unknown[]): void => {
-    for (const value of nodes) {
-      const block = value as {
-        type: string;
-        props?: Record<string, unknown>;
-        children?: unknown[];
-      };
-      const props = block.props ?? {};
-      if (block.type === "image") candidates.push({ id: props.media_id, alt: props.alt_override });
-      if (block.type === "gallery" && Array.isArray(props.items)) {
-        for (const item of props.items as Record<string, unknown>[])
-          candidates.push({ id: item.media_id, alt: item.alt_override });
-      }
-      visit(block.children ?? []);
-    }
-  };
-  if (explicit) candidates.push({ id: hero });
-  else visit(blocks);
-  for (const candidate of candidates) {
-    if (typeof candidate.id !== "string" || !STABLE_ID_RE.test(candidate.id)) continue;
-    const asset = await getMedia(candidate.id);
-    const image =
-      asset?.kind === "image" ? asset.derivatives.find((d) => d.preset === "card")?.url : undefined;
-    if (image !== undefined)
-      return {
-        image,
-        image_alt: typeof candidate.alt === "string" ? candidate.alt : asset?.alt || null,
-      };
-  }
-  return empty;
-}
-
-function plainText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value !== "object" || value === null) return "";
-  const document = value as { type?: string; content?: unknown };
-  if (document.type !== "document") return "";
-  const walk = (node: unknown): string => {
-    if (typeof node === "string") return node;
-    if (Array.isArray(node)) return node.map(walk).join("");
-    if (typeof node === "object" && node !== null) {
-      const record = node as Record<string, unknown>;
-      if (typeof record.text === "string") return record.text;
-      return walk(record.content);
-    }
-    return "";
-  };
-  return walk(document.content).trim();
-}
-
-/** Text of the first paragraph-level node — card teasers must not start with
- * a heading or list fragment, which is what plainText picks up first. */
-function firstParagraphText(value: unknown): string {
-  if (typeof value !== "object" || value === null) return "";
-  const document = value as { type?: string; content?: unknown };
-  if (document.type !== "document" || !Array.isArray(document.content)) return "";
-  const paragraph = document.content.find(
-    (node) =>
-      typeof node === "object" &&
-      node !== null &&
-      (node as Record<string, unknown>).type === "paragraph",
-  );
-  // plainText expects a document-shaped node; wrap the paragraph.
-  return paragraph === undefined ? "" : plainText({ type: "document", content: [paragraph] });
 }
 
 /** One theme's render machinery: registries + boot settings + tokens pipeline.
@@ -1146,6 +1021,36 @@ export async function registerSiteRoute(
     return scope;
   }
 
+  /** Feed-card dependencies shared by related blocks and collections: the
+   * block registry, content-type lookup, the batched media port and the
+   * rendering theme's presets. */
+  function cardDeps(stack: ThemeStack) {
+    return {
+      blocks: application.blocks,
+      contentType: (key: string) => application.contentTypes.getLatestContentType(key),
+      assets: (ids: readonly string[]) => mediaProvider.getAssetViewModels(ids),
+      presets: stack.manifest.media_presets,
+    };
+  }
+
+  async function cardsOf(
+    rows: readonly import("@pcms/api").CollectionFeedItemRow[],
+    options: {
+      readonly fields: readonly string[];
+      readonly imageField: string;
+      readonly imagePreset: string;
+      readonly tagField: string;
+    },
+    stack: ThemeStack,
+  ): Promise<readonly FeedCard[]> {
+    if (!stack.manifest.media_presets.some((preset) => preset.id === options.imagePreset)) {
+      // Known-at-seal preset that the CURRENT theme no longer declares: cards
+      // degrade to no image; GET never seals, migrates or transforms.
+      fastify.log.warn({ preset: options.imagePreset }, "render.feed_image_preset_unknown");
+    }
+    return buildFeedCards(rows, options, cardDeps(stack));
+  }
+
   async function relatedCards(
     blocksInDocument: unknown,
     contextLocale: string,
@@ -1155,73 +1060,75 @@ export async function registerSiteRoute(
     const cardsByBlock: Record<string, RelatedCard[]> = {};
     if (!Array.isArray(blocksInDocument)) return cardsByBlock;
     const site = await application.routes.ensureSite(application.defaultSiteKey);
-    for (const block of blocksInDocument as Record<string, unknown>[]) {
-      if (block.type !== "related_content") continue;
+    const deps = {
+      pool: application.pool,
+      isKnownContentType: (key: string) =>
+        application.contentTypes.getLatestContentType(key) !== null,
+    };
+    // Related blocks can be NESTED inside container blocks (the seal walker
+    // already accepts them there); the card map is keyed by block id, so the
+    // whole renderable tree must be visited.
+    const relatedBlocks: Record<string, unknown>[] = [];
+    const collect = (list: unknown): void => {
+      if (!Array.isArray(list)) return;
+      for (const value of list) {
+        if (typeof value !== "object" || value === null) continue;
+        const node = value as Record<string, unknown>;
+        if (node.type === "related_content") relatedBlocks.push(node);
+        collect(node.children);
+      }
+    };
+    collect(blocksInDocument);
+    for (const block of relatedBlocks) {
       const props = (block.props ?? {}) as Record<string, unknown>;
       const blockId = typeof block.id === "string" ? block.id : "";
-      let entryIds = Array.isArray(props.entry_ids)
-        ? (props.entry_ids as unknown[]).filter(
-            (value): value is string => typeof value === "string",
-          )
-        : [];
+      const mode = typeof props.mode === "string" ? props.mode : "manual";
+      const binding =
+        typeof props.collection_key === "string"
+          ? stack.manifest.collections?.[props.collection_key]
+          : undefined;
+      // R2: the block inherits its collection binding's order when it declares
+      // none, so REST, template collections and related blocks agree.
+      const options = readRelatedFeedOptions(props, binding);
+      const excluded = new Set(options.excludeEntryIds);
+      const pinned = (Array.isArray(props.entry_ids) ? props.entry_ids : []).filter(
+        (value): value is string => typeof value === "string" && !excluded.has(value),
+      );
       const limit =
         typeof props.limit === "number" && Number.isInteger(props.limit) && props.limit >= 1
           ? props.limit
           : null;
+      const contentTypes = options.contentTypes ?? binding?.content_types ?? [];
+      const tagField = binding?.tag_field ?? "tags";
       // Collection/hybrid modes resolve `collection_key` against the
-      // RENDERING theme's declared collections (Theme Contract §43): pinned
-      // ids first, then collection fill without duplicates. The section is
-      // the page the block sits on — the same "self" semantics the feed
-      // scope uses. An unknown key degrades to an empty card list with a
-      // loud typed log (REST answers COLLECTION_UNKNOWN for the same key).
-      const mode = typeof props.mode === "string" ? props.mode : "manual";
-      if (
-        (mode === "collection" || mode === "hybrid") &&
-        typeof props.collection_key === "string"
-      ) {
-        const binding = stack.manifest.collections?.[props.collection_key];
+      // RENDERING theme's declared collections (Theme Contract §43). An
+      // unknown key degrades to an empty card list with a loud typed log
+      // (REST answers COLLECTION_UNKNOWN for the same key).
+      let fill: readonly import("@pcms/api").CollectionFeedItemRow[] = [];
+      const wantsFill = mode === "collection" || mode === "hybrid";
+      if (wantsFill && typeof props.collection_key === "string") {
         if (binding === undefined) {
           fastify.log.warn(
             { collection_key: props.collection_key, code: "COLLECTION_UNKNOWN" },
             "render.collection_unknown",
           );
-          entryIds = mode === "collection" ? [] : entryIds;
         } else {
           try {
-            const fill = await queryCollectionFeed(
-              {
-                pool: application.pool,
-                isKnownContentType: (key) =>
-                  application.contentTypes.getLatestContentType(key) !== null,
-              },
-              {
-                context: contextLocale,
-                contentTypes: binding.content_types,
-                sectionEntryId: selfEntryId,
-                tagField: binding.tag_field ?? "tags",
-                tag: null,
-                page: 1,
-                pageSize: limit ?? binding.page_size ?? COLLECTION_DEFAULT_PAGE_SIZE,
-              },
-            );
-            const fillIds = fill.items.map((item) => item.entry_id);
-            if (mode === "collection") {
-              entryIds = fillIds;
-            } else {
-              const seen = new Set(entryIds);
-              const extra: string[] = [];
-              for (const id of fillIds) {
-                if (entryIds.length + extra.length >= (limit ?? 100)) break;
-                if (!seen.has(id)) {
-                  seen.add(id);
-                  extra.push(id);
-                }
-              }
-              entryIds = [...entryIds, ...extra];
-            }
+            const feed = await queryCollectionFeed(deps, {
+              context: contextLocale,
+              contentTypes,
+              sectionEntryId: options.scope === "site" ? null : selfEntryId,
+              scope: options.scope,
+              order: options.order,
+              excludeEntryIds: options.excludeEntryIds,
+              siteId: site.id,
+              tagField,
+              tag: null,
+              page: 1,
+              pageSize: limit ?? binding.page_size ?? COLLECTION_DEFAULT_PAGE_SIZE,
+            });
+            fill = feed.items;
           } catch (error) {
-            // ponytail: render-side diagnostic only — seal-time collection
-            // key validation is the upgrade path when a real document hits it.
             fastify.log.warn(
               { err: error, collection_key: props.collection_key },
               "render.collection_unresolved",
@@ -1229,87 +1136,74 @@ export async function registerSiteRoute(
           }
         }
       }
-      const cards: RelatedCard[] = [];
-      for (const entryId of entryIds) {
-        const card = await publishedCard(entryId, site.id, contextLocale);
-        if (card !== null) cards.push(card);
-      }
-      cardsByBlock[blockId] = cards;
+      // Pinned ids keep their declared order; one batch statement for all of
+      // them (never one publication/route read per card).
+      const pinnedRows =
+        pinned.length === 0
+          ? []
+          : await queryPublishedCardRows(deps, {
+              context: contextLocale,
+              entryIds: pinned,
+              siteId: site.id,
+            });
+      // `limit` bounds the OUTPUT, pinned ids included: only resolvable,
+      // published, non-excluded pins take a slot (removed pins never do).
+      const cap = limit ?? 100;
+      let rows: readonly import("@pcms/api").CollectionFeedItemRow[];
+      if (mode === "collection") rows = fill;
+      else if (mode === "hybrid") {
+        const merged = pinnedRows.slice(0, cap);
+        const seen = new Set(merged.map((row) => row.entry_id));
+        for (const row of fill) {
+          if (merged.length >= cap) break;
+          if (seen.has(row.entry_id)) continue;
+          seen.add(row.entry_id);
+          merged.push(row);
+        }
+        rows = merged;
+      } else rows = limit === null ? pinnedRows : pinnedRows.slice(0, limit);
+
+      const cards = await cardsOf(
+        rows,
+        {
+          fields: options.fields,
+          imageField: options.imageField,
+          imagePreset: options.imagePreset,
+          // Related cards keep their historical `tags` surface; the binding's
+          // tag_field governs filtering, not what the card exposes.
+          tagField: "tags",
+        },
+        stack,
+      );
+      cardsByBlock[blockId] = cards.map((card, index) => {
+        const row = rows[index];
+        return {
+          kind:
+            card.content_type === "article" || card.content_type === "news"
+              ? "blog"
+              : card.content_type === "service"
+                ? "service"
+                : "project",
+          entry_id: card.entry_id,
+          href: localizedRoutePath({
+            locale: row?.route_locale ?? "x-default",
+            path: row?.route_path ?? "/",
+          }),
+          title: card.title,
+          description: card.description,
+          // Legacy related-card alias chains stay exactly as they were.
+          note: card.note,
+          tag: card.tag,
+          tags: card.tags,
+          date:
+            card.date_field === null ? null : new Date(card.date_field).toLocaleDateString("ru-RU"),
+          image: card.image,
+          image_alt: card.image_alt,
+          fields: card.fields,
+        };
+      });
     }
     return cardsByBlock;
-  }
-
-  async function publishedCard(
-    entryId: string,
-    siteId: string,
-    contextLocale: string,
-  ): Promise<RelatedCard | null> {
-    if (!STABLE_ID_RE.test(entryId)) return null;
-    if (contextLocale !== "default") {
-      const translation = await application.entries
-        .findTranslation(entryId as never, contextLocale)
-        .catch(() => null);
-      if (translation === null) return null;
-      entryId = translation.id;
-    }
-    const revision = await application.pool.withTransaction((tx) =>
-      application.publications.getPublishedRevision(tx, "entry", entryId as never, contextLocale),
-    );
-    if (revision === null) return null;
-    const entry = await application.entries.findEntry(entryId as never);
-    if (entry === null || entry.archivedAt !== null) return null;
-    const payload = (revision.payload ?? {}) as {
-      fields?: Record<string, unknown>;
-      blocks?: unknown;
-    };
-    const fields = payload.fields ?? {};
-    const tags = Array.isArray(fields.tags)
-      ? (fields.tags as unknown[]).filter((value): value is string => typeof value === "string")
-      : [];
-    const routes = await application.routes.listRoutes(siteId);
-    const route = routes.find(
-      (candidate) =>
-        candidate.targetType === "entry" &&
-        candidate.targetId === entryId &&
-        candidate.locale === (contextLocale === "default" ? "x-default" : contextLocale) &&
-        candidate.retiredAt === null &&
-        candidate.isCanonical,
-    );
-    if (route === undefined) return null;
-    const cardImage = await selectCardImage(
-      fields.hero_image,
-      blockNodesOf(payload.blocks, application),
-      async (id) => {
-        const asset = await getAsset(application.pool, id as never);
-        return asset === null || asset.archivedAt !== null
-          ? null
-          : mediaProvider.getAssetViewModel(id);
-      },
-    );
-    const kind =
-      entry.contentTypeId === "article" || entry.contentTypeId === "news"
-        ? "blog"
-        : entry.contentTypeId === "service"
-          ? "service"
-          : "project";
-    return {
-      kind,
-      entry_id: entryId,
-      href: localizedRoutePath({ locale: route.locale, path: route.path }),
-      title: typeof fields.title === "string" ? fields.title : entryId,
-      note:
-        plainText(fields.intro) ||
-        plainText(fields.teaser) ||
-        firstParagraphText(fields.body).slice(0, 200) ||
-        null,
-      tag: tags[0] ?? null,
-      tags,
-      date:
-        typeof fields.published_at === "string" || fields.published_at instanceof Date
-          ? new Date(fields.published_at as string).toLocaleDateString("ru-RU")
-          : null,
-      ...cardImage,
-    };
   }
 
   /** Collection feed machinery (Theme Contract §43): one declared collection
@@ -1419,46 +1313,10 @@ export async function registerSiteRoute(
     return { ...head, title, core_meta, canonical, json_ld, robots };
   }
 
-  function tagsOf(fields: Record<string, unknown>, tagField: string): readonly string[] {
-    const value = fields[tagField];
-    return Array.isArray(value)
-      ? value.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  }
-
-  async function feedCardFromRow(
-    row: import("@pcms/api").CollectionFeedItemRow,
-    tagField: string,
-  ): Promise<CollectionFeedItem> {
-    const fields = row.fields ?? {};
-    const cardImage = await selectCardImage(
-      fields.hero_image,
-      blockNodesOf(row.blocks, application),
-      async (id) => {
-        const asset = await getAsset(application.pool, id as never);
-        return asset === null || asset.archivedAt !== null
-          ? null
-          : mediaProvider.getAssetViewModel(id);
-      },
-    );
-    return {
-      entry_id: row.entry_id,
-      href: localizedRoutePath({ locale: row.route_locale, path: row.route_path }),
-      title: typeof fields.title === "string" ? fields.title : row.entry_id,
-      teaser:
-        plainText(fields.intro) ||
-        plainText(fields.teaser) ||
-        firstParagraphText(fields.body).slice(0, 200) ||
-        null,
-      date: row.published_at,
-      tags: tagsOf(fields, tagField),
-      ...cardImage,
-    };
-  }
-
   async function resolveCollectionFeedScope(
     key: string,
     binding: ThemeManifestCollection,
+    stack: ThemeStack,
     context: {
       readonly selfEntryId: string;
       readonly contextLocale: string;
@@ -1466,6 +1324,8 @@ export async function registerSiteRoute(
       readonly query: Record<string, unknown>;
     },
   ): Promise<unknown> {
+    const options = readBindingFeedOptions(binding);
+    const site = await application.routes.ensureSite(application.defaultSiteKey);
     // Browsable URLs degrade leniently (page=abc → 1); the REST surface is
     // the strict one and answers 400 for the same input.
     const rawTag = context.query.tag;
@@ -1486,15 +1346,47 @@ export async function registerSiteRoute(
         {
           context: context.contextLocale,
           contentTypes: binding.content_types,
-          sectionEntryId: context.selfEntryId,
+          sectionEntryId: options.scope === "site" ? null : context.selfEntryId,
+          scope: options.scope,
+          order: options.order,
+          // The rendered page is not excluded implicitly: "site" is the whole
+          // site, and a page that wants itself out names itself explicitly.
+          siteId: site.id,
           tagField,
           tag,
           page,
           pageSize,
         },
       );
-      const items: CollectionFeedItem[] = [];
-      for (const row of feed.items) items.push(await feedCardFromRow(row, tagField));
+      // One batched projection for the whole page (no per-item reads).
+      const cards = await cardsOf(
+        feed.items,
+        {
+          fields: [],
+          imageField: "hero_image",
+          imagePreset: "card",
+          tagField,
+        },
+        stack,
+      );
+      const items: CollectionFeedItem[] = cards.map((card, index) => {
+        const row = feed.items[index];
+        return {
+          entry_id: card.entry_id,
+          href: localizedRoutePath({
+            locale: row?.route_locale ?? "x-default",
+            path: row?.route_path ?? "/",
+          }),
+          title: card.title,
+          description: card.description,
+          teaser: card.note,
+          date: card.published_at,
+          tags: card.tags,
+          image: card.image,
+          image_alt: card.image_alt,
+          fields: card.fields,
+        };
+      });
       return {
         key,
         items,
@@ -1549,7 +1441,7 @@ export async function registerSiteRoute(
     const scope: Record<string, unknown> = {};
     for (const [key, binding] of Object.entries(stack.manifest.collections ?? {})) {
       if (!(binding.templates ?? []).includes(templateId)) continue;
-      scope[key] = await resolveCollectionFeedScope(key, binding, {
+      scope[key] = await resolveCollectionFeedScope(key, binding, stack, {
         selfEntryId,
         contextLocale,
         requestPath,
@@ -1783,7 +1675,7 @@ export async function registerSiteRoute(
       body?: unknown;
     };
     const fields = payload.fields ?? {};
-    const blockNodes = blockNodesOf(payload.blocks, application, (issues) =>
+    const blockNodes = blockNodesOf(payload.blocks, application.blocks, (issues) =>
       fastify.log.warn({ issues }, "render.blocks_dropped"),
     );
     const forms = await formsScope(

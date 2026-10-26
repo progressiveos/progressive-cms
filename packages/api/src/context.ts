@@ -1,3 +1,5 @@
+import { resolveActiveThemeDirectory } from "./active-theme-media-presets.js";
+import { hasExplicitFeedOptions, readFeedOrder, validateFeedOptions } from "./feed-options.js";
 import {
   createInteractionPrivacyService,
   type InteractionPrivacyService,
@@ -263,7 +265,12 @@ import {
   type SeoEnvironment,
   type SeoStore,
 } from "@pcms/seo";
-import { createThemeDiscovery, THEME_CONTRACT_VERSION, type ThemeDiscovery } from "@pcms/themes";
+import {
+  createThemeDiscovery,
+  THEME_CONTRACT_VERSION,
+  type ThemeDiscovery,
+  type ThemeManifest,
+} from "@pcms/themes";
 import { BUNDLE_VERSION } from "./bundle.js";
 import { ApiError } from "./errors.js";
 import {
@@ -768,6 +775,11 @@ function entryEntityAdapter(deps: {
   contentTypes: ContentTypeRegistry;
   blocks: BlockRegistry;
   prepareImage: (id: string) => Promise<void>;
+  /** ACTIVE theme manifest + preset ids, resolved live (not the boot seed). */
+  resolveFeedTheme: () => Promise<{
+    readonly manifest: ThemeManifest | null;
+    readonly presets: ReadonlySet<string>;
+  }>;
 }): {
   entityType: "entry";
   description: string;
@@ -775,6 +787,107 @@ function entryEntityAdapter(deps: {
   canonicalize(payload: unknown): unknown;
   extractMediaAssetIds(payload: unknown, ctx: SealContext): Promise<readonly string[]>;
 } {
+  const STABLE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  async function pinnedContentTypes(value: unknown, ctx: SealContext): Promise<readonly string[]> {
+    const keys = new Set<string>();
+    for (const id of Array.isArray(value) ? value : []) {
+      if (typeof id !== "string" || !STABLE_ID_RE.test(id)) continue;
+      const pinned =
+        ctx.executor === undefined
+          ? await deps.entries.findEntry(id as never).catch(() => null)
+          : await deps.entries
+              .findEntryWithinTx(ctx.executor as never, id as never)
+              .catch(() => null);
+      // A removed pinned id never invalidates the block; its type simply
+      // cannot be checked (the id also stops rendering).
+      if (pinned !== null) keys.add(pinned.contentTypeId);
+    }
+    return [...keys];
+  }
+
+  async function relatedContentFeedIssues(
+    props: Record<string, unknown>,
+    path: string,
+    ctx: SealContext,
+    theme: { readonly manifest: ThemeManifest | null; readonly presets: ReadonlySet<string> },
+  ): Promise<RevisionIssue[]> {
+    const mode = typeof props.mode === "string" ? props.mode : "manual";
+    const binding =
+      typeof props.collection_key === "string"
+        ? theme.manifest?.collections?.[props.collection_key]
+        : undefined;
+    const themeKnown = theme.manifest !== null;
+    const override = Array.isArray(props.content_types)
+      ? props.content_types.filter((key): key is string => typeof key === "string")
+      : null;
+    // Without an override the binding decides; manual blocks have no binding,
+    // so the still-resolvable pinned entries define the checked types.
+    const keys =
+      override ??
+      (mode === "manual"
+        ? await pinnedContentTypes(props.entry_ids, ctx)
+        : (binding?.content_types ?? []));
+    const appliedTypes = keys.flatMap((key) => {
+      const type = deps.contentTypes.getLatestContentType(key);
+      return type === null ? [] : [type];
+    });
+    return validateFeedOptions({
+      mode,
+      props,
+      path,
+      appliedTypes,
+      collectionKnown: themeKnown ? binding !== undefined : null,
+      knownPresets: themeKnown ? theme.presets : null,
+      contentTypes: (key) => deps.contentTypes.getLatestContentType(key),
+      explicit: hasExplicitFeedOptions(props),
+      // Validation checks the EFFECTIVE order, including one inherited from
+      // the collection binding.
+      ...(binding === undefined ? {} : { bindingOrder: readFeedOrder(binding.order) }),
+    }).map((issue) => ({ ...issue, severity: "error" as const }));
+  }
+
+  /**
+   * Semantic validation of explicitly-declared feed options, including
+   * nested renderable blocks. Structural prop shapes stay the block
+   * registry's job; this is the single entry path (REST/MCP/PCPUB/seal) where
+   * field/preset existence can be checked against the ACTIVE theme.
+   */
+  async function feedOptionIssues(blocks: unknown, ctx: SealContext): Promise<RevisionIssue[]> {
+    const root = (blocks as { blocks?: unknown } | null)?.blocks;
+    const targets: { props: Record<string, unknown>; path: string }[] = [];
+    const collect = (list: unknown, path: string): void => {
+      if (!Array.isArray(list)) return;
+      for (const [index, value] of list.entries()) {
+        if (typeof value !== "object" || value === null) continue;
+        const block = value as { type?: unknown; props?: unknown; children?: unknown };
+        const nodePath = `${path}/${index}`;
+        if (
+          block.type === "related_content" &&
+          typeof block.props === "object" &&
+          block.props !== null &&
+          hasExplicitFeedOptions(block.props as Record<string, unknown>)
+        ) {
+          targets.push({
+            props: block.props as Record<string, unknown>,
+            path: `${nodePath}/props`,
+          });
+        }
+        collect(block.children, `${nodePath}/children`);
+      }
+    };
+    collect(root, "/blocks/blocks");
+    // Documents without explicit feed options (i.e. all history) never touch
+    // the theme or the content-type registry.
+    if (targets.length === 0) return [];
+    const theme = await deps.resolveFeedTheme();
+    const issues: RevisionIssue[] = [];
+    for (const target of targets) {
+      issues.push(...(await relatedContentFeedIssues(target.props, target.path, ctx, theme)));
+    }
+    return issues;
+  }
+
   return {
     entityType: "entry",
     description: "Content entry (fields + optional block document body)",
@@ -848,6 +961,11 @@ function entryEntityAdapter(deps: {
           for (const issue of blockResult.issues) {
             issues.push({ code: issue.code, message: issue.message, severity: "error" });
           }
+        }
+        // History is never re-judged: a theme change after publication must
+        // not make a SEALED revision look broken.
+        if (ctx.revisionState !== "SEALED") {
+          issues.push(...(await feedOptionIssues(body.blocks, ctx)));
         }
       }
       const images = new Set<string>();
@@ -1030,12 +1148,21 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
       });
     await ensureCoreDerivative(coreDerivativeDeps(), asset, mediaPresets, "richtext-v1");
   };
+  // Seal-time semantic checks (feed-anywhere options) resolve the ACTIVE
+  // theme, not the boot seed: a theme activated after boot declares the
+  // collections/presets the check must use. Assigned once the discovery is
+  // built below; the closure only runs during seal/validate.
+  let resolveActiveTheme = async (): Promise<{
+    readonly manifest: ThemeManifest | null;
+    readonly presets: ReadonlySet<string>;
+  }> => ({ manifest: null, presets: new Set() });
   const revisionRegistry = createVersionedEntityRegistry([
     entryEntityAdapter({
       entries,
       contentTypes,
       blocks,
       prepareImage: prepareRichTextImage,
+      resolveFeedTheme: () => resolveActiveTheme(),
     }),
     noPayloadAdapter("global_content", "Global content record"),
     noPayloadAdapter("theme_settings", "Theme settings record"),
@@ -2462,6 +2589,24 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     input.themeDir === undefined || !existsSync(join(input.themeDir, "theme.json"))
       ? null
       : createThemeDiscovery(input.themeDir, { cmsVersion });
+  // Seal-time feed checks see the ACTIVE theme (theme pointer → installed
+  // package → configured renderDir). An unresolvable active theme degrades to
+  // the boot-seed manifest: filesystem state must never block a seal.
+  resolveActiveTheme = async () => {
+    const presets = new Set<string>(mediaPresets.listPresets().map((preset) => preset.id));
+    const configuredDir = input.themeDir;
+    if (configuredDir === undefined) return { manifest: null, presets };
+    const manifest = await resolveActiveThemeDirectory({
+      db: pool,
+      siteKey: defaultSiteKey,
+      configuredDir,
+      cmsVersion,
+    })
+      .then((dir) => createThemeDiscovery(dir, { cmsVersion }).getManifest())
+      .catch(() => themeDiscoveryValue?.getManifest() ?? null);
+    for (const preset of manifest?.media_presets ?? []) presets.add(preset.id);
+    return { manifest, presets };
+  };
   // Theme-declared block variants feed the single validation point
   // (2026-09-29: theme.json block_renderers[].variants were dead — content
   // validation rejected every variant, discovery reported []). The theme is
