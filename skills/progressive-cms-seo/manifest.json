@@ -55,10 +55,5 @@
     }
   },
   "dangerous_optional_scopes": [],
-  "safety_levels": [
-    "READ",
-    "DRAFT_WRITE",
-    "PREVIEW",
-    "PUBLIC_MUTATION"
-  ]
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "PUBLIC_MUTATION"]
 }

@@ -40,8 +40,6 @@
       "requiresCms": ">=1.0.0-rc.27 <2.0.0-0"
     }
   ],
-  "excluded": [
-    "internal operator/admin Skills"
-  ],
+  "excluded": ["internal operator/admin Skills"],
   "installation": "Set PCMS_SKILLS_DIR to the complete public docs/skills directory; standalone site-builder, 152fz and seo are also exported to release-root skills/. First-party IDs are not community packages."
 }

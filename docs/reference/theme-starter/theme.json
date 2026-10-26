@@ -8,32 +8,20 @@
     {
       "id": "company-page",
       "file": "templates/page.liquid",
-      "accepts_content_types": [
-        "company_page@1"
-      ],
-      "required_fields": [
-        "title"
-      ]
+      "accepts_content_types": ["company_page@1"],
+      "required_fields": ["title"]
     },
     {
       "id": "company-news",
       "file": "templates/article.liquid",
-      "accepts_content_types": [
-        "company_news@1"
-      ],
-      "required_fields": [
-        "title"
-      ]
+      "accepts_content_types": ["company_news@1"],
+      "required_fields": ["title"]
     },
     {
       "id": "company-project",
       "file": "templates/article.liquid",
-      "accepts_content_types": [
-        "company_project@1"
-      ],
-      "required_fields": [
-        "title"
-      ]
+      "accepts_content_types": ["company_project@1"],
+      "required_fields": ["title"]
     }
   ],
   "components": [
@@ -73,28 +61,19 @@
       "id": "header.primary",
       "required": true,
       "max_depth": 1,
-      "supported_item_types": [
-        "internal_entry",
-        "external_url"
-      ]
+      "supported_item_types": ["internal_entry", "external_url"]
     },
     {
       "id": "header.mobile",
       "required": true,
       "max_depth": 1,
-      "supported_item_types": [
-        "internal_entry",
-        "external_url"
-      ]
+      "supported_item_types": ["internal_entry", "external_url"]
     },
     {
       "id": "footer.primary",
       "required": true,
       "max_depth": 1,
-      "supported_item_types": [
-        "internal_entry",
-        "external_url"
-      ]
+      "supported_item_types": ["internal_entry", "external_url"]
     }
   ],
   "media_presets": [
@@ -103,38 +82,24 @@
       "width": 640,
       "height": 400,
       "fit": "cover",
-      "formats": [
-        "webp"
-      ]
+      "formats": ["webp"]
     }
   ],
   "settings_schema": [],
   "collections": {
     "news": {
-      "content_types": [
-        "company_news"
-      ],
+      "content_types": ["company_news"],
       "page_size": 6,
-      "templates": [
-        "company-page"
-      ]
+      "templates": ["company-page"]
     },
     "projects": {
-      "content_types": [
-        "company_project"
-      ],
+      "content_types": ["company_project"],
       "page_size": 6,
-      "templates": [
-        "company-page"
-      ]
+      "templates": ["company-page"]
     }
   },
   "assets": {
-    "css": [
-      "assets/theme.css"
-    ],
-    "js": [
-      "assets/forms.js"
-    ]
+    "css": ["assets/theme.css"],
+    "js": ["assets/forms.js"]
   }
 }

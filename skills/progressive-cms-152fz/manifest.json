@@ -55,13 +55,6 @@
       "theme_contract": "^1.0"
     }
   },
-  "dangerous_optional_scopes": [
-    "privacy.manage"
-  ],
-  "safety_levels": [
-    "READ",
-    "DRAFT_WRITE",
-    "PREVIEW",
-    "PUBLIC_MUTATION"
-  ]
+  "dangerous_optional_scopes": ["privacy.manage"],
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "PUBLIC_MUTATION"]
 }

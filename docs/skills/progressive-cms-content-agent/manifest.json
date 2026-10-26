@@ -9,10 +9,7 @@
       "mcp": "2024-11-05",
       "block_document": "1"
     },
-    "minimum_capabilities": [
-      "content.read",
-      "publication.read"
-    ],
+    "minimum_capabilities": ["content.read", "publication.read"],
     "optional_capabilities": [
       "preview.create",
       "publication.schedule",
@@ -70,15 +67,6 @@
     "Publish only with permissions and task authorization; verify public HTML and eventual Search.",
     "Verify editor can save, preview, seal and publish a subsequent revision."
   ],
-  "safety_levels": [
-    "READ",
-    "DRAFT_WRITE",
-    "PREVIEW",
-    "SCHEDULE",
-    "PUBLIC_MUTATION"
-  ],
-  "references": [
-    "SKILL.md",
-    "references/workflow.md"
-  ]
+  "safety_levels": ["READ", "DRAFT_WRITE", "PREVIEW", "SCHEDULE", "PUBLIC_MUTATION"],
+  "references": ["SKILL.md", "references/workflow.md"]
 }

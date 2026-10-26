@@ -4,13 +4,7 @@
   "title": "Progressive CMS agent skill manifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "id",
-    "version",
-    "description",
-    "entry_workflow",
-    "safety_levels"
-  ],
+  "required": ["id", "version", "description", "entry_workflow", "safety_levels"],
   "properties": {
     "id": {
       "type": "string",
@@ -129,9 +123,7 @@
     "attribution": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "author"
-      ],
+      "required": ["author"],
       "properties": {
         "author": {
           "type": "string",

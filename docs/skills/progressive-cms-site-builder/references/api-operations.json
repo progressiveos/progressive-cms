@@ -25,19 +25,11 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "code",
-              "message",
-              "request_id",
-              "details",
-              "retryable"
-            ],
+            "required": ["code", "message", "request_id", "details", "retryable"],
             "type": "object"
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "type": "object"
       },
       "Page": {
@@ -55,10 +47,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "items",
-          "has_more"
-        ],
+        "required": ["items", "has_more"],
         "type": "object"
       }
     },
@@ -190,9 +179,7 @@
           }
         ],
         "summary": "Agent bootstrap: site, environment, actor/scopes, contracts, capabilities, installed skills, preview/domain readiness.",
-        "tags": [
-          "discovery"
-        ]
+        "tags": ["discovery"]
       }
     },
     "/capabilities": {
@@ -302,9 +289,7 @@
           }
         ],
         "summary": "Actor-visible subsystem capabilities + contract versions (permission-filtered)",
-        "tags": [
-          "discovery"
-        ]
+        "tags": ["discovery"]
       }
     },
     "/content/schema/validate": {
@@ -330,17 +315,13 @@
                             "type": "array"
                           }
                         },
-                        "required": [
-                          "contentTypes"
-                        ],
+                        "required": ["contentTypes"],
                         "type": "object"
                       }
                     ]
                   }
                 },
-                "required": [
-                  "definitions"
-                ],
+                "required": ["definitions"],
                 "type": "object"
               }
             }
@@ -451,9 +432,7 @@
           }
         ],
         "summary": "Validate content type definitions against the effective set: registration probe + additive-change report, no effects.",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content_schema.propose"
       }
     },
@@ -480,17 +459,13 @@
                             "type": "array"
                           }
                         },
-                        "required": [
-                          "contentTypes"
-                        ],
+                        "required": ["contentTypes"],
                         "type": "object"
                       }
                     ]
                   }
                 },
-                "required": [
-                  "definitions"
-                ],
+                "required": ["definitions"],
                 "type": "object"
               }
             }
@@ -601,9 +576,7 @@
           }
         ],
         "summary": "Apply additive-only content type changes (new types, new optional fields). Audited; response reports affected entries and restart_required.",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content_schema.apply"
       }
     },
@@ -714,9 +687,7 @@
           }
         ],
         "summary": "Registered content types (deterministic order)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "content.read"
       }
     },
@@ -837,9 +808,7 @@
           }
         ],
         "summary": "Full content type schema (round-trippable)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "content.read"
       }
     },
@@ -950,9 +919,7 @@
           }
         ],
         "summary": "Registered block types",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "content.read"
       }
     },
@@ -1063,9 +1030,7 @@
           }
         ],
         "summary": "Active theme contract snapshot (manifest, templates, placements)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "theme.read"
       }
     },
@@ -1176,9 +1141,7 @@
           }
         ],
         "summary": "Theme templates with accepted content types",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "theme.read"
       }
     },
@@ -1289,9 +1252,7 @@
           }
         ],
         "summary": "Theme-declared placements + current bindings",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
     },
@@ -1412,9 +1373,7 @@
           }
         ],
         "summary": "Materialized navigation tree by set id or key",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
     },
@@ -1525,9 +1484,7 @@
           }
         ],
         "summary": "SERV preview (title/description/robots/social) for an entry",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "seo.read"
       }
     },
@@ -1638,9 +1595,7 @@
           }
         ],
         "summary": "Publish-level SEO validation report for an entry",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "seo.validate"
       }
     },
@@ -1653,10 +1608,7 @@
             "name": "status",
             "required": false,
             "schema": {
-              "enum": [
-                "ACTIVE",
-                "ARCHIVED"
-              ],
+              "enum": ["ACTIVE", "ARCHIVED"],
               "type": "string"
             }
           }
@@ -1765,9 +1717,7 @@
           }
         ],
         "summary": "List form definitions (current version each)",
-        "tags": [
-          "forms"
-        ],
+        "tags": ["forms"],
         "x-permission": "forms.read_definition"
       },
       "post": {
@@ -1916,9 +1866,7 @@
           }
         ],
         "summary": "Create a form definition (version 1; forms.manage_definition)",
-        "tags": [
-          "forms"
-        ],
+        "tags": ["forms"],
         "x-permission": "forms.manage_definition"
       }
     },
@@ -2029,9 +1977,7 @@
           }
         ],
         "summary": "Builder-facing field type corpus with supported properties",
-        "tags": [
-          "forms"
-        ],
+        "tags": ["forms"],
         "x-permission": "forms.read_definition"
       }
     },
@@ -2066,16 +2012,10 @@
                   },
                   "template_key": {
                     "maxLength": 64,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   }
                 },
-                "required": [
-                  "content_type",
-                  "payload"
-                ],
+                "required": ["content_type", "payload"],
                 "type": "object"
               }
             }
@@ -2186,9 +2126,7 @@
           }
         ],
         "summary": "Create entry + first working revision atomically",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.create"
       }
     },
@@ -2327,9 +2265,7 @@
           }
         ],
         "summary": "Open or create the entry's working draft (Admin spec §24)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.edit"
       }
     },
@@ -2462,9 +2398,7 @@
           }
         ],
         "summary": "Homepage binding for the site (navigation.edit; Routing home_entry_id)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.edit"
       }
     },
@@ -2493,9 +2427,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "parent_entry_id"
-                ],
+                "required": ["parent_entry_id"],
                 "type": "object"
               }
             }
@@ -2606,9 +2538,7 @@
           }
         ],
         "summary": "Reparent an entry in the Content Tree (never rewrites routes/navigation)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.edit"
       }
     },
@@ -2729,9 +2659,7 @@
           }
         ],
         "summary": "Canonical route view: current path, history, proposal (PCMS-ADMIN-T011)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
     },
@@ -2852,9 +2780,7 @@
           }
         ],
         "summary": "Stored SEO document for an entry (or null; PCMS-ADMIN-T010)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "seo.read"
       },
       "put": {
@@ -2876,15 +2802,10 @@
                 "additionalProperties": false,
                 "properties": {
                   "document": {
-                    "type": [
-                      "object",
-                      "null"
-                    ]
+                    "type": ["object", "null"]
                   }
                 },
-                "required": [
-                  "document"
-                ],
+                "required": ["document"],
                 "type": "object"
               }
             }
@@ -2995,9 +2916,7 @@
           }
         ],
         "summary": "Save the entry SEO document (seo.edit; canonical override also needs seo.canonical_override)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "seo.edit"
       }
     },
@@ -3118,9 +3037,7 @@
           }
         ],
         "summary": "Delete a WORKING or SEALED revision (cleanup). The currently published revision is undeletable (409 REVISION_PUBLISHED). Audited.",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.edit"
       },
       "get": {
@@ -3239,9 +3156,7 @@
           }
         ],
         "summary": "Full revision record (payload included)",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.read"
       },
       "patch": {
@@ -3270,10 +3185,7 @@
                     "type": "object"
                   }
                 },
-                "required": [
-                  "payload",
-                  "expected_edit_generation"
-                ],
+                "required": ["payload", "expected_edit_generation"],
                 "type": "object"
               }
             }
@@ -3384,9 +3296,7 @@
           }
         ],
         "summary": "Autosave a working revision (optimistic edit generation)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.edit"
       }
     },
@@ -3507,9 +3417,7 @@
           }
         ],
         "summary": "Validate a revision (draft or publish level)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "content.edit"
       }
     },
@@ -3537,10 +3445,7 @@
                     "type": "integer"
                   }
                 },
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": ["object", "null"]
               }
             }
           },
@@ -3650,9 +3555,7 @@
           }
         ],
         "summary": "Seal a working revision (publish-level validation)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "revision.seal"
       }
     },
@@ -3781,9 +3684,7 @@
           }
         ],
         "summary": "Current publication pointer for an entity",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.read"
       }
     },
@@ -3806,9 +3707,7 @@
                     "type": "string"
                   },
                   "entity_type": {
-                    "enum": [
-                      "entry"
-                    ],
+                    "enum": ["entry"],
                     "type": "string"
                   },
                   "expected_generation": {
@@ -3940,9 +3839,7 @@
           }
         ],
         "summary": "Direct single-entity publish with generation CAS. Entries WITHOUT a live public route are rejected (409 PUBLICATION_ROUTE_MISSING) — first publish goes through a changeset with a route_operation.",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.publish"
       }
     },
@@ -3970,10 +3867,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "key",
-                  "title"
-                ],
+                "required": ["key", "title"],
                 "type": "object"
               }
             }
@@ -4084,9 +3978,7 @@
           }
         ],
         "summary": "Create a navigation set (optionally derived)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.edit"
       }
     },
@@ -4111,17 +4003,11 @@
                 "properties": {
                   "at": {
                     "minimum": 0,
-                    "type": [
-                      "integer",
-                      "null"
-                    ]
+                    "type": ["integer", "null"]
                   },
                   "label": {
                     "maxLength": 200,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "parent_item_id": {
                     "nullable": true,
@@ -4129,10 +4015,7 @@
                     "type": "string"
                   },
                   "target": {
-                    "type": [
-                      "object",
-                      "null"
-                    ]
+                    "type": ["object", "null"]
                   },
                   "type": {
                     "maxLength": 32,
@@ -4140,15 +4023,10 @@
                   },
                   "ui_intent": {
                     "maxLength": 16,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   }
                 },
-                "required": [
-                  "type"
-                ],
+                "required": ["type"],
                 "type": "object"
               }
             }
@@ -4259,9 +4137,7 @@
           }
         ],
         "summary": "Insert a navigation item (stable Item ID assigned by the domain)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.edit"
       }
     },
@@ -4382,9 +4258,7 @@
           }
         ],
         "summary": "Seal the working tree of a navigation set (navigation.publish)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.publish"
       }
     },
@@ -4505,9 +4379,7 @@
           }
         ],
         "summary": "Unbind a theme placement",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.edit"
       },
       "put": {
@@ -4533,9 +4405,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "navigation_set_id"
-                ],
+                "required": ["navigation_set_id"],
                 "type": "object"
               }
             }
@@ -4646,9 +4516,7 @@
           }
         ],
         "summary": "Bind a navigation set to a theme placement",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "navigation.edit"
       }
     },
@@ -4759,9 +4627,7 @@
           }
         ],
         "summary": "Placement binding validation (depth/type/required) — PCMS-ADMIN-T013",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
     },
@@ -4809,12 +4675,7 @@
             "name": "origin",
             "required": false,
             "schema": {
-              "enum": [
-                "upload",
-                "import",
-                "stock",
-                "generated"
-              ],
+              "enum": ["upload", "import", "stock", "generated"],
               "type": "string"
             }
           },
@@ -4823,10 +4684,7 @@
             "name": "include_archived",
             "required": false,
             "schema": {
-              "enum": [
-                "true",
-                "false"
-              ],
+              "enum": ["true", "false"],
               "type": "string"
             }
           },
@@ -4952,9 +4810,7 @@
           }
         ],
         "summary": "Bounded, paginated media search (typed filters only)",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.read"
       },
       "post": {
@@ -4987,11 +4843,7 @@
                             "type": "string"
                           }
                         },
-                        "required": [
-                          "media_id",
-                          "preset",
-                          "error"
-                        ],
+                        "required": ["media_id", "preset", "error"],
                         "type": "object"
                       },
                       "minItems": 1,
@@ -5124,9 +4976,7 @@
           }
         ],
         "summary": "Direct binary upload; accepted assets include per-preset derivative failures when present (application/octet-stream + X-PCMS-Filename).",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.write"
       }
     },
@@ -5247,9 +5097,7 @@
           }
         ],
         "summary": "Full media diagnostic view (asset + versions + variants)",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.read"
       },
       "patch": {
@@ -5413,9 +5261,7 @@
           }
         ],
         "summary": "Update descriptive metadata and the image focal point",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.write"
       }
     },
@@ -5460,11 +5306,7 @@
                             "type": "string"
                           }
                         },
-                        "required": [
-                          "media_id",
-                          "preset",
-                          "error"
-                        ],
+                        "required": ["media_id", "preset", "error"],
                         "type": "object"
                       },
                       "minItems": 1,
@@ -5475,11 +5317,7 @@
                       "type": "integer"
                     }
                   },
-                  "required": [
-                    "media_id",
-                    "generated",
-                    "reused"
-                  ],
+                  "required": ["media_id", "generated", "reused"],
                   "type": "object"
                 }
               }
@@ -5586,9 +5424,7 @@
           }
         ],
         "summary": "Generate missing raster image variants for the active theme",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.write"
       }
     },
@@ -5699,9 +5535,7 @@
           }
         ],
         "summary": "Registered media presets",
-        "tags": [
-          "media"
-        ],
+        "tags": ["media"],
         "x-permission": "media.read"
       }
     },
@@ -5727,27 +5561,18 @@
                             "type": "string"
                           },
                           "entity_type": {
-                            "enum": [
-                              "entry"
-                            ],
+                            "enum": ["entry"],
                             "type": "string"
                           },
                           "kind": {
-                            "enum": [
-                              "revision"
-                            ]
+                            "enum": ["revision"]
                           },
                           "revision_id": {
                             "pattern": "^[0-9a-f-]{36}$",
                             "type": "string"
                           }
                         },
-                        "required": [
-                          "kind",
-                          "entity_type",
-                          "entity_id",
-                          "revision_id"
-                        ],
+                        "required": ["kind", "entity_type", "entity_id", "revision_id"],
                         "type": "object"
                       },
                       {
@@ -5758,40 +5583,27 @@
                             "type": "string"
                           },
                           "kind": {
-                            "enum": [
-                              "changeset"
-                            ]
+                            "enum": ["changeset"]
                           }
                         },
-                        "required": [
-                          "kind",
-                          "changeset_id"
-                        ],
+                        "required": ["kind", "changeset_id"],
                         "type": "object"
                       },
                       {
                         "additionalProperties": false,
                         "properties": {
                           "kind": {
-                            "enum": [
-                              "service"
-                            ]
+                            "enum": ["service"]
                           },
                           "locale": {
                             "maxLength": 64,
                             "type": "string"
                           },
                           "template": {
-                            "enum": [
-                              "search",
-                              "error-404"
-                            ]
+                            "enum": ["search", "error-404"]
                           }
                         },
-                        "required": [
-                          "kind",
-                          "template"
-                        ],
+                        "required": ["kind", "template"],
                         "type": "object"
                       }
                     ]
@@ -5801,9 +5613,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "scope"
-                ],
+                "required": ["scope"],
                 "type": "object"
               }
             }
@@ -5914,9 +5724,7 @@
           }
         ],
         "summary": "Create a signed, expiring preview reference (never a public route)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "preview.create"
       }
     },
@@ -5958,9 +5766,7 @@
                     "type": "object"
                   }
                 },
-                "required": [
-                  "values"
-                ],
+                "required": ["values"],
                 "type": "object"
               }
             }
@@ -6063,9 +5869,7 @@
           }
         },
         "summary": "Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23)",
-        "tags": [
-          "forms"
-        ]
+        "tags": ["forms"]
       }
     },
     "/settings/site-identity": {
@@ -6175,9 +5979,7 @@
           }
         ],
         "summary": "Typed site identity (SEO+Theme defaults; seo.read)",
-        "tags": [
-          "discovery"
-        ],
+        "tags": ["discovery"],
         "x-permission": "seo.read"
       },
       "put": {
@@ -6189,15 +5991,10 @@
                 "additionalProperties": false,
                 "properties": {
                   "identity": {
-                    "type": [
-                      "object",
-                      "null"
-                    ]
+                    "type": ["object", "null"]
                   }
                 },
-                "required": [
-                  "identity"
-                ],
+                "required": ["identity"],
                 "type": "object"
               }
             }
@@ -6308,9 +6105,7 @@
           }
         ],
         "summary": "Save the typed site identity (seo.site_settings)",
-        "tags": [
-          "content"
-        ],
+        "tags": ["content"],
         "x-permission": "seo.site_settings"
       }
     },
@@ -6421,9 +6216,7 @@
           }
         ],
         "summary": "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.write"
       }
     },
@@ -6450,9 +6243,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "theme_key"
-                ],
+                "required": ["theme_key"],
                 "type": "object"
               }
             }
@@ -6563,9 +6354,7 @@
           }
         ],
         "summary": "Activate a validated installed theme and switch live rendering (theme.activate)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.activate"
       }
     },
@@ -6583,10 +6372,7 @@
                     },
                     "revision_id": {
                       "format": "uuid",
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "settings_generation": {
                       "type": "integer"
@@ -6704,9 +6490,7 @@
           }
         ],
         "summary": "Actual in-memory theme id/version used by the public renderer (theme.read)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.read"
       }
     },
@@ -6828,9 +6612,7 @@
           }
         ],
         "summary": "Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate). Body: raw ZIP (optional ?expected_generation=N) or JSON {package_ref, expected_generation}.",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.write"
       }
     },
@@ -6847,20 +6629,14 @@
                       "type": "string"
                     },
                     "installed_head_version": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "package_sha256": {
                       "type": "string"
                     },
                     "revision_id": {
                       "format": "uuid",
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "served_version": {
                       "type": "string"
@@ -6981,9 +6757,7 @@
           }
         ],
         "summary": "Descriptor of the package of the theme the renderer ACTUALLY serves: identity, served/installed versions, revision, generation and archive digest (theme.read)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.read"
       }
     },
@@ -7105,9 +6879,7 @@
           }
         ],
         "summary": "Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.read"
       }
     },
@@ -7218,9 +6990,7 @@
           }
         ],
         "summary": "Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.write"
       }
     },
@@ -7341,9 +7111,7 @@
           }
         ],
         "summary": "Validate a staged package without changing the site: identity, version, digest and typed diagnostics; the candidate render stack is built and discarded (theme.validate)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.validate"
       }
     },
@@ -7454,9 +7222,7 @@
           }
         ],
         "summary": "Installed themes in the themes root (theme.read). active = admin_theme_state row; isRenderTarget = the theme themes.renderDir actually serves.",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.read"
       }
     },
@@ -7614,9 +7380,7 @@
           }
         },
         "summary": "Public feed of a theme-declared collection (published cards; page/page_size/tag; rate-limited)",
-        "tags": [
-          "content"
-        ]
+        "tags": ["content"]
       }
     },
     "/search": {
@@ -7801,9 +7565,7 @@
           }
         },
         "summary": "Bounded public site search (PostgreSQL full-text, spec §23)",
-        "tags": [
-          "search"
-        ]
+        "tags": ["search"]
       }
     },
     "/search/status": {
@@ -7913,9 +7675,7 @@
           }
         ],
         "summary": "Search index health, version and reindex progress (§26/§31)",
-        "tags": [
-          "search"
-        ],
+        "tags": ["search"],
         "x-permission": "search.diagnostics"
       }
     },
@@ -7930,20 +7690,14 @@
                   "properties": {
                     "active_revision_id": {
                       "format": "uuid",
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "revisions": {
                       "items": {
                         "properties": {
                           "activated_at": {
                             "format": "date-time",
-                            "type": [
-                              "string",
-                              "null"
-                            ]
+                            "type": ["string", "null"]
                           },
                           "active": {
                             "type": "boolean"
@@ -8080,9 +7834,7 @@
           }
         ],
         "summary": "Retained confirmed theme revisions for this site (active plus newest, at most 100)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.read"
       }
     },
@@ -8105,10 +7857,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "revision_id",
-                  "expected_generation"
-                ],
+                "required": ["revision_id", "expected_generation"],
                 "type": "object"
               }
             }
@@ -8131,10 +7880,7 @@
                         },
                         "revision_id": {
                           "format": "uuid",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "type": ["string", "null"]
                         },
                         "settings_generation": {
                           "type": "integer"
@@ -8255,9 +8001,7 @@
           }
         ],
         "summary": "Live activation of a retained revision, with lifecycle CAS (theme.write + theme.activate)",
-        "tags": [
-          "themes"
-        ],
+        "tags": ["themes"],
         "x-permission": "theme.write"
       }
     },
@@ -8480,9 +8224,7 @@
           }
         ],
         "summary": "Preview old snapshots (theme.read) or remove explicit candidates (theme.write); preserves active, last-good, newest five and recovery revisions",
-        "tags": [
-          "themes"
-        ]
+        "tags": ["themes"]
       }
     },
     "/changesets": {
@@ -8494,12 +8236,7 @@
             "name": "state",
             "required": false,
             "schema": {
-              "enum": [
-                "DRAFT",
-                "READY",
-                "APPLIED",
-                "CANCELLED"
-              ],
+              "enum": ["DRAFT", "READY", "APPLIED", "CANCELLED"],
               "type": "string"
             }
           },
@@ -8625,9 +8362,7 @@
           }
         ],
         "summary": "ChangeSets (bounded page, optional state filter)",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.read"
       },
       "post": {
@@ -8644,9 +8379,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "title"
-                ],
+                "required": ["title"],
                 "type": "object"
               }
             }
@@ -8757,9 +8490,7 @@
           }
         ],
         "summary": "Create a ChangeSet (coordinated release container)",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.plan"
       }
     },
@@ -8791,9 +8522,7 @@
                     "type": "string"
                   },
                   "entity_type": {
-                    "enum": [
-                      "entry"
-                    ],
+                    "enum": ["entry"],
                     "type": "string"
                   },
                   "expected_generation": {
@@ -8801,10 +8530,7 @@
                     "type": "integer"
                   },
                   "intent": {
-                    "enum": [
-                      "PUBLISH",
-                      "UNPUBLISH"
-                    ]
+                    "enum": ["PUBLISH", "UNPUBLISH"]
                   },
                   "route_operation": {
                     "type": "object"
@@ -8814,12 +8540,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "entity_type",
-                  "entity_id",
-                  "intent",
-                  "expected_generation"
-                ],
+                "required": ["entity_type", "entity_id", "intent", "expected_generation"],
                 "type": "object"
               }
             }
@@ -8930,9 +8651,7 @@
           }
         ],
         "summary": "Add a candidate (revision/route operation) to a ChangeSet",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.plan"
       }
     },
@@ -9053,9 +8772,7 @@
           }
         ],
         "summary": "Validate the whole release without applying it",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.plan"
       }
     },
@@ -9176,9 +8893,7 @@
           }
         ],
         "summary": "Apply the release: every pointer/route move in ONE transaction",
-        "tags": [
-          "publication"
-        ],
+        "tags": ["publication"],
         "x-permission": "publication.publish"
       }
     }

@@ -1,17 +1,10 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "nodeEnv",
-    "db"
-  ],
+  "required": ["nodeEnv", "db"],
   "properties": {
     "nodeEnv": {
-      "enum": [
-        "development",
-        "production",
-        "test"
-      ]
+      "enum": ["development", "production", "test"]
     },
     "http": {
       "type": "object",
@@ -52,13 +45,7 @@
     "db": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "host",
-        "port",
-        "database",
-        "user",
-        "sslMode"
-      ],
+      "required": ["host", "port", "database", "user", "sslMode"],
       "properties": {
         "host": {
           "type": "string",
@@ -82,11 +69,7 @@
           "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
         },
         "sslMode": {
-          "enum": [
-            "disable",
-            "require",
-            "verify-full"
-          ]
+          "enum": ["disable", "require", "verify-full"]
         },
         "sslCaFile": {
           "type": "string",
@@ -129,22 +112,14 @@
       "additionalProperties": false,
       "properties": {
         "level": {
-          "enum": [
-            "debug",
-            "info",
-            "warn",
-            "error"
-          ]
+          "enum": ["debug", "info", "warn", "error"]
         }
       }
     },
     "media": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "storageDir",
-        "quarantineDir"
-      ],
+      "required": ["storageDir", "quarantineDir"],
       "properties": {
         "storageDir": {
           "type": "string",
@@ -236,9 +211,7 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "env"
-            ],
+            "required": ["env"],
             "properties": {
               "env": {
                 "type": "string",
@@ -249,9 +222,7 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "file"
-            ],
+            "required": ["file"],
             "properties": {
               "file": {
                 "type": "string",
@@ -363,11 +334,7 @@
           "additionalProperties": false,
           "properties": {
             "policy": {
-              "enum": [
-                "OPTIONAL",
-                "REQUIRED_PRIVILEGED",
-                "REQUIRED_ALL"
-              ]
+              "enum": ["OPTIONAL", "REQUIRED_PRIVILEGED", "REQUIRED_ALL"]
             },
             "stepUpWindowMinutes": {
               "type": "integer",
@@ -444,11 +411,7 @@
       "additionalProperties": false,
       "properties": {
         "environment": {
-          "enum": [
-            "production",
-            "staging",
-            "development"
-          ]
+          "enum": ["production", "staging", "development"]
         }
       }
     },
@@ -465,15 +428,10 @@
     "mail": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "from"
-      ],
+      "required": ["from"],
       "properties": {
         "transport": {
-          "enum": [
-            "smtp",
-            "console"
-          ]
+          "enum": ["smtp", "console"]
         },
         "from": {
           "type": "string",
@@ -490,11 +448,7 @@
           "maximum": 65535
         },
         "mode": {
-          "enum": [
-            "smtps",
-            "starttls",
-            "plain"
-          ]
+          "enum": ["smtps", "starttls", "plain"]
         },
         "usernameSecretRef": {
           "type": "string",
