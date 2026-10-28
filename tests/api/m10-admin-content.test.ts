@@ -207,6 +207,39 @@ test("create_working_draft: idempotent open, then branch from a sealed revision"
   assert.equal(fields.title, "Черновик-тест");
 });
 
+test("create_working_draft refuses to branch from a WORKING source revision", async (t) => {
+  if (!testDatabaseConfigured()) return t.skip("PCMS_TEST_DATABASE_URL is not set");
+  const { app } = await fixture(t);
+  const ctx: OperationContext = apiContextOf(ownerActor());
+  const entry = await draftOf(app, "Published source");
+  await app.revisions.sealRevision({ revisionId: entry.revision_id as never });
+  const unsealedSource = await app.revisions.createWorkingRevision({
+    entityType: "entry",
+    entityId: entry.entry_id as never,
+    payload: { fields: { title: "Unsealed source" }, blocks: null },
+    schemaVersion: "1",
+    locale: "en",
+    actor: { actorClass: "operator", actorId: "test-owner", origin: "human" },
+  });
+
+  await assert.rejects(
+    createWorkingDraft(app, ctx, {
+      entry_id: entry.entry_id,
+      from_revision_id: unsealedSource.id,
+    }),
+    (error: { readonly code?: string; readonly status?: number }) => {
+      assert.equal(error.code, "REVISION_NOT_SEALED");
+      assert.equal(error.status, 409);
+      return true;
+    },
+  );
+  assert.equal(
+    await app.revisions.findWorkingRevision(app.pool, "entry", entry.entry_id as never),
+    null,
+    "rejected source must not create a draft",
+  );
+});
+
 // --- PCMS-ADMIN-T005: canonical rich text conversion for the Admin editor. ---
 test("convert_rich_text: markdown↔AST through the canonical M02 adapter", async (t) => {
   if (!testDatabaseConfigured()) return t.skip("PCMS_TEST_DATABASE_URL is not set");

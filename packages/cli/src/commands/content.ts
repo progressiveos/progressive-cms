@@ -57,6 +57,51 @@ export async function contentCommand(invocation: ContentInvocation): Promise<Cli
   const { args, options, env, cwd } = invocation;
   const [subcommand, operand, ...rest] = args;
   try {
+    if (subcommand === "revision" && (operand === "show" || operand === "current")) {
+      const id = rest[0];
+      if (id === undefined || id.startsWith("--") || rest.length !== 1) {
+        return usage(
+          `cms content revision ${operand} <${operand === "show" ? "revisionId" : "entryId"}> [--json]`,
+        );
+      }
+      const client = requireApi(options, env);
+      if (typeof client === "string") return apiUnconfigured(client);
+      let revisionId = id;
+      let publication: unknown;
+      if (operand === "current") {
+        const result = await apiCall(
+          client,
+          "GET",
+          `/publications/entry/${encodeURIComponent(id)}`,
+        );
+        if (!result.ok) return result.result;
+        const pointer = result.body as { state?: string; current_revision_id?: string | null };
+        if (pointer.state !== "PUBLISHED" || typeof pointer.current_revision_id !== "string") {
+          return failureResult(
+            Object.assign(new Error("entry is not published"), { code: "PUBLICATION_NOT_FOUND" }),
+            options,
+          );
+        }
+        revisionId = pointer.current_revision_id;
+        publication = result.body;
+      }
+      const response = await apiCall(client, "GET", `/revisions/${encodeURIComponent(revisionId)}`);
+      if (!response.ok) return response.result;
+      if (operand === "current") {
+        const revision = response.body as { entity_id?: string; entity_type?: string };
+        if (revision.entity_id !== id || revision.entity_type !== "entry") {
+          return failureResult(
+            Object.assign(new Error("publication points to a different entity"), {
+              code: "PUBLICATION_REVISION_MISMATCH",
+            }),
+            options,
+          );
+        }
+      }
+      return machineResult(
+        operand === "current" ? { publication, revision: response.body } : response.body,
+      );
+    }
     if (subcommand === "schema" && (operand === "list" || operand === undefined)) {
       const render = (
         items: readonly { key: string; version: number; title: string; bodyPolicy: string }[],
@@ -444,6 +489,8 @@ export async function contentCommand(invocation: ContentInvocation): Promise<Cli
         "       cms content patch --revision <revisionId> --file payload.json --expected-generation <N> [--json]",
         "       cms content seal --revision <revisionId> [--expected-generation <N>] --environment <env> --yes [--json]",
         "       cms content preview --entity-id <entryId> --revision <revisionId> [--allow-draft] [--json]",
+        "       cms content revision show <revisionId> [--json]",
+        "       cms content revision current <entryId> [--json]",
         "       cms content revision delete <revisionId> --environment <env> --yes [--json]",
         "",
       ].join("\n"),

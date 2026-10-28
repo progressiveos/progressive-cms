@@ -779,6 +779,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
         },
       },
       async handle(app, ctx, request) {
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         return {
           status: 200,
           body: await searchMediaOp(app, ctx, request.query as Record<string, unknown>),
@@ -797,6 +798,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "media.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { mediaId: string };
         const inspected = await app.mediaDiscovery.inspectAsset(
           stableId(params.mediaId, "mediaId"),
@@ -817,6 +819,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "media.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { sha256: string };
         const sha256 = params.sha256.toLowerCase();
         if (!/^[0-9a-f]{64}$/.test(sha256)) {
@@ -840,6 +843,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "media.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { mediaId: string };
         const assetId = stableId(params.mediaId, "mediaId");
         const asset = await getAsset(app.pool, assetId as never);
@@ -927,6 +931,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
         permission: "media.read",
       },
       async handle(app, ctx, request) {
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         return {
           status: 200,
           body: await getMediaUsageOp(
@@ -1180,6 +1185,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "publication.read");
         const params = request.params as { entryId: string };
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const entryId = stableId(params.entryId, "entryId");
         const page = parsePageRequest(request.query as Record<string, unknown>);
         const fetched = await app.revisions.listRevisions(app.pool, "entry", entryId as never, {
@@ -1217,6 +1223,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "publication.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { revisionId: string };
         const revision = await app.revisions.getRevision(
           app.pool,
@@ -1240,6 +1247,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "publication.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { fromId: string; toId: string };
         const from = await app.revisions.getRevision(
           app.pool,
@@ -1268,6 +1276,7 @@ export function makeDiscoveryRoutes(): ApiRoute[] {
       },
       async handle(app, ctx, request) {
         app.authorize(ctx.actor, "publication.read");
+        app.authorization.authorizeSite(ctx.actor, app.defaultSiteKey);
         const params = request.params as { entityType: string; entityId: string };
         const publication = await app.publications.getPublication(
           app.pool,
@@ -1455,6 +1464,7 @@ function serializeRevision(revision: {
   id: string;
   entityType: string;
   entityId: string;
+  parentRevisionId: string | null;
   revisionNo: number;
   state: string;
   payload: unknown;
@@ -1469,6 +1479,7 @@ function serializeRevision(revision: {
     id: revision.id,
     entity_type: revision.entityType,
     entity_id: revision.entityId,
+    parent_revision_id: revision.parentRevisionId,
     revision_no: revision.revisionNo,
     state: revision.state,
     payload: revision.payload,

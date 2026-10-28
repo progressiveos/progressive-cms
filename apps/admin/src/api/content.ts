@@ -88,6 +88,7 @@ export interface RevisionListItemWire {
 export interface RevisionWire {
   readonly id: string;
   readonly entity_id: string;
+  readonly parent_revision_id?: string | null;
   readonly revision_no: number;
   readonly state: "WORKING" | "SEALED";
   readonly payload: { readonly fields?: Record<string, unknown>; readonly blocks?: unknown };

@@ -2,6 +2,21 @@
 
 Contract owner: Core revisions/publications. REST paths below are relative to `/api/v1`; use the target/authentication headers in [REST API](rest-api.md).
 
+## Inspect the published version and draft base
+
+Use `GET /publications/entry/<entry-id>` to read the current publication pointer, including `current_revision_id` and its publication `generation`. Then use `GET /revisions/<revision-id>` for the full revision. Both reads require `publication.read`; the full revision includes nullable `parent_revision_id`, the revision from which it was branched. This is revision provenance, not the current publication pointer. The bounded revision-history list omits this field, so fetch a revision by id when you need its base.
+
+The CLI provides the same reads:
+
+```sh
+cms content revision current <entry-id> --json
+cms content revision show <revision-id> --json
+```
+
+`current` returns `{ "publication": ..., "revision": ... }`; `show` returns one complete revision. Both require an API context and `publication.read`.
+
+To create a draft from a specific revision, send `POST /entries/<entry-id>/draft` with `{"from_revision_id":"<revision-id>"}` or use `cms content draft --entry <entry-id> --from-revision <revision-id> --json`. This mutation requires `content.edit`; its `base_revision_id` records the chosen source and matches the created revision's `parent_revision_id`. An explicit `from_revision_id` must identify a SEALED revision of that same entry. A WORKING source returns HTTP 409 `REVISION_NOT_SEALED` and creates no revision. Missing and foreign revision ids return the same 404 response, so the API does not disclose whether another entry owns the id. If a WORKING draft already exists and the requested source is valid, Core returns it unchanged (`created: false`): this request does not rebase it. Check its existing base before editing or publishing.
+
 ## Create and edit
 
 `POST /entries` takes a content type, optional accepted template key and `payload`. [The news example](reference/examples/create-news.json) uses a declared RichText body. A parent section can be supplied as `parent_entry_id`. Record `entry_id` and `revision_id`; do not derive ids from routes.
@@ -13,7 +28,7 @@ cms content draft --entry <entry-id> --json
 cms content patch --revision <working-revision-id> --file patch-news.json --expected-generation <generation> --json
 ```
 
-Use [patch-news.json](reference/examples/patch-news.json) as the payload shape. Read the current revision first (`GET /revisions/<id>`) and use its actual `edit_generation`; a successful patch returns the new generation. A 409 conflict means reread/reconcile, not retry with a fabricated generation. `draft` may return an existing WORKING revision; check whether it was created and which base it uses.
+Use [patch-news.json](reference/examples/patch-news.json) as the payload shape. Read the current revision first and use its actual `edit_generation`; a successful patch returns the new generation. A 409 conflict means reread/reconcile, not retry with a fabricated generation.
 
 ## Validate and preview
 

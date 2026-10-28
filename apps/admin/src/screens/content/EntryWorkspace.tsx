@@ -104,6 +104,13 @@ export function EntryWorkspace(props: {
   const canPublish = auth.can("revision.seal") && auth.can("publication.publish");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [needsDraft, setNeedsDraft] = useState(false);
+  const [hasWorking, setHasWorking] = useState(false);
+  const [legacyBaseConfirmation, setLegacyBaseConfirmation] = useState<{
+    revisionId: string;
+    currentRevisionId: string | null;
+    generation: number;
+    reason: "unknown" | "changed";
+  } | null>(null);
   const [conflict, setConflict] = useState<number | null>(null);
   const [tab, setTab] = useState("content");
   const [dirty, setDirty] = useState(false);
@@ -115,6 +122,19 @@ export function EntryWorkspace(props: {
       setOpeningDraft(true);
       setLoadError(null);
       try {
+        if (fromRevisionId !== undefined && !hasWorking) {
+          const publication = await apiGet<{ state: string; current_revision_id: string | null }>(
+            `/publications/entry/${encodeURIComponent(props.entryId)}`,
+          );
+          if (
+            publication.state !== "PUBLISHED" ||
+            publication.current_revision_id !== fromRevisionId
+          ) {
+            toast(t("published_content_changed"), "warning");
+            props.onChanged();
+            return;
+          }
+        }
         const draft = await createWorkingDraft(props.entryId, fromRevisionId);
         const loaded = await getRevision(draft.revision_id);
         setRevision(loaded);
@@ -122,6 +142,7 @@ export function EntryWorkspace(props: {
         setBlocks(loaded.payload.blocks ?? null);
         setGeneration(loaded.edit_generation);
         setNeedsDraft(false);
+        setHasWorking(true);
         setDirty(false);
         setSaveState("idle");
       } catch (caught) {
@@ -134,7 +155,7 @@ export function EntryWorkspace(props: {
         setOpeningDraft(false);
       }
     },
-    [props.entryId],
+    [props.entryId, props.onChanged, hasWorking, toast],
   );
 
   useEffect(() => {
@@ -143,6 +164,8 @@ export function EntryWorkspace(props: {
     setRevision(null);
     setLoadError(null);
     setNeedsDraft(false);
+    setHasWorking(false);
+    setLegacyBaseConfirmation(null);
     setTab("content");
     const run = async () => {
       try {
@@ -156,11 +179,28 @@ export function EntryWorkspace(props: {
         }
         const working = revisions.items.find((item) => item.state === "WORKING");
         if (working === undefined) {
+          let publication: { state: string; current_revision_id: string | null } | null;
+          try {
+            publication = await apiGet(`/publications/entry/${encodeURIComponent(props.entryId)}`);
+          } catch (error) {
+            if (!(error instanceof ApiError && error.status === 404)) throw error;
+            publication = null;
+          }
+          if (publication?.state === "PUBLISHED" && publication.current_revision_id !== null) {
+            const published = await getRevision(publication.current_revision_id);
+            if (cancelled) return;
+            if (published.entity_id !== props.entryId)
+              throw new Error("publication revision mismatch");
+            setRevision(published);
+            setValues((published.payload.fields ?? {}) as Record<string, unknown>);
+            setBlocks(published.payload.blocks ?? null);
+          }
           if (!cancelled) setNeedsDraft(true);
           return;
         }
         const revisionLoaded = await getRevision(working.id);
         if (cancelled) return;
+        setHasWorking(true);
         setRevision(revisionLoaded);
         setValues((revisionLoaded.payload.fields ?? {}) as Record<string, unknown>);
         setBlocks(revisionLoaded.payload.blocks ?? null);
@@ -181,8 +221,33 @@ export function EntryWorkspace(props: {
     };
   }, [props.entryId, props.contentTypeKey]);
 
-  const save = useCallback(async (): Promise<boolean> => {
-    if (revision === null || schema === null) return false;
+  const showPublished = async () => {
+    try {
+      const publication = await apiGet<{ state: string; current_revision_id: string | null }>(
+        `/publications/entry/${encodeURIComponent(props.entryId)}`,
+      );
+      if (publication.state !== "PUBLISHED" || publication.current_revision_id === null) {
+        toast(t("published_content_missing"), "warning");
+        return;
+      }
+      const published = await getRevision(publication.current_revision_id);
+      if (published.entity_id !== props.entryId) throw new Error("publication revision mismatch");
+      setRevision(published);
+      setValues((published.payload.fields ?? {}) as Record<string, unknown>);
+      setBlocks(published.payload.blocks ?? null);
+      setNeedsDraft(true);
+    } catch (error) {
+      toast(
+        error instanceof ApiError
+          ? (errorText(error.code) ?? error.message)
+          : t("entry_open_failed"),
+        "error",
+      );
+    }
+  };
+
+  const save = useCallback(async (): Promise<number | null> => {
+    if (revision === null || schema === null) return null;
     setSaveState("saving");
     try {
       const result = await updateDraft(
@@ -199,55 +264,96 @@ export function EntryWorkspace(props: {
       setSaveState("saved");
       setDirty(false);
       props.onChanged();
-      return true;
+      return result.edit_generation;
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "REVISION_STALE") {
         const detail = caught.details[0] as { current?: number } | undefined;
         setConflict(typeof detail?.current === "number" ? detail.current : generation);
         setSaveState("idle");
-        return false;
+        return null;
       } else {
         setSaveState("error");
         toast(
           errorText(caught instanceof ApiError ? caught.code : "") ?? t("save_failed"),
           "error",
         );
-        return false;
+        return null;
       }
     }
   }, [revision, values, blocks, schema, generation, props, toast]);
 
   const publishingNow = publishing || saveState === "saving";
 
-  const publishNow = useCallback(async () => {
-    if (revision === null || publishingNow) return;
-    setPublishing(true);
-    try {
-      // Owner 2026-10-06: the editor publish button ALWAYS saves the draft
-      // first, then seals and publishes — one action for the human.
-      const saved = await save();
-      if (!saved) return;
-      await apiPost(`/revisions/${revision.id}/seal`, {
-        expected_edit_generation: generation,
-      });
-      const publication = await apiGet(`/publications/entry/${props.entryId}`).catch(() => null);
-      await apiPost("/publications/publish", {
-        entity_type: "entry",
-        entity_id: props.entryId,
-        target_revision_id: revision.id,
-        expected_generation: (publication as { generation?: number } | null)?.generation ?? 0,
-      });
-      toast(t("editor_published"), "success");
-      setDirty(false);
-      props.onChanged();
-    } catch (caught) {
-      // Validation issues ride the envelope details — show them (owner: the
-      // human must SEE what is wrong).
-      toast(describeApiError(caught), "error");
-    } finally {
-      setPublishing(false);
-    }
-  }, [revision, generation, publishingNow, props, toast, save]);
+  const publishNow = useCallback(
+    async (approvedLegacy?: {
+      revisionId: string;
+      currentRevisionId: string | null;
+      generation: number;
+      reason: "unknown" | "changed";
+    }) => {
+      if (revision === null || publishingNow) return;
+      setPublishing(true);
+      try {
+        let publication: {
+          state: string;
+          current_revision_id: string | null;
+          generation: number;
+        } | null;
+        try {
+          publication = await apiGet(`/publications/entry/${props.entryId}`);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+          publication = null;
+        }
+        if (
+          publication?.state === "PUBLISHED" &&
+          (revision.parent_revision_id == null ||
+            publication.current_revision_id !== revision.parent_revision_id)
+        ) {
+          if (approvedLegacy === undefined) {
+            setLegacyBaseConfirmation({
+              revisionId: revision.id,
+              currentRevisionId: publication.current_revision_id,
+              generation: publication.generation,
+              reason: revision.parent_revision_id == null ? "unknown" : "changed",
+            });
+            return;
+          }
+          if (
+            approvedLegacy.revisionId !== revision.id ||
+            approvedLegacy.currentRevisionId !== publication.current_revision_id ||
+            approvedLegacy.generation !== publication.generation
+          ) {
+            toast(t("published_content_changed"), "warning");
+            return;
+          }
+        }
+        // Owner 2026-10-06: the editor publish button ALWAYS saves the draft
+        // first, then seals and publishes — one action for the human.
+        const saved = await save();
+        if (saved === null) return;
+        await apiPost(`/revisions/${revision.id}/seal`, {
+          expected_edit_generation: saved,
+        });
+        await apiPost("/publications/publish", {
+          entity_type: "entry",
+          entity_id: props.entryId,
+          target_revision_id: revision.id,
+          expected_generation: publication?.generation ?? 0,
+        });
+        toast(t("editor_published"), "success");
+        setDirty(false);
+        props.onChanged();
+      } catch (caught) {
+        // Validation issues ride the envelope details — show them (owner: the
+        // human must SEE what is wrong).
+        toast(describeApiError(caught), "error");
+      } finally {
+        setPublishing(false);
+      }
+    },
+    [revision, publishingNow, props, toast, save],
+  );
 
   const reloadRevision = useCallback(async () => {
     if (revision === null) return;
@@ -313,14 +419,48 @@ export function EntryWorkspace(props: {
     return <ErrorPanel message={loadError} onRetry={props.onChanged} />;
   }
   if (needsDraft) {
+    if (schema !== null && revision !== null) {
+      return (
+        <div className="pcms-panel pcms-editor" data-testid="published-content">
+          <h2>{typeof values.title === "string" ? values.title : t("tree_untitled")}</h2>
+          <p>{t("published_content_readonly")}</p>
+          <LocationStrip {...(props.location === undefined ? {} : { location: props.location })} />
+          {auth.can("content.edit") && (
+            <Button
+              variant="primary"
+              disabled={openingDraft}
+              onClick={() => void openDraft(revision.id)}
+            >
+              {hasWorking ? t("published_content_return_draft") : t("needs_draft_action")}
+            </Button>
+          )}
+          <SchemaForm
+            fields={schema.fieldSchema.fields}
+            values={values}
+            onChange={() => {}}
+            disabled
+            skipBlockDocument={schema.bodyPolicy === "block_document"}
+          />
+          {schema.bodyPolicy === "block_document" && (
+            <BlockDocumentEditor
+              value={(blocks ?? { schema_version: 1, blocks: [] }) as never}
+              onChange={() => {}}
+              disabled
+            />
+          )}
+        </div>
+      );
+    }
     return (
       <EmptyState
         title={t("needs_draft_title")}
         hint={t("needs_draft_hint")}
         action={
-          <Button variant="primary" onClick={() => void openDraft()}>
-            {t("needs_draft_action")}
-          </Button>
+          auth.can("content.edit") ? (
+            <Button variant="primary" disabled={openingDraft} onClick={() => void openDraft()}>
+              {t("needs_draft_action")}
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -350,6 +490,9 @@ export function EntryWorkspace(props: {
           </span>
         </div>
         <div className="pcms-editor__actions">
+          {!dirty && auth.can("publication.read") && (
+            <Button onClick={() => void showPublished()}>{t("published_content_show")}</Button>
+          )}
           <span data-testid="save-state" aria-live="polite" className="pcms-editor__save-state">
             {saveState === "saving"
               ? t("saving")
@@ -486,6 +629,34 @@ export function EntryWorkspace(props: {
           }}
         />
       </TabPanel>
+      <Dialog
+        open={legacyBaseConfirmation !== null}
+        onClose={() => setLegacyBaseConfirmation(null)}
+        title={t("legacy_base_title")}
+        footer={
+          <>
+            <Button onClick={() => setLegacyBaseConfirmation(null)}>{t("conflict_stay")}</Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const approved = legacyBaseConfirmation;
+                setLegacyBaseConfirmation(null);
+                if (approved) void publishNow(approved);
+              }}
+            >
+              {t("legacy_base_confirm")}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {t(
+            legacyBaseConfirmation?.reason === "changed"
+              ? "changed_base_warning"
+              : "legacy_base_warning",
+          )}
+        </p>
+      </Dialog>
       <Dialog
         open={conflict !== null}
         onClose={() => setConflict(null)}

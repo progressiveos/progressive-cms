@@ -10,6 +10,7 @@ export function SchemaForm(props: {
   readonly onChange: (values: Record<string, unknown>) => void;
   /** bodyPolicy block_document: the body panel edits payload.blocks instead. */
   readonly skipBlockDocument?: boolean;
+  readonly disabled?: boolean;
 }) {
   const fields =
     props.skipBlockDocument === true
@@ -22,6 +23,7 @@ export function SchemaForm(props: {
       <ObjectFields
         fields={fields}
         values={props.values}
+        {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
         onChange={(values) => props.onChange(values)}
       />
     </div>

@@ -48,6 +48,12 @@ Identity-локаль записи (`entries.locale`) обязана следо�
    `GET /entries/:entryId/route`, `GET /publications/entry/:entryId`,
    `GET /entries/:entryId/revisions`. Record the publication generation: it
    is your CAS baseline.
+   CLI: `cms content revision current <entryId> --json` returns the publication
+   pointer and its full revision; `cms content revision show <revisionId> --json`
+   reads any permitted revision. Both are read-only and require `publication.read`.
+   Preserve the returned `publication.generation` for the publication CAS;
+   do not substitute a freshly fetched generation after editing stale content.
+   If publication changes meanwhile, resolve the conflict before publishing.
 4. **External identity** (recurring sync) —
    `GET /external-identities/:namespace/:externalId?source_hash=<hash>`.
    `HUMAN_EDIT_CONFLICT` → **stop**; never overwrite a human's published

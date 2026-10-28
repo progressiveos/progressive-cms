@@ -270,13 +270,13 @@ export interface MediaViewModelProvider {
     options?: { readonly altOverride?: string | null; readonly decorative?: boolean },
   ) => Promise<MediaAssetPublicViewModel | null>;
   /**
-   * Batch port (feed cards): one assets query + one variants query for many
-   * ids. Archived assets and unknown ids resolve to null — a public card
-   * never surfaces a retired asset. The single-item port keeps its own
-   * semantics (callers there already check archived state).
+   * Bounded batch port: one assets query and one variants query per 500 ids.
+   * Archived assets resolve to null by default, as required by feed cards;
+   * includeArchived preserves the single-item port's existing semantics.
    */
   readonly getAssetViewModels: (
     mediaIds: readonly string[],
+    options?: { readonly includeArchived?: boolean },
   ) => Promise<Record<string, MediaAssetPublicViewModel | null>>;
 }
 
@@ -342,23 +342,29 @@ export function createMediaViewModelProvider(input: {
         }),
       };
     },
-    async getAssetViewModels(mediaIds) {
+    async getAssetViewModels(mediaIds, options) {
       const ids = [...new Set(mediaIds)];
       const out: Record<string, MediaAssetPublicViewModel | null> = {};
       for (const id of ids) out[id] = null;
       if (ids.length === 0) return out;
-      const assets = await getAssetsByIds(input.pool, ids);
-      const live = assets.filter((asset) => asset.archivedAt === null);
-      if (live.length === 0) return out;
-      const variantsByAsset = await listVariantsForAssets(
-        input.pool,
-        live.map((asset) => ({ assetId: asset.id, versionNo: asset.currentVersionNo })),
-      );
-      for (const asset of live) {
-        out[asset.id] = publicViewModel(
-          asset,
-          variantsByAsset.filter((variant) => variant.assetId === asset.id),
+      for (let offset = 0; offset < ids.length; offset += 500) {
+        const assets = await getAssetsByIds(input.pool, ids.slice(offset, offset + 500));
+        const live = assets.filter(
+          (asset) => options?.includeArchived === true || asset.archivedAt === null,
         );
+        if (live.length === 0) continue;
+        const variants = await listVariantsForAssets(
+          input.pool,
+          live.map((asset) => ({ assetId: asset.id, versionNo: asset.currentVersionNo })),
+        );
+        const grouped = new Map<string, MediaVariantRecord[]>();
+        for (const variant of variants) {
+          const group = grouped.get(variant.assetId) ?? [];
+          group.push(variant);
+          grouped.set(variant.assetId, group);
+        }
+        for (const asset of live)
+          out[asset.id] = publicViewModel(asset, grouped.get(asset.id) ?? []);
       }
       return out;
     },

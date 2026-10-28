@@ -484,7 +484,11 @@ const RELATED_BLOCK_TEMPLATE = `<section class="block block-related" data-block=
 /** Container block: renders its children, so nesting is visible in HTML. */
 const CONTAINER_BLOCK_TEMPLATE = `<div class="container" data-block="{{ block.id }}">{{ children }}</div>`;
 
-async function feedFixture(t: import("node:test").TestContext, onQuery?: (sql: string) => void) {
+async function feedFixture(
+  t: import("node:test").TestContext,
+  onQuery?: (sql: string) => void,
+  committed = false,
+) {
   const root = mkdtempSync(join(tmpdir(), "pcms-feed-anywhere-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const themeDir = join(root, "themes", "reference-theme-v1");
@@ -550,7 +554,12 @@ async function feedFixture(t: import("node:test").TestContext, onQuery?: (sql: s
       mediaStorage: new LocalMediaStorage({ root: join(root, "media") }),
       mediaQuarantine: new LocalMediaStorage({ root: join(root, "quarantine") }),
     },
-    onQuery === undefined ? undefined : { onQuery },
+    onQuery === undefined && !committed
+      ? undefined
+      : {
+          ...(onQuery === undefined ? {} : { onQuery }),
+          ...(committed ? { transactionMode: "committed" as const } : {}),
+        },
   );
   const ctx = apiContextOf(ownerActor("feed-anywhere"));
   const site = await app.routes.ensureSite("default");
@@ -2162,4 +2171,142 @@ test("R5: a nested related block renders its cards", { skip }, async (t) => {
   const ids = relatedCardIds(page.body, "e2");
   assert.equal(ids.length, 3, "a nested related block renders its published cards");
   assert.match(page.body, /card__field-title">n-a</);
+});
+
+test("public render batches media references from many image blocks", { skip }, async (t) => {
+  const sql: string[] = [];
+  const { app, pool, ctx, site } = await feedFixture(
+    t,
+    (statement) => sql.push(statement),
+    process.env.PCMS_MEDIA_BASELINE === "1",
+  );
+  await app.domains.addDomainBinding({
+    siteId: site.id,
+    hostname: "media.example",
+    isPrimary: true,
+  });
+  const bytes = await sharp({
+    create: { width: 40, height: 30, channels: 3, background: { r: 1, g: 2, b: 3 } },
+  })
+    .jpeg()
+    .toBuffer();
+  const ids: string[] = [];
+  for (let index = 0; index < 56; index++) {
+    const uploaded = await uploadMediaOp(app, ctx, { bytes, filename: `image-${index}.jpg` });
+    ids.push(uploaded.asset.id);
+  }
+  const blocks = ids.map((id, index) => ({
+    id: `01920000-0000-7000-8000-${index.toString(16).padStart(12, "0")}`,
+    type: "image",
+    schema_version: 1,
+    variant: null,
+    props: { media_id: id, ...(index === 0 ? {} : { alt_override: `image ${index}` }) },
+    children: [],
+  }));
+  const draft = await createDraft(app, ctx, {
+    content_type: "page",
+    payload: { fields: { title: "Media test" }, blocks: { schema_version: 1, blocks } },
+  });
+  await setEntryTemplateOp(app, ctx, { entry_id: draft.entry_id, template_key: "plain_page" });
+  await sealRevision(app, ctx, { revision_id: draft.revision_id });
+  await publishRevision(app, ctx, {
+    entity_type: "entry",
+    entity_id: draft.entry_id,
+    target_revision_id: draft.revision_id,
+    expected_generation: 0,
+  });
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/media-test/",
+    targetType: "entry",
+    targetId: draft.entry_id,
+  });
+  const fastify = createApiFastify(() => "req_perf_media");
+  const { registerSiteRoute } = await import("../../apps/web/src/site.js");
+  await registerSiteRoute(fastify, { application: app });
+  t.after(() => fastify.close());
+  assert.equal((await fastify.inject({ method: "GET", url: "/media-test/" })).statusCode, 200);
+  sql.length = 0;
+  const response = await fastify.inject({ method: "GET", url: "/media-test/" });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /alt="image 55"/);
+  assert.equal((response.body.match(/class="block block-image/g) ?? []).length, 56);
+  const mediaSql = sql.filter((statement) => /FROM media_(assets|variants)/i.test(statement));
+  assert.ok(mediaSql.length <= 10, `56 media assets used ${mediaSql.length} queries`);
+  t.diagnostic(`56 assets: ${sql.length} total SQL, ${mediaSql.length} media SQL`);
+  if (process.env.PCMS_MEDIA_BASELINE === "1") {
+    const baseline = createApiFastify(() => "req_perf_media_baseline");
+    const path = "../../apps/web/src/site-perf-baseline.js";
+    const oldSite = await import(path);
+    await oldSite.registerSiteRoute(baseline, { application: app });
+    t.after(() => baseline.close());
+    await baseline.inject({ method: "GET", url: "/media-test/" });
+    sql.length = 0;
+    const oldResponse = await baseline.inject({ method: "GET", url: "/media-test/" });
+    const oldMedia = sql.filter((statement) => /FROM media_(assets|variants)/i.test(statement));
+    assert.equal(oldResponse.statusCode, 200);
+    assert.equal(oldResponse.body, response.body);
+    t.diagnostic(
+      `baseline 56 assets: ${sql.length} total SQL, ${oldMedia.length} media SQL; HTML identical`,
+    );
+    await fastify.listen({ host: "127.0.0.1", port: 0 });
+    await baseline.listen({ host: "127.0.0.1", port: 0 });
+    const { monitorEventLoopDelay, performance } = await import("node:perf_hooks");
+    for (const [name, server] of [
+      ["baseline", baseline],
+      ["batch", fastify],
+    ] as const) {
+      const address = server.server.address();
+      assert.ok(address && typeof address === "object");
+      const url = `http://127.0.0.1:${address.port}/media-test/`;
+      for (const concurrency of [1, 5, 10, 20, 40]) {
+        const delay = monitorEventLoopDelay({ resolution: 10 });
+        delay.enable();
+        let maxWaiting = 0;
+        const timer = setInterval(() => {
+          maxWaiting = Math.max(maxWaiting, pool.stats().waitingCount);
+        }, 2);
+        const times: number[] = [];
+        const started = performance.now();
+        for (let round = 0; round < 3; round++)
+          await Promise.all(
+            Array.from({ length: concurrency }, async () => {
+              const start = performance.now();
+              const result = await fetch(url);
+              times.push(performance.now() - start);
+              assert.equal(result.status, 200);
+              await result.arrayBuffer();
+            }),
+          );
+        const elapsed = performance.now() - started;
+        clearInterval(timer);
+        delay.disable();
+        times.sort((a, b) => a - b);
+        t.diagnostic(
+          `${name} n=${concurrency} samples=${times.length} p50=${times[Math.floor((times.length - 1) * 0.5)]?.toFixed(2)}ms p95=${times[Math.ceil(times.length * 0.95) - 1]?.toFixed(2)}ms rps=${((times.length * 1000) / elapsed).toFixed(2)} wait=${maxWaiting} event-loop-p95=${(delay.percentile(95) / 1e6).toFixed(2)}ms errors=0`,
+        );
+      }
+      const start = performance.now();
+      let count = 0;
+      await Promise.all(
+        Array.from({ length: 5 }, async () => {
+          while (performance.now() - start < 3000) {
+            const result = await fetch(url);
+            assert.equal(result.status, 200);
+            await result.arrayBuffer();
+            count++;
+          }
+        }),
+      );
+      t.diagnostic(
+        `${name} steady n=5 rps=${((count * 1000) / (performance.now() - start)).toFixed(2)} responses=${count} errors=0`,
+      );
+    }
+  }
+  await app.pool.query("UPDATE media_assets SET alt_default = 'updated asset alt' WHERE id = $1", [
+    ids[0],
+  ]);
+  const refreshed = await fastify.inject({ method: "GET", url: "/media-test/" });
+  assert.equal(refreshed.statusCode, 200);
+  assert.match(refreshed.body, /alt="updated asset alt"/);
 });

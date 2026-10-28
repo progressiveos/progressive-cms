@@ -35,8 +35,8 @@ import { isStableId } from "@pcms/core";
 import {
   createMediaPresetRegistry as createAssetPresetRegistry,
   createMediaViewModelProvider,
-  getAsset,
-  listVariants,
+  getAssetsByIds,
+  listVariantsForAssets,
   variantPublicUrl,
 } from "@pcms/media";
 import type { NavigationItemNode } from "@pcms/navigation";
@@ -412,6 +412,8 @@ export async function registerSiteRoute(
     generation: number;
     directory: string;
     pinAssets: boolean;
+    media: Map<string, import("@pcms/media").MediaAssetPublicViewModel | null>;
+    feedMedia: Map<string, import("@pcms/media").MediaAssetPublicViewModel | null>;
   }>();
   application.themeDir = activeThemeDir;
   application.themeDiscovery = createThemeDiscovery(activeThemeDir, discoveryOptions);
@@ -541,6 +543,8 @@ export async function registerSiteRoute(
           generation: appliedThemeGeneration,
           directory: activeThemeDir,
           pinAssets: true,
+          media: new Map(),
+          feedMedia: new Map(),
         };
       })
       .then(
@@ -656,6 +660,16 @@ export async function registerSiteRoute(
     registry: application.mediaPresets,
   });
 
+  async function requestMedia(ids: readonly string[], includeArchived: boolean) {
+    const snapshot = requestTheme.getStore();
+    const cache = includeArchived ? snapshot?.media : snapshot?.feedMedia;
+    const unique = [...new Set(ids)];
+    const missing = unique.filter((id) => !cache?.has(id));
+    const loaded = await mediaProvider.getAssetViewModels(missing, { includeArchived });
+    for (const id of missing) cache?.set(id, loaded[id] ?? null);
+    return Object.fromEntries(unique.map((id) => [id, cache?.get(id) ?? loaded[id] ?? null]));
+  }
+
   async function buildMediaScope(
     stack: ThemeStack,
     ids: ReadonlySet<string>,
@@ -677,9 +691,10 @@ export async function registerSiteRoute(
         presets: Record<string, ImageModel | null>;
       }
     > = {};
+    const assets = await requestMedia([...ids], true);
     for (const id of ids) {
-      const asset = await mediaProvider.getAssetViewModel(id);
-      if (asset === null) continue;
+      const asset = assets[id];
+      if (asset == null) continue;
       const viewModel: MediaAssetViewModel = asset;
       const presets: Record<string, ImageModel | null> = {};
       for (const preset of stack.themePresets.listPresets()) {
@@ -1045,7 +1060,7 @@ export async function registerSiteRoute(
     return {
       blocks: application.blocks,
       contentType: (key: string) => application.contentTypes.getLatestContentType(key),
-      assets: (ids: readonly string[]) => mediaProvider.getAssetViewModels(ids),
+      assets: (ids: readonly string[]) => requestMedia(ids, false),
       presets: stack.manifest.media_presets,
     };
   }
@@ -1737,23 +1752,31 @@ export async function registerSiteRoute(
         return document;
       },
     );
-    for (const id of richTextIds) {
-      const asset = await getAsset(application.pool, id as never);
-      if (asset === null || asset.archivedAt !== null || asset.kind !== "image") continue;
-      const version = revision.mediaVersions?.[id] ?? asset.currentVersionNo;
-      const variants = await listVariants(application.pool, id, version);
-      const image = variants.find((variant) => variant.presetId === "richtext-v1");
-      if (image)
+    const richIds = [...richTextIds];
+    for (let offset = 0; offset < richIds.length; offset += 500) {
+      const assets = (
+        await getAssetsByIds(application.pool, richIds.slice(offset, offset + 500))
+      ).filter((asset) => asset.archivedAt === null && asset.kind === "image");
+      const variants = await listVariantsForAssets(
+        application.pool,
+        assets.map((asset) => ({
+          assetId: asset.id,
+          versionNo: revision.mediaVersions?.[asset.id] ?? asset.currentVersionNo,
+        })),
+      );
+      for (const image of variants) {
+        if (image.presetId !== "richtext-v1" || imageSources.has(image.assetId)) continue;
         imageSources.set(
-          id,
+          image.assetId,
           variantPublicUrl({
-            assetId: id,
-            versionNo: version,
+            assetId: image.assetId,
+            versionNo: image.versionNo,
             presetId: image.presetId,
             variantKey: image.variantKey,
             format: image.format,
           }),
         );
+      }
     }
     const richTextOptions = { imageSource: (id: string) => imageSources.get(id) ?? null };
     const blocksHtml =

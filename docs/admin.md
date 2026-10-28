@@ -13,10 +13,15 @@ An authoring agent uses a separate Service Account access token with task-specif
 ## Human continuation test
 
 1. Log in over the supported HTTPS origin and open a news entry created by the agent. Verify title/body/media are declared editable fields, not hidden blocks or pre-rendered HTML.
-2. Open/create the WORKING revision. Change a paragraph, use formatting and save. Confirm revision state and edit generation advance.
-3. Insert a table, enter header/data cells, add a row and save. The persisted document must be RichText AST v2. Preview must show the table through Core rendering.
-4. Replace the optional principal image with a Media Library asset; preserve meaningful alt text. A missing image remains a valid state where the Content Type allows it.
-5. Preview the exact revision, resolve validation issues, seal and publish using the role’s authorized actions. Verify the actual public page and search projection.
+2. If the entry has a publication but no working draft, confirm Admin shows the published version as read-only. Use **View published version** to inspect the current publication; use **Create draft** to edit it. If a draft already exists, **Return to draft** opens that same draft.
+3. Change a paragraph, use formatting and save. Confirm revision state and edit generation advance. If starting from the published version, verify the new draft uses that version as its base.
+4. Insert a table, enter header/data cells, add a row and save. The persisted document must be RichText AST v2. Preview must show the table through Core rendering.
+5. Replace the optional principal image with a Media Library asset; preserve meaningful alt text. A missing image remains a valid state where the Content Type allows it.
+6. Preview the exact revision, resolve validation issues, seal and publish using the role’s authorized actions. Verify the actual public page and search projection.
+
+Before publishing, Admin compares the draft's `parent_revision_id` with the current publication pointer. If the published version changed after the draft was created, or an older draft has no recorded base, Admin asks the editor to compare versions and explicitly confirm. Cancel to keep reviewing; after confirmation Admin rereads the pointer and stops if it changed again. Publication generation checks still apply.
+
+When Admin creates a draft from the displayed published version, it uses that exact SEALED revision as the base. The REST contract also rejects a WORKING source with HTTP 409 `REVISION_NOT_SEALED`; missing and foreign revision ids receive the same 404. See [the draft-base API workflow](publishing.md#inspect-the-published-version-and-draft-base).
 
 No database edits, private helper scripts or repeat visits from the building agent may be required. If a type/template mismatch prevents editing or sealing, the site has not passed handoff even if its first public render looked correct.
 

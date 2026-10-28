@@ -1628,6 +1628,21 @@ export async function createWorkingDraft(
       },
     );
   }
+  let sourceRevision: RevisionRecord | undefined;
+  if (input.from_revision_id !== undefined) {
+    const source = await app.revisions.getRevision(app.pool, input.from_revision_id as never);
+    if (source === null || source.entityId !== entry.id || source.entityType !== "entry") {
+      throw new ApiError("API_NOT_FOUND", "source revision not found for this entry", {
+        status: 404,
+      });
+    }
+    if (source.state !== "SEALED") {
+      throw new ApiError("REVISION_NOT_SEALED", "source revision is not sealed", {
+        status: 409,
+      });
+    }
+    sourceRevision = source;
+  }
   // The working revision follows the ENTRY identity locale (not the
   // "default" sentinel): a locale-scoped entry must be edited and sealed in
   // its own locale, or seal fails with LOCALE_MISMATCH (privacy-page case,
@@ -1647,20 +1662,17 @@ export async function createWorkingDraft(
     };
   }
   let payload: { fields?: unknown; blocks?: unknown } = {};
-  if (input.from_revision_id !== undefined) {
-    const source = await app.revisions.getRevision(app.pool, input.from_revision_id as never);
-    if (source === null || source.entityId !== entry.id || source.entityType !== "entry") {
-      throw new ApiError("API_NOT_FOUND", "source revision not found for this entry", {
-        status: 404,
-      });
-    }
-    payload = source.payload as { fields?: unknown; blocks?: unknown };
+  let parentRevisionId: StableId | undefined;
+  if (sourceRevision !== undefined) {
+    payload = sourceRevision.payload as { fields?: unknown; blocks?: unknown };
+    parentRevisionId = sourceRevision.id;
   } else {
     const latest = (
       await app.revisions.listRevisions(app.pool, "entry", entry.id as never, { limit: 1 })
     )[0];
     if (latest !== undefined && latest !== null) {
       payload = latest.payload as { fields?: unknown; blocks?: unknown };
+      parentRevisionId = latest.id;
     }
   }
   const actor = revisionActorFrom(ctx);
@@ -1671,6 +1683,7 @@ export async function createWorkingDraft(
     schemaVersion: String(loaded.version),
     locale: entry.locale,
     actor,
+    ...(parentRevisionId === undefined ? {} : { parentRevisionId }),
   });
   return {
     revision_id: revision.id,

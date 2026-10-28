@@ -363,6 +363,7 @@ Environment keys read directly: none; shared loaders may read configuration/envi
 Command/operand selection conditions:
 ```javascript
 operand === "apply"
+operand === "current"
 operand === "delete"
 operand === "list"
 operand === "show"
@@ -381,6 +382,12 @@ subcommand === "validate"
 HTTP client calls (source expressions, including complete request construction):
 ```javascript
 apiCall(
+          client,
+          "GET",
+          `/publications/entry/${encodeURIComponent(id)}`
+        )
+
+apiCall(
         client,
         "DELETE",
         `/revisions/${encodeURIComponent(revisionId)}`
@@ -389,6 +396,8 @@ apiCall(
 apiCall(client, "GET", "/discovery/content/types")
 
 apiCall(client, "GET", `/discovery/content/types/${key}`)
+
+apiCall(client, "GET", `/revisions/${encodeURIComponent(revisionId)}`)
 
 apiCall(client, "PATCH", `/revisions/${flags.revision}`, {
         payload: document.payload ?? document,

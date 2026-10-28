@@ -66,6 +66,7 @@ export function RepeaterEditor(props: FieldControlProps) {
                 <ObjectFields
                   fields={itemFields}
                   values={row}
+                  disabled={disabled}
                   onChange={(values) => update(rows.with(index, values as RepeaterItem))}
                 />
               </div>

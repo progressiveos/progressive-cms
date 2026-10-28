@@ -27,7 +27,12 @@ export function ObjectControl(props: FieldControlProps) {
   ) as Record<string, unknown>;
   return (
     <fieldset className="pcms-fieldset" disabled={props.disabled}>
-      <ObjectFields fields={fields} values={values} onChange={props.onChange} />
+      <ObjectFields
+        fields={fields}
+        values={values}
+        onChange={props.onChange}
+        {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
+      />
     </fieldset>
   );
 }
@@ -36,6 +41,7 @@ export function ObjectFields(props: {
   readonly fields: Readonly<Record<string, FieldSchemaWire>>;
   readonly values: Readonly<Record<string, unknown>>;
   readonly onChange: (values: Record<string, unknown>) => void;
+  readonly disabled?: boolean;
 }) {
   return (
     <>
@@ -45,6 +51,7 @@ export function ObjectFields(props: {
           fieldId={fieldId}
           schema={schema}
           value={props.values[fieldId]}
+          {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
           onChange={(value) => props.onChange({ ...props.values, [fieldId]: value })}
         />
       ))}
@@ -59,6 +66,7 @@ export function BoundField(props: {
   readonly schema: FieldSchemaWire;
   readonly value: unknown;
   readonly onChange: (value: unknown) => void;
+  readonly disabled?: boolean;
 }) {
   const Control = fieldControlFor(props.schema.type);
   return (
@@ -72,6 +80,7 @@ export function BoundField(props: {
         value={props.value}
         onChange={props.onChange}
         fieldId={props.fieldId}
+        {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
       />
     </Field>
   );
@@ -95,6 +104,7 @@ export function ListControl(props: FieldControlProps) {
             <ListRow
               schema={itemSchema}
               value={item}
+              {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
               onChange={(value) => update(items.with(index, value))}
             />
           </div>
@@ -125,9 +135,17 @@ function ListRow(props: {
   readonly schema: FieldSchemaWire;
   readonly value: unknown;
   readonly onChange: (value: unknown) => void;
+  readonly disabled?: boolean;
 }) {
   const Control = fieldControlFor(props.schema.type);
-  return <Control schema={props.schema} value={props.value} onChange={props.onChange} />;
+  return (
+    <Control
+      schema={props.schema}
+      value={props.value}
+      onChange={props.onChange}
+      {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
+    />
+  );
 }
 
 /* --- media / relation: StableId references via pickers --- */
