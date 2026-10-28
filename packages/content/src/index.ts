@@ -76,6 +76,7 @@ export {
   type EntriesService,
   type EntryKind,
   type EntryRecord,
+  resolveNavigationEntries,
 } from "./entries/entries.js";
 export { ContentError } from "./errors.js";
 export {

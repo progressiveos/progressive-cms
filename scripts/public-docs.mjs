@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -458,7 +459,13 @@ export function checkDocs(
   }
   const resources = generatedResources(docs);
   for (const [path, content] of resources) {
-    if (!existsSync(join(docs, path)) || !readFileSync(join(docs, path)).equals(content))
+    const actual = join(docs, path);
+    if (
+      !existsSync(actual) ||
+      !(path.endsWith(".json")
+        ? isDeepStrictEqual(json(actual), JSON.parse(content.toString("utf8")))
+        : readFileSync(actual).equals(content))
+    )
       fail(`Stale generated Skill resource: ${path}; run sync`);
   }
   for (const path of files(join(docs, skillPath, "assets"))) {

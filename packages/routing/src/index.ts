@@ -26,6 +26,7 @@ export {
   type CanonicalUrlService,
   createCanonicalUrlService,
   localizedRoutePath,
+  resolveNavigationPaths,
 } from "./canonical.js";
 export {
   createRoutingDiscovery,

@@ -161,6 +161,7 @@ export {
   type PublicationOperationInput,
   type PublicationOperationResult,
   type PublicationService,
+  publishedEntryIds,
   publishedEventTypeFor,
   type UnpublishInput,
 } from "./publication.js";

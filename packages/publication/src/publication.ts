@@ -76,6 +76,27 @@ const PUBLICATION_COLUMNS = `entity_type, entity_id, context, state, current_rev
   current_payload_hash, generation, first_published_at, published_at, modified_at,
   unpublished_at, updated_at`;
 
+/** Batch equivalent of getPublishedRevision's visibility checks, for navigation. */
+export async function publishedEntryIds(
+  executor: DbClient,
+  ids: readonly string[],
+  context: string,
+): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (let offset = 0; offset < ids.length; offset += 500) {
+    const result = await executor.query<{ entity_id: string }>(
+      `SELECT p.entity_id FROM publications p
+       JOIN revisions r ON r.id = p.current_revision_id
+         AND r.entity_type = p.entity_type AND r.entity_id = p.entity_id
+       WHERE p.entity_type = 'entry' AND p.context = $2 AND p.state = 'PUBLISHED'
+         AND p.entity_id = ANY($1::uuid[]) AND r.state = 'SEALED' AND r.payload_hash IS NOT NULL`,
+      [ids.slice(offset, offset + 500), context],
+    );
+    for (const row of result.rows) found.add(row.entity_id);
+  }
+  return found;
+}
+
 export interface PublicationOperationInput {
   readonly entityType: string;
   readonly entityId: StableId;

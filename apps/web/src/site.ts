@@ -30,7 +30,8 @@ import {
   recoverThemeLifecycle,
 } from "@pcms/api";
 import { validateBlockDocument } from "@pcms/blocks";
-import { collectRichTextMediaIds, type FieldSchema } from "@pcms/content";
+import { collectRichTextMediaIds, type FieldSchema, resolveNavigationEntries } from "@pcms/content";
+import { isStableId } from "@pcms/core";
 import {
   createMediaPresetRegistry as createAssetPresetRegistry,
   createMediaViewModelProvider,
@@ -40,8 +41,8 @@ import {
 } from "@pcms/media";
 import type { NavigationItemNode } from "@pcms/navigation";
 import { createNavigationDiscovery, deriveBreadcrumbs } from "@pcms/navigation";
-import { PREVIEW_RESPONSE_HEADERS } from "@pcms/publication";
-import { localizedRoutePath } from "@pcms/routing";
+import { PREVIEW_RESPONSE_HEADERS, publishedEntryIds } from "@pcms/publication";
+import { localizedRoutePath, resolveNavigationPaths } from "@pcms/routing";
 import { serializeJsonLd } from "@pcms/seo";
 import {
   applyTokenOverrides,
@@ -727,13 +728,50 @@ export async function registerSiteRoute(
     contextLocale: string,
     homeEntryId: string | null,
   ): Promise<Record<string, { items: NavigationItemViewModel[] }>> {
+    const bindings = await application.placements.listBindings();
+    const trees = new Map<string, readonly NavigationItemNode[]>();
+    for (const binding of bindings) {
+      if (!trees.has(binding.navigationSetId))
+        trees.set(
+          binding.navigationSetId,
+          await application.navigation.materializeTree(binding.navigationSetId),
+        );
+    }
+    const ids = new Set<string>();
+    const collect = (nodes: readonly NavigationItemNode[]) => {
+      for (const node of nodes) {
+        if (node.type === "internal_entry") {
+          const id = readTargetString(node.target, "entry_id");
+          if (id !== null && isStableId(id)) {
+            ids.add(id);
+            collect(node.children);
+          }
+        } else if (node.type === "group") {
+          collect(node.children);
+        }
+      }
+    };
+    for (const tree of trees.values()) collect(tree);
+    const targets = await resolveNavigationEntries(application.pool, [...ids], contextLocale);
+    const targetIds = [...new Set(targets.values())];
+    const published = await publishedEntryIds(application.pool, targetIds, contextLocale);
+    const paths = await resolveNavigationPaths(application.pool, targetIds, {
+      locale: contextLocale === "default" ? "x-default" : contextLocale,
+    }).catch(() => new Map<string, string>());
+    const resolvedTrees = new Map<string, NavigationItemViewModel[]>();
     const assignments: { placement: string; items: NavigationItemViewModel[] }[] = [];
-    for (const binding of await application.placements.listBindings()) {
-      const tree = await application.navigation.materializeTree(binding.navigationSetId);
-      assignments.push({
-        placement: binding.placementKey,
-        items: await toViewModels(tree, contextLocale, homeEntryId),
-      });
+    for (const binding of bindings) {
+      let items = resolvedTrees.get(binding.navigationSetId);
+      if (items === undefined) {
+        items = await toViewModels(
+          trees.get(binding.navigationSetId)!,
+          contextLocale,
+          homeEntryId,
+          { targets, published, paths },
+        );
+        resolvedTrees.set(binding.navigationSetId, items);
+      }
+      assignments.push({ placement: binding.placementKey, items });
     }
     const scope: Record<string, { items: NavigationItemViewModel[] }> = {};
     for (const contract of stack.placements.listPlacements()) {
@@ -901,6 +939,7 @@ export async function registerSiteRoute(
     nodes: readonly NavigationItemNode[],
     contextLocale: string,
     homeEntryId: string | null,
+    resolved: { targets: Map<string, string>; published: Set<string>; paths: Map<string, string> },
   ): Promise<NavigationItemViewModel[]> {
     const results: NavigationItemViewModel[] = [];
     for (const node of nodes) {
@@ -913,7 +952,7 @@ export async function registerSiteRoute(
           results.push({
             type: "group",
             title,
-            items: await toViewModels(node.children, contextLocale, homeEntryId),
+            items: await toViewModels(node.children, contextLocale, homeEntryId, resolved),
           });
           break;
         case "internal_entry": {
@@ -924,50 +963,28 @@ export async function registerSiteRoute(
           // request locale when one exists. No translation → the item drops
           // instead of silently linking to another language (validation
           // reports the same gap in the Admin).
-          let targetId = entryId;
-          if (contextLocale !== "default") {
-            const translation = await application.entries
-              .findTranslation(entryId as never, contextLocale)
-              .catch(() => null);
-            if (translation === null) break;
-            targetId = translation.id;
-          }
-          const target = await application.entries.findEntry(targetId as never);
-          if (target === null || target.archivedAt !== null) break;
-          // Public navigation never exposes routed but unpublished targets.
-          const published = await application.pool.withTransaction((tx) =>
-            application.publications.getPublishedRevision(
-              tx,
-              "entry",
-              targetId as never,
-              contextLocale,
-            ),
-          );
-          if (published === null) break;
+          if (!isStableId(entryId) && contextLocale === "default")
+            await application.entries.findEntry(entryId as never);
+          const targetId = resolved.targets.get(entryId);
+          if (targetId === undefined || !resolved.published.has(targetId)) break;
           // The home binding is site-level; its translations have no route
           // row — their locale-scoped home URL is prefix + "/".
           const homeTranslation = homeEntryId !== null && targetId === homeEntryId;
           // Unrouted entries drop out loudly in placement validation; the
           // renderer must not fail a whole page for one broken menu item.
-          const resolved =
+          const hrefResult =
             homeTranslation && homeEntryId !== null
               ? await homeHref(contextLocale).catch(() => null)
-              : await application.actionUrls
-                  .resolveAction(
-                    {
-                      kind: "internal_entry",
-                      entry_id: targetId,
-                    },
-                    { locale: contextLocale === "default" ? "x-default" : contextLocale },
-                  )
-                  .catch(() => null);
-          if (resolved === null || resolved.kind !== "url") break;
+              : resolved.paths.has(targetId)
+                ? { kind: "url" as const, href: resolved.paths.get(targetId)! }
+                : null;
+          if (hrefResult === null) break;
           results.push({
             type: "internal_entry",
             entry_id: targetId,
             title,
-            href: resolved.href,
-            items: await toViewModels(node.children, contextLocale, homeEntryId),
+            href: hrefResult.href,
+            items: await toViewModels(node.children, contextLocale, homeEntryId, resolved),
           });
           break;
         }

@@ -9,9 +9,10 @@ import { Client, Pool } from "pg";
 export async function rollbackApiFixture(
   t: { after: (fn: () => Promise<void>) => void },
   input: Omit<Parameters<typeof createApplicationServices>[0], "pool">,
-  options?: { transactionMode: "committed" },
+  options?: { transactionMode?: "committed"; onQuery?: (sql: string) => void },
 ) {
-  if (options?.transactionMode === "committed") return committedApiFixture(t, input);
+  if (options?.transactionMode === "committed")
+    return committedApiFixture(t, input, options.onQuery);
   const client = new Client({ connectionString: process.env.PCMS_TEST_DATABASE_URL });
   await client.connect();
   t.after(async () => {
@@ -44,6 +45,7 @@ export async function rollbackApiFixture(
   let pendingQuery: Promise<unknown> = Promise.resolve();
   const connection: DbClient = {
     async query(sql, params) {
+      options?.onQuery?.(sql);
       const next = pendingQuery.then(() => client.query(sql, params ? [...params] : []));
       pendingQuery = next.catch(() => {});
       const result = await next;
@@ -85,6 +87,7 @@ export async function rollbackApiFixture(
 async function committedApiFixture(
   t: { after: (fn: () => Promise<void>) => void },
   input: Omit<Parameters<typeof createApplicationServices>[0], "pool">,
+  onQuery?: (sql: string) => void,
 ) {
   const schema = `pcms_test_${randomUUID().replaceAll("-", "")}`;
   const admin = new Client({ connectionString: process.env.PCMS_TEST_DATABASE_URL });
@@ -113,6 +116,7 @@ async function committedApiFixture(
   }
   const pool: DbPool = {
     async query(sql, params) {
+      onQuery?.(sql);
       const r = await driver.query(sql, params ? [...params] : []);
       return { rows: r.rows, rowCount: r.rowCount };
     },
@@ -122,6 +126,7 @@ async function committedApiFixture(
       try {
         return await work({
           async query(sql, params) {
+            onQuery?.(sql);
             const r = await client.query(sql, params ? [...params] : []);
             return { rows: r.rows, rowCount: r.rowCount };
           },

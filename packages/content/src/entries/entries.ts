@@ -166,6 +166,36 @@ export interface EntriesService {
   ): Promise<{ readonly id: EntryId; readonly locale: string } | null>;
 }
 
+/** Resolve navigation targets with the same translation and archive rules as findTranslation/findEntry. */
+export async function resolveNavigationEntries(
+  executor: DbClient | DbPool,
+  ids: readonly string[],
+  locale: string,
+): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>();
+  for (let offset = 0; offset < ids.length; offset += 500) {
+    const chunk = ids.slice(offset, offset + 500);
+    const result =
+      locale === "default"
+        ? await executor.query<{ source_id: string; target_id: string }>(
+            `SELECT id AS source_id, id AS target_id FROM entries
+           WHERE id = ANY($1::uuid[]) AND archived_at IS NULL`,
+            [chunk],
+          )
+        : await executor.query<{ source_id: string; target_id: string }>(
+            `SELECT source.id AS source_id, target.id AS target_id FROM entries source
+           JOIN LATERAL (
+             SELECT id FROM entries
+             WHERE COALESCE(translation_group_id, id) = COALESCE(source.translation_group_id, source.id)
+               AND locale = $2 AND archived_at IS NULL ORDER BY id LIMIT 1
+           ) target ON true WHERE source.id = ANY($1::uuid[])`,
+            [chunk, locale],
+          );
+    for (const row of result.rows) resolved.set(row.source_id, row.target_id);
+  }
+  return resolved;
+}
+
 export function createEntriesService(pool: DbPool): EntriesService {
   async function findEntryWithinTx(
     executor: DbClient | DbPool,

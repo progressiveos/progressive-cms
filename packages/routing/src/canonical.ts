@@ -9,7 +9,7 @@ import type { DomainBindingRecord } from "./domains.js";
 import { createDomainService, type DomainService } from "./domains.js";
 import { RoutingError } from "./errors.js";
 import type { RouteRecord } from "./routes.js";
-import { createRouteService, type RouteService } from "./routes.js";
+import { createRouteService, type RouteService, type SiteRecord } from "./routes.js";
 
 export interface CanonicalUrlOptions {
   /** Site the entry belongs to; defaults to the site of `hostname`, or the
@@ -63,34 +63,76 @@ export function localizedRoutePath(route: {
   return `/${subtag.toLowerCase()}${route.path}`;
 }
 
+async function resolveContext(
+  routes: RouteService,
+  domains: DomainService,
+  options?: CanonicalUrlOptions,
+): Promise<{
+  site: SiteRecord;
+  locale: string;
+  binding: DomainBindingRecord;
+}> {
+  if (options?.hostname !== undefined) {
+    const binding = await domains.resolveHost(options.hostname);
+    const site = await routes.getSite(binding.siteId);
+    return { site, locale: options.locale ?? site.defaultLocale, binding };
+  }
+  const site =
+    options?.siteId !== undefined
+      ? await routes.getSite(options.siteId)
+      : await routes.findSiteByKey("default");
+  if (site === null) throw new RoutingError("SITE_NOT_FOUND", `no default site`);
+  const bindings = await domains.listDomainBindings(site.id);
+  const binding = bindings.find((d) => d.isPrimary);
+  if (binding === undefined) {
+    throw new RoutingError("DOMAIN_NOT_ALLOWED", `site has no primary domain binding`, {
+      details: { site_id: site.id },
+    });
+  }
+  return { site, locale: options?.locale ?? site.defaultLocale, binding };
+}
+
+/** Resolve canonical paths in bounded batches with the same site/binding priority as individual calls. */
+export async function resolveNavigationPaths(
+  pool: DbPool,
+  ids: readonly string[],
+  options?: CanonicalUrlOptions,
+): Promise<Map<string, string>> {
+  const paths = new Map<string, string>();
+  if (ids.length === 0) return paths;
+  for (const id of ids) {
+    if (!isStableId(id)) {
+      throw new RoutingError("NAV_TARGET_MISSING", `invalid entry id`, {
+        details: { entry_id: id },
+      });
+    }
+  }
+  const routes = createRouteService(pool);
+  const domains = createDomainService(pool);
+  const { site, locale, binding } = await resolveContext(routes, domains, options);
+  for (let offset = 0; offset < ids.length; offset += 500) {
+    const chunk = ids.slice(offset, offset + 500);
+    if (site.homeEntryId !== null && chunk.includes(site.homeEntryId))
+      paths.set(site.homeEntryId, "/");
+    const result = await pool.query<{ target_id: string; path: string; locale: string }>(
+      `SELECT requested.id AS target_id, route.path, route.locale
+       FROM unnest($1::uuid[]) AS requested(id)
+       JOIN LATERAL (SELECT path, locale FROM routes
+         WHERE target_id = requested.id::text AND site_id = $2 AND locale = $3
+           AND retired_at IS NULL AND is_canonical
+           AND (domain_binding_id = $4 OR domain_binding_id IS NULL)
+         ORDER BY (domain_binding_id = $4) DESC LIMIT 1) route ON true`,
+      [chunk, site.id, locale, binding.id],
+    );
+    for (const row of result.rows)
+      if (row.target_id !== site.homeEntryId) paths.set(row.target_id, localizedRoutePath(row));
+  }
+  return paths;
+}
+
 export function createCanonicalUrlService(pool: DbPool): CanonicalUrlService {
   const routes: RouteService = createRouteService(pool);
   const domains: DomainService = createDomainService(pool);
-
-  async function resolveContext(options?: CanonicalUrlOptions): Promise<{
-    siteId: string;
-    locale: string;
-    binding: DomainBindingRecord;
-  }> {
-    if (options?.hostname !== undefined) {
-      const binding = await domains.resolveHost(options.hostname);
-      const site = await routes.getSite(binding.siteId);
-      return { siteId: site.id, locale: options.locale ?? site.defaultLocale, binding };
-    }
-    const site =
-      options?.siteId !== undefined
-        ? await routes.getSite(options.siteId)
-        : await routes.findSiteByKey("default");
-    if (site === null) throw new RoutingError("SITE_NOT_FOUND", `no default site`);
-    const bindings = await domains.listDomainBindings(site.id);
-    const binding = bindings.find((d) => d.isPrimary);
-    if (binding === undefined) {
-      throw new RoutingError("DOMAIN_NOT_ALLOWED", `site has no primary domain binding`, {
-        details: { site_id: site.id },
-      });
-    }
-    return { siteId: site.id, locale: options?.locale ?? site.defaultLocale, binding };
-  }
 
   return {
     async findRouteByEntry(entryId, options) {
@@ -99,8 +141,8 @@ export function createCanonicalUrlService(pool: DbPool): CanonicalUrlService {
           details: { entry_id: entryId },
         });
       }
-      const { siteId, locale, binding } = await resolveContext(options);
-      const site = await routes.getSite(siteId);
+      const { site, locale, binding } = await resolveContext(routes, domains, options);
+      const siteId = site.id;
       if (site.homeEntryId === entryId) {
         return { route: null, isHome: true, binding };
       }

@@ -1,7 +1,7 @@
 # Versioning and compatibility
 
 <!-- cms-current:start -->
-Current Progressive CMS release: **RC33** (`1.0.0-rc.33`).
+Current Progressive CMS release: **RC34** (`1.0.0-rc.34`).
 <!-- cms-current:end -->
 
 This guide describes the current product behavior. Historical release introductions below explain provenance; they do not identify the current product or the installed server. Skill versions and minimum compatible CMS ranges are independent of the release label. The authoritative ranges live in the supplied Skill/theme manifests, not copied version numbers in instructions.

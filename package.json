@@ -1,6 +1,6 @@
 {
   "name": "progressive-cms",
-  "version": "1.0.0-rc.33",
+  "version": "1.0.0-rc.34",
   "private": true,
   "type": "module",
   "description": "Progressive CMS \u2014 modular monolith CMS platform (see docs/specs/INDEX.md)",

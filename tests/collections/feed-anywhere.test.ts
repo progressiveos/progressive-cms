@@ -32,6 +32,391 @@ import { testDatabaseConfigured } from "../helpers/testdb.js";
 
 const skip = testDatabaseConfigured() ? false : "PCMS_TEST_DATABASE_URL is not set";
 
+test("SQL fixture observer includes transaction control in both modes", { skip }, async (t) => {
+  for (const mode of ["rollback", "committed"] as const) {
+    await t.test(mode, async (child) => {
+      const statements: string[] = [];
+      const options =
+        mode === "committed"
+          ? {
+              transactionMode: "committed" as const,
+              onQuery: (sql: string) => statements.push(sql),
+            }
+          : { onQuery: (sql: string) => statements.push(sql) };
+      const { pool } = await rollbackApiFixture(child, {}, options);
+      statements.length = 0;
+      await pool.withTransaction((client) => client.query("SELECT 1"));
+      const transaction = statements.filter((sql) =>
+        /^(BEGIN|COMMIT|SAVEPOINT |RELEASE SAVEPOINT |SELECT 1$)/.test(sql),
+      );
+      assert.equal(transaction.length, 3);
+      assert.match(transaction[0]!, mode === "committed" ? /^BEGIN$/ : /^SAVEPOINT /);
+      assert.equal(transaction[1], "SELECT 1");
+      assert.match(transaction[2]!, mode === "committed" ? /^COMMIT$/ : /^RELEASE SAVEPOINT /);
+    });
+  }
+});
+
+test("localized navigation follows publish, unpublish and rollback immediately", {
+  skip,
+}, async (t) => {
+  const { app, ctx, site, themeDir } = await feedFixture(t);
+  writeFileSync(
+    join(themeDir, "templates", "plain_page.liquid"),
+    `<!doctype html><html><head>{{ head_html }}</head><body>{% for item in nav["header.primary"].items %}<a href="{{ item.href }}">{{ item.title }}</a>{% endfor %}</body></html>`,
+  );
+  await app.domains.addDomainBinding({
+    siteId: site.id,
+    hostname: "locale.example",
+    isPrimary: true,
+  });
+  await app.localization.update({
+    enabled: true,
+    defaultLocale: "ru-RU",
+    locales: ["ru-RU", "en-US"],
+    updatedBy: "test",
+  });
+  async function draft(title: string, locale?: string) {
+    const result = await createDraft(app, ctx, {
+      content_type: "page",
+      ...(locale === undefined ? {} : { locale }),
+      payload: { fields: { title }, blocks: { schema_version: 1, blocks: [] } },
+    });
+    await setEntryTemplateOp(app, ctx, { entry_id: result.entry_id, template_key: "plain_page" });
+    return result;
+  }
+  async function publish(item: Awaited<ReturnType<typeof draft>>, context?: string) {
+    await sealRevision(app, ctx, { revision_id: item.revision_id });
+    await publishRevision(app, ctx, {
+      entity_type: "entry",
+      entity_id: item.entry_id,
+      target_revision_id: item.revision_id,
+      expected_generation: 0,
+      ...(context === undefined ? {} : { context }),
+    });
+  }
+  const page = await draft("Page");
+  const target = await draft("Target");
+  await publish(page);
+  await publish(target);
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/page/",
+    targetType: "entry",
+    targetId: page.entry_id,
+  });
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/target/",
+    targetType: "entry",
+    targetId: target.entry_id,
+  });
+  const enPage = await draft("Page EN", "en-US");
+  const enTarget = await draft("Target EN", "en-US");
+  await app.pool.query("UPDATE entries SET translation_group_id = $2 WHERE id = $1", [
+    enPage.entry_id,
+    page.entry_id,
+  ]);
+  await app.pool.query("UPDATE entries SET translation_group_id = $2 WHERE id = $1", [
+    enTarget.entry_id,
+    target.entry_id,
+  ]);
+  await publish(enPage, "en-US");
+  await sealRevision(app, ctx, { revision_id: enTarget.revision_id });
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/page/",
+    locale: "en-US",
+    targetType: "entry",
+    targetId: enPage.entry_id,
+  });
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/target/",
+    locale: "en-US",
+    targetType: "entry",
+    targetId: enTarget.entry_id,
+  });
+  const set = await app.navigation.createSet({ key: "localized-nav", title: "Localized" });
+  await app.navigation.insertItem({
+    setId: set.id,
+    type: "internal_entry",
+    label: "Target link",
+    target: { entry_id: target.entry_id },
+  });
+  await app.placements.bindPlacement({ placementKey: "header.primary", navigationSetId: set.id });
+  const fastify = createApiFastify(() => "req_localized_nav");
+  const { registerSiteRoute } = await import("../../apps/web/src/site.js");
+  await registerSiteRoute(fastify, { application: app });
+  t.after(() => fastify.close());
+  const before = await fastify.inject({ method: "GET", url: "/en/page/" });
+  assert.equal(before.statusCode, 200, before.body);
+  assert.doesNotMatch(before.body, /Target link/);
+  await publishRevision(app, ctx, {
+    entity_type: "entry",
+    entity_id: enTarget.entry_id,
+    target_revision_id: enTarget.revision_id,
+    context: "en-US",
+    expected_generation: 0,
+  });
+  const published = await fastify.inject({
+    method: "GET",
+    url: "/en/page/",
+    headers: { cookie: "irrelevant=test" },
+  });
+  assert.equal(published.statusCode, 200, published.body);
+  assert.match(published.body, /href="\/en\/target\/">Target link/);
+  assert.equal(
+    published.body.match(/<head>[\s\S]*?<\/head>/)?.[0],
+    before.body.match(/<head>[\s\S]*?<\/head>/)?.[0],
+  );
+  await app.publications.unpublish({
+    entityType: "entry",
+    entityId: enTarget.entry_id as never,
+    context: "en-US",
+    expectedGeneration: 1,
+    actor: { actorClass: "operator", actorId: "test" },
+    reason: "test",
+  });
+  const unpublished = await fastify.inject({ method: "GET", url: "/en/page/" });
+  assert.doesNotMatch(unpublished.body, /Target link/);
+  await app.publications.rollback({
+    entityType: "entry",
+    entityId: enTarget.entry_id as never,
+    context: "en-US",
+    expectedGeneration: 2,
+    targetRevisionId: enTarget.revision_id as never,
+    actor: { actorClass: "operator", actorId: "test" },
+  });
+  const rolledBack = await fastify.inject({ method: "GET", url: "/en/page/" });
+  assert.match(rolledBack.body, /href="\/en\/target\/">Target link/);
+  const defaultPage = await fastify.inject({ method: "GET", url: "/page/" });
+  assert.match(defaultPage.body, /href="\/target\/">Target link/);
+});
+
+test("public navigation resolves many published links with bounded SQL", { skip }, async (t) => {
+  let queryCount = 0;
+  const { app, pool, ctx, site, themeDir } = await feedFixture(t, () => queryCount++);
+  writeFileSync(
+    join(themeDir, "templates", "plain_page.liquid"),
+    `{% for item in nav["header.primary"].items %}<a href="{{ item.href }}">{{ item.title }}</a>{% endfor %}{% for item in nav["header.mobile"].items %}<span>{{ item.title }}</span>{% endfor %}`,
+  );
+  await app.domains.addDomainBinding({
+    siteId: site.id,
+    hostname: "example.test",
+    isPrimary: true,
+  });
+  const set = await app.navigation.createSet({ key: "perf-nav", title: "Performance" });
+  await app.placements.bindPlacement({ placementKey: "header.primary", navigationSetId: set.id });
+  await app.placements.bindPlacement({ placementKey: "header.mobile", navigationSetId: set.id });
+  const entries: string[] = [];
+  for (let i = 0; i < 200; i++) {
+    const draft = await createDraft(app, ctx, {
+      content_type: "page",
+      payload: { fields: { title: `Page ${i}` }, blocks: { schema_version: 1, blocks: [] } },
+    });
+    await setEntryTemplateOp(app, ctx, { entry_id: draft.entry_id, template_key: "plain_page" });
+    await sealRevision(app, ctx, { revision_id: draft.revision_id });
+    await publishRevision(app, ctx, {
+      entity_type: "entry",
+      entity_id: draft.entry_id,
+      target_revision_id: draft.revision_id,
+      expected_generation: 0,
+    });
+    await app.routes.activateRoute({
+      siteId: site.id,
+      path: `/perf-${i}/`,
+      targetType: "entry",
+      targetId: draft.entry_id,
+    });
+    entries.push(draft.entry_id);
+  }
+  await app.navigation.insertItem({
+    setId: set.id,
+    type: "internal_entry",
+    label: "Link 0",
+    target: { entry_id: entries[0]! },
+  });
+  const { resolveNavigationPaths } = await import("@pcms/routing");
+  await resolveNavigationPaths(pool, [entries[0]!], { locale: "x-default" });
+  const fastify = createApiFastify(() => "req_perf_nav");
+  const { registerSiteRoute } = await import("../../apps/web/src/site.js");
+  await registerSiteRoute(fastify, { application: app });
+  t.after(() => fastify.close());
+  const counter = {
+    get count() {
+      return queryCount;
+    },
+    reset() {
+      queryCount = 0;
+    },
+  };
+  const warm = await fastify.inject({ method: "GET", url: "/perf-0/" });
+  assert.equal(warm.statusCode, 200, warm.body);
+  counter.reset();
+  const first = await fastify.inject({ method: "GET", url: "/perf-0/" });
+  const one = counter.count;
+  assert.equal(first.statusCode, 200, first.body);
+  for (let i = 1; i < entries.length; i++) {
+    await app.navigation.insertItem({
+      setId: set.id,
+      type: "internal_entry",
+      label: `Link ${i}`,
+      target: { entry_id: entries[i]! },
+    });
+  }
+  counter.reset();
+  const many = await fastify.inject({ method: "GET", url: "/perf-0/" });
+  const manyCount = counter.count;
+  assert.equal(many.statusCode, 200);
+  assert.match(many.body, /href="\/perf-199\/">Link 199/);
+  assert.match(many.body, /<span>Link 199<\/span>/);
+  assert.ok(manyCount - one <= 10, `navigation SQL grew from ${one} to ${manyCount}`);
+  t.diagnostic(`one link: ${one} SQL; 200 links in two placements: ${manyCount} SQL`);
+
+  const draft = await createDraft(app, ctx, {
+    content_type: "page",
+    payload: { fields: { title: "Draft target" }, blocks: { schema_version: 1, blocks: [] } },
+  });
+  const sealed = await createDraft(app, ctx, {
+    content_type: "page",
+    payload: { fields: { title: "Sealed target" }, blocks: { schema_version: 1, blocks: [] } },
+  });
+  await sealRevision(app, ctx, { revision_id: sealed.revision_id });
+  for (const [entryId, label] of [
+    [draft.entry_id, "Private working"],
+    [sealed.entry_id, "Private sealed"],
+  ] as const) {
+    await app.routes.activateRoute({
+      siteId: site.id,
+      path: `/${label.replace(" ", "-").toLowerCase()}/`,
+      targetType: "entry",
+      targetId: entryId,
+    });
+    await app.navigation.insertItem({
+      setId: set.id,
+      type: "internal_entry",
+      label,
+      target: { entry_id: entryId },
+    });
+  }
+  await app.publications.unpublish({
+    entityType: "entry",
+    entityId: entries[1] as never,
+    expectedGeneration: 1,
+    actor: { actorClass: "operator", actorId: "test" },
+    reason: "test",
+  });
+  await archiveEntry(app, ctx, { entry_id: entries[4]! });
+  await app.routes.retireRoute({ siteId: site.id, path: "/perf-2/" });
+  await app.routes.activateRoute({
+    siteId: site.id,
+    path: "/new-perf-2/",
+    targetType: "entry",
+    targetId: entries[2]!,
+  });
+  const changed = await fastify.inject({ method: "GET", url: "/perf-0/" });
+  assert.equal(changed.statusCode, 200, changed.body);
+  assert.doesNotMatch(changed.body, /Link 1<\/a>/);
+  assert.doesNotMatch(changed.body, /Link 4<\/a>/);
+  assert.doesNotMatch(changed.body, /Private working|Private sealed/);
+  assert.match(changed.body, /href="\/new-perf-2\/">Link 2/);
+  if (process.env.PCMS_NAV_BROWSER === "1") {
+    const { chromium } = await import("@playwright/test");
+    const address = await fastify.listen({ host: "127.0.0.1", port: 0 });
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      for (const viewport of [
+        { width: 1280, height: 800 },
+        { width: 390, height: 844 },
+      ]) {
+        await page.setViewportSize(viewport);
+        const response = await page.goto(`${address}/perf-0/`);
+        assert.equal(response?.status(), 200);
+        assert.equal(await page.locator('a[href="/new-perf-2/"]').textContent(), "Link 2");
+        assert.equal(await page.getByText("Private working").count(), 0);
+        assert.equal(await page.getByText("Private sealed").count(), 0);
+      }
+    } finally {
+      await browser.close();
+    }
+  }
+
+  const other = await app.routes.ensureSite("other", "Other");
+  await app.domains.addDomainBinding({
+    siteId: other.id,
+    hostname: "other.example.test",
+    isPrimary: true,
+  });
+  await app.routes.activateRoute({
+    siteId: other.id,
+    path: "/other-2/",
+    targetType: "entry",
+    targetId: entries[2]!,
+  });
+  const [firstSite, secondSite] = await Promise.all([
+    resolveNavigationPaths(pool, [entries[2]!], { hostname: "example.test", locale: "x-default" }),
+    resolveNavigationPaths(pool, [entries[2]!], {
+      hostname: "other.example.test",
+      locale: "x-default",
+    }),
+  ]);
+  assert.equal(firstSite.get(entries[2]!), "/new-perf-2/");
+  assert.equal(secondSite.get(entries[2]!), "/other-2/");
+  const oldAction = await app.actionUrls.resolveAction(
+    { kind: "internal_entry", entry_id: entries[2]! },
+    { hostname: "example.test", locale: "x-default" },
+  );
+  assert.deepEqual(oldAction, { kind: "url", href: firstSite.get(entries[2]!) });
+  assert.equal(
+    (await resolveNavigationPaths(pool, [entries[2]!], { hostname: "example.test", locale: "fr" }))
+      .size,
+    0,
+  );
+  await pool.query("UPDATE entries SET locale = 'en', translation_group_id = $2 WHERE id = $1", [
+    entries[3],
+    entries[2],
+  ]);
+  const { resolveNavigationEntries } = await import("@pcms/content");
+  const translated = await resolveNavigationEntries(pool, [entries[2]!], "en");
+  assert.equal(translated.get(entries[2]!), entries[3]);
+  assert.equal((await app.entries.findTranslation(entries[2] as never, "en"))?.id, entries[3]);
+  assert.equal((await resolveNavigationEntries(pool, [entries[2]!], "fr")).size, 0);
+
+  const { publishedEntryIds } = await import("@pcms/publication");
+  const visible = await publishedEntryIds(pool, entries, "default");
+  for (const id of entries) {
+    const previous = await app.publications.getPublishedRevision(
+      pool,
+      "entry",
+      id as never,
+      "default",
+    );
+    assert.equal(visible.has(id), previous !== null, `published visibility for ${id}`);
+  }
+  assert.equal(visible.has(entries[1]!), false);
+  assert.equal(visible.has(entries[4]!), true); // Archive is enforced by the entry resolver.
+  assert.equal((await resolveNavigationEntries(pool, [entries[4]!], "default")).size, 0);
+  await app.routes.setHomeEntry(site.id, entries[0]!);
+  assert.equal(
+    (
+      await resolveNavigationPaths(pool, [entries[0]!], {
+        hostname: "example.test",
+        locale: "x-default",
+      })
+    ).get(entries[0]!),
+    "/",
+  );
+  const { newStableId } = await import("@pcms/core");
+  const boundedIds = [...entries, ...Array.from({ length: 301 }, () => newStableId())];
+  counter.reset();
+  await resolveNavigationEntries(pool, boundedIds, "default");
+  await publishedEntryIds(pool, boundedIds, "default");
+  await resolveNavigationPaths(pool, boundedIds, { hostname: "example.test", locale: "x-default" });
+  assert.ok(counter.count <= 10, `501 ids used ${counter.count} SQL statements`);
+});
+
 /** Reference types with the two card fields the feed options need. */
 const DEFINITIONS = (() => {
   const parsed = JSON.parse(
@@ -99,7 +484,7 @@ const RELATED_BLOCK_TEMPLATE = `<section class="block block-related" data-block=
 /** Container block: renders its children, so nesting is visible in HTML. */
 const CONTAINER_BLOCK_TEMPLATE = `<div class="container" data-block="{{ block.id }}">{{ children }}</div>`;
 
-async function feedFixture(t: import("node:test").TestContext) {
+async function feedFixture(t: import("node:test").TestContext, onQuery?: (sql: string) => void) {
   const root = mkdtempSync(join(tmpdir(), "pcms-feed-anywhere-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const themeDir = join(root, "themes", "reference-theme-v1");
@@ -155,14 +540,18 @@ async function feedFixture(t: import("node:test").TestContext) {
   writeFileSync(join(themeDir, "blocks", "related_content.liquid"), RELATED_BLOCK_TEMPLATE);
   writeFileSync(join(themeDir, "blocks", "test-container.liquid"), CONTAINER_BLOCK_TEMPLATE);
 
-  const { app, pool } = await rollbackApiFixture(t, {
-    themeDir,
-    mediaPresets: manifest.media_presets as readonly unknown[],
-    contentTypeDefinitions: DEFINITIONS as never,
-    seoEnvironment: "production",
-    mediaStorage: new LocalMediaStorage({ root: join(root, "media") }),
-    mediaQuarantine: new LocalMediaStorage({ root: join(root, "quarantine") }),
-  });
+  const { app, pool } = await rollbackApiFixture(
+    t,
+    {
+      themeDir,
+      mediaPresets: manifest.media_presets as readonly unknown[],
+      contentTypeDefinitions: DEFINITIONS as never,
+      seoEnvironment: "production",
+      mediaStorage: new LocalMediaStorage({ root: join(root, "media") }),
+      mediaQuarantine: new LocalMediaStorage({ root: join(root, "quarantine") }),
+    },
+    onQuery === undefined ? undefined : { onQuery },
+  );
   const ctx = apiContextOf(ownerActor("feed-anywhere"));
   const site = await app.routes.ensureSite("default");
   return { app, pool, ctx, site, themeDir };
