@@ -111,6 +111,16 @@ test("content golden path: documented flag syntax parses against a real API", as
   const createdBody = JSON.parse(created.stdout) as { entry_id: string; revision_id: string };
   const entryId = createdBody.entry_id;
 
+  // --from-revision is a branch from immutable history, so seal the initial
+  // revision before using it as the source of a new working draft.
+  const sourceSealed = await command({
+    args: ["seal", "--revision", createdBody.revision_id],
+    options: { json: true, yes: true, environment: "prod" },
+    env,
+    cwd: process.cwd(),
+  });
+  assert.equal(sourceSealed.exitCode, 0, sourceSealed.stderr || sourceSealed.stdout);
+
   // The exact reported repro shape: draft --entry <id> --json (global flag
   // after the subcommand), then the documented --from-revision variation.
   const opened = await run(["draft", "--entry", entryId], true);
