@@ -154,6 +154,43 @@
             "minimum": 1,
             "maximum": 100
           },
+          "section": {
+            "type": "string",
+            "enum": ["self", "subtree", "site"]
+          },
+          "order": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["by"],
+            "properties": {
+              "by": {
+                "type": "string",
+                "enum": ["published_at", "field"]
+              },
+              "direction": {
+                "type": "string",
+                "enum": ["asc", "desc"]
+              },
+              "field": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "by": {
+                      "const": "field"
+                    }
+                  }
+                },
+                "then": {
+                  "required": ["field"]
+                }
+              }
+            ]
+          },
           "templates": {
             "type": "array",
             "maxItems": 50,
@@ -233,6 +270,30 @@
           "type": "string",
           "pattern": "^templates/[a-z0-9][a-z0-9._/-]{0,127}\\.liquid$"
         },
+        "markdown_file": {
+          "type": "string",
+          "pattern": "^templates/[a-z0-9][a-z0-9._/-]{0,127}\\.liquid$"
+        },
+        "markdown_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "dependencies"],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "dependencies": {
+              "type": "array",
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_*]+)*$"
+              }
+            }
+          }
+        },
         "accepts_content_types": {
           "type": "array",
           "minItems": 1,
@@ -292,7 +353,17 @@
         "editor_selectable": {
           "type": "boolean"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["markdown_contract"]
+          },
+          "then": {
+            "required": ["markdown_file"]
+          }
+        }
+      ]
     },
     "component": {
       "type": "object",
@@ -316,7 +387,7 @@
       "properties": {
         "block": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{0,63}@[1-9]\\d*$"
+          "pattern": "^(?=.{1,200}@)(?:[a-z][a-z0-9_]{0,63}|[a-z][a-z0-9-]{0,62}(?:\\.[a-z0-9][a-z0-9-]{0,62}){0,9})@[1-9]\\d*$"
         },
         "file": {
           "type": "string",

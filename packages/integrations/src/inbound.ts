@@ -118,15 +118,16 @@ export function createInboundService(deps: {
     readonly payloadHash: string;
     readonly eventType: string | null;
     readonly rawBody: string;
+    readonly headers?: Readonly<Record<string, string>>;
     readonly status: InboundRecord["status"];
     readonly errorCode: string | null;
   }): Promise<InboundRecord> {
     const result = await pool.query<InboundRow>(
       `INSERT INTO integration_inbound_event
          (id, source_type, source_id, provider_event_id, dedup_key, payload_hash,
-          event_type, raw_payload, status, error_code, received_at)
+          event_type, raw_payload, status, error_code, received_at, transport)
        VALUES ($1, $2, $3, $4, $5, $6, $7,
-               CASE WHEN $10::boolean THEN $8::jsonb ELSE NULL END, $9, $11, $12)
+               CASE WHEN $10::boolean THEN $8::jsonb ELSE NULL END, $9, $11, $12, $13::jsonb)
        ON CONFLICT (source_type, source_id, dedup_key) DO NOTHING
        RETURNING *`,
       [
@@ -137,11 +138,28 @@ export function createInboundService(deps: {
         input.dedupKey,
         input.payloadHash,
         input.eventType,
-        input.rawBody,
+        (() => {
+          try {
+            JSON.parse(input.rawBody);
+            return input.rawBody;
+          } catch {
+            return JSON.stringify(input.rawBody);
+          }
+        })(),
         input.status,
         true,
         input.errorCode,
         clock.now(),
+        input.headers === undefined
+          ? null
+          : JSON.stringify({
+              raw_body: input.rawBody,
+              headers: Object.fromEntries(
+                Object.entries(input.headers).filter(
+                  ([name]) => !["cookie", "proxy-authorization"].includes(name.toLowerCase()),
+                ),
+              ),
+            }),
       ],
     );
     if (result.rows.length === 1) return rowToRecord(result.rows[0]!);
@@ -211,9 +229,29 @@ export function createInboundService(deps: {
         );
       }
       const payloadHash = createHash("sha256").update(input.rawBody).digest("hex");
+      const usedHeaders = new Set<string>();
+      const trackedHeaders = new Proxy(input.headers, {
+        get(target, property, receiver) {
+          if (typeof property === "string") usedHeaders.add(property.toLowerCase());
+          return Reflect.get(target, property, receiver);
+        },
+        has(target, property) {
+          if (typeof property === "string") usedHeaders.add(property.toLowerCase());
+          return Reflect.has(target, property);
+        },
+        getOwnPropertyDescriptor(target, property) {
+          if (typeof property === "string") usedHeaders.add(property.toLowerCase());
+          return Reflect.getOwnPropertyDescriptor(target, property);
+        },
+        ownKeys(target) {
+          for (const name of Reflect.ownKeys(target))
+            if (typeof name === "string") usedHeaders.add(name.toLowerCase());
+          return Reflect.ownKeys(target);
+        },
+      });
       try {
         await contract.verify(
-          { headers: input.headers, rawBody: input.rawBody },
+          { headers: trackedHeaders, rawBody: input.rawBody },
           { sourceId: input.sourceId },
         );
       } catch (error) {
@@ -225,7 +263,7 @@ export function createInboundService(deps: {
         );
       }
       const providerEventId = contract.extractEventId({
-        headers: input.headers,
+        headers: trackedHeaders,
         rawBody: input.rawBody,
       });
       const dedupKey =
@@ -250,7 +288,7 @@ export function createInboundService(deps: {
       let status: InboundRecord["status"] = "RECEIVED";
       let errorCode: string | null = null;
       try {
-        const parsed = contract.parse({ headers: input.headers, rawBody: input.rawBody });
+        const parsed = contract.parse({ headers: trackedHeaders, rawBody: input.rawBody });
         eventType = parsed.eventType;
         normalized = parsed.normalized;
       } catch (error) {
@@ -266,14 +304,23 @@ export function createInboundService(deps: {
         payloadHash,
         eventType,
         rawBody: input.rawBody,
+        ...(input.sourceType === "payment_provider"
+          ? {
+              headers: Object.fromEntries(
+                Object.entries(input.headers).filter(([name]) =>
+                  usedHeaders.has(name.toLowerCase()),
+                ),
+              ),
+            }
+          : {}),
         status,
         errorCode,
       });
       // Opportunistic bounded retention (spec §25): old raw payloads are
       // nulled; metadata/history remains. One indexed DELETE-free UPDATE.
       await pool.query(
-        `UPDATE integration_inbound_event SET raw_payload = NULL
-         WHERE raw_payload IS NOT NULL
+        `UPDATE integration_inbound_event SET raw_payload = NULL, transport = NULL
+         WHERE (raw_payload IS NOT NULL OR transport IS NOT NULL)
            AND received_at < $1::timestamptz - ($2 || ' days')::interval`,
         [clock.now(), String(DEFAULT_RETENTION_DAYS)],
       );
@@ -333,8 +380,8 @@ export function createInboundService(deps: {
     /** Explicit retention sweep (also invoked opportunistically). */
     async enforceRetention(retentionDays: number = DEFAULT_RETENTION_DAYS): Promise<number> {
       const result = await pool.query<{ id: string }>(
-        `UPDATE integration_inbound_event SET raw_payload = NULL
-         WHERE raw_payload IS NOT NULL
+        `UPDATE integration_inbound_event SET raw_payload = NULL, transport = NULL
+         WHERE (raw_payload IS NOT NULL OR transport IS NOT NULL)
            AND received_at < $1::timestamptz - ($2 || ' days')::interval
          RETURNING id`,
         [clock.now(), String(Math.max(0, retentionDays))],

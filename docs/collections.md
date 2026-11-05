@@ -107,4 +107,8 @@ The response includes `collection`, `total`, `page`, `page_size`, `page_count`, 
 
 Unknown collection keys return 404 `COLLECTION_UNKNOWN`; malformed page, page size, tag, locale or section values return 400. An invalid binding/content type is reported as a conflict rather than silently widening the feed.
 
+## Public rate limit
+
+The anonymous feed uses a per-client-IP, per-Web-process token bucket with capacity 40 and refill of 2 requests per second. Successful responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix time when the bucket would be full). A limited response is HTTP 429 with `SEARCH_RATE_LIMITED`, those headers and `Retry-After` in seconds until one token is available. This route-specific bucket is independent per Web process; see [Search](search.md#public-rate-limit) for the separate search quota.
+
 See [Themes](themes.md) for theme authoring and the [complete REST map](rest-api-map.md#list_collection_items) for the registered request/security contract.

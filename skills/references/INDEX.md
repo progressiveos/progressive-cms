@@ -38,8 +38,8 @@ SKILL.md (it is thin), then one or two files from the table below.
 | Bulk publication, time-based plans | [`progressive-cms-content-agent/references/bulk-publication.md`](../progressive-cms-content-agent/references/bulk-publication.md) |
 | **Site delivery compliance (MANDATORY per site): cookie banner + Terms of use + Security statement** | [`progressive-cms-content-agent/references/site-delivery-compliance.md`](../progressive-cms-content-agent/references/site-delivery-compliance.md) |
 | **Collections: named feeds (news/blog) — theme.json `collections`, scope shape, REST, pagination/tags** | [`progressive-cms-theme-developer/references/collections.md`](../progressive-cms-theme-developer/references/collections.md) |
-| **Analytics & tags (agency/operator): providers, network rules, dataLayer v1, doctor** | [`docs/analytics-for-agencies.md`](../../docs/analytics-for-agencies.md) |
-| **IndexNow (SEO): site-level toggle, key file, delivery status — platform-owned, themes must not implement it** | `cms_get_indexnow_settings` / `cms_update_indexnow_settings` / `cms_get_indexnow_status` (MCP); spec `docs/specs/Progressive_CMS_IndexNow_v1_Spec.md` |
+| **Analytics & tags (agency/operator): providers, network rules, dataLayer v1, doctor** | [public configuration guide](../../docs/configuration.md) |
+| **IndexNow (SEO): site-level toggle, key file, delivery status — platform-owned, themes must not implement it** | `cms_get_indexnow_settings` / `cms_update_indexnow_settings` / `cms_get_indexnow_status` (MCP); [public SEO guide](../../docs/seo.md) |
 | `.pcpub` mode (local content authoring) | [`progressive-cms-content-agent/references/artifact-mode.md`](../progressive-cms-content-agent/references/artifact-mode.md) |
 | Addressed personal-data correction/block/erase and processor followups | [`progressive-cms-operator/references/personal-data-tools.md`](../progressive-cms-operator/references/personal-data-tools.md) |
 | Operations: health, config, extensions, maintenance | [`progressive-cms-operator/references/golden-path.md`](../progressive-cms-operator/references/golden-path.md) |
@@ -52,8 +52,8 @@ SKILL.md (it is thin), then one or two files from the table below.
 | Theme block variants (block_renderers[].variants) — live: content validation accepts them, discovery lists them | theme.json → `GET /discovery/blocks/:typeId?version=N` → `allowedVariants` |
 | **Write a community skill (.pcskill) and publish it** | [`progressive-cms-extension-developer/references/writing-community-skills.md`](../progressive-cms-extension-developer/references/writing-community-skills.md) |
 | Write an extension | [`progressive-cms-extension-developer/SKILL.md`](../progressive-cms-extension-developer/SKILL.md) |
-| Extension Contract 2.0, SDK, jobs, public mutations and locale routes | [`../../docs/specs/PUBLIC-EXTENSION-CONTRACT.md`](../../docs/specs/PUBLIC-EXTENSION-CONTRACT.md) |
-| Build Progressive Shop as a separate extension | [`../../docs/specs/SHOP-DEVELOPER-HANDOFF.md`](../../docs/specs/SHOP-DEVELOPER-HANDOFF.md) |
+| Extension Contract 2.0, SDK, jobs, public mutations and locale routes | [public Extension Contract guide](../../docs/extensions.md) |
+| Build Progressive Shop as a separate extension | [public Extension Contract guide](../../docs/extensions.md) and [Payments](../../docs/payments.md) |
 | Agent web research (fact search/fetch) | [`progressive-cms-web-research/SKILL.md`](../progressive-cms-web-research/SKILL.md) |
 
 ## Skills (machine entries)

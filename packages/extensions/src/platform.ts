@@ -84,7 +84,33 @@ export interface ExtensionJobsPort {
   }): Promise<void>;
 }
 
+/** Handler must lock and reserve the subject using this transaction for a
+ * create; it must reject unauthorized access and return a saved snapshot. */
+export type ExtensionPaymentSubjectResolver = (input: {
+  readonly subjectId: string;
+  readonly proof: unknown;
+  readonly actor: ExtensionPrincipal;
+  readonly site: ExtensionSiteContext;
+  readonly operation: "create" | "get";
+  readonly tx: ExtensionDbReader;
+}) => Promise<{ readonly amountMinor: number; readonly currency: string } | null>;
+
+export interface ExtensionPaymentsPort {
+  create(input: {
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly providerInstanceId: string;
+    readonly idempotencyKey: string;
+    readonly proof?: unknown;
+  }): Promise<{ readonly id: string; readonly status: string; readonly replayed: boolean }>;
+  get(input: {
+    readonly paymentId: string;
+    readonly proof?: unknown;
+  }): Promise<{ readonly id: string; readonly status: string } | null>;
+}
+
 export interface ExtensionPlatformServices {
+  readonly payments?: ExtensionPaymentsPort;
   /** Permission check for the CURRENT principal; fails closed (anonymous
    * principals never pass). The permission must be registered (manifest
    * namespace or platform registry) — composition guarantees that. */
@@ -102,6 +128,17 @@ export interface ExtensionPlatformServices {
 export interface ExtensionCallContext {
   readonly actor: ExtensionPrincipal;
   readonly requestId: string;
+  /**
+   * Opaque server-derived network-source identifier (CORE-SHOP-SECURITY-SOURCE-01):
+   * HMAC of the transport-resolved client address over the installation
+   * secret, IPv6 aggregated to /64. Server-side handlers only — never echoed
+   * into public JSON by Core itself, never mixed with the authorized actor.
+   * Absent (undefined) when there is no request, the transport could not
+   * establish a trustworthy source, or the installation has no configured
+   * `http.sourceKeySecretRef` — treat absence as "no source signal", never
+   * as a shared bucket.
+   */
+  readonly sourceKey?: string;
   readonly extension: {
     readonly id: string;
     readonly config: Record<string, unknown> | null;
@@ -144,6 +181,7 @@ export function createExtensionPlatformServices(input: {
   readonly actor: ExtensionPrincipal;
   readonly requestId: string;
   readonly extensionId: string;
+  readonly payments?: ExtensionPaymentsPort;
   /** Writes an auth security event on the given executor (tx client). */
   readonly auditWriter: (
     executor: DbClient,
@@ -183,6 +221,7 @@ export function createExtensionPlatformServices(input: {
     query: (sql, params) => input.pool.query(sql, params),
   };
   return {
+    ...(input.payments === undefined ? {} : { payments: input.payments }),
     authorize: (permission) => input.authorize(permission),
     async transaction(run) {
       return input.pool.withTransaction(async (client) => {

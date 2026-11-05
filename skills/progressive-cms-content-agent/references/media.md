@@ -1,4 +1,4 @@
-# Content Agent — Media rules (PCMS-SKILL-T004)
+# Content Agent — Media rules
 
 ## Identity and addressing
 

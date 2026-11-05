@@ -1,9 +1,16 @@
+export { parseExtensionPaymentGrants } from "./config/extension-payment-grants.js";
 // CMS Core owns identity, lifecycle, transactions, invariants, versioning,
 // authorization, publication state, audit and extension boundaries
 // (Architecture Baseline v0.2 §7). M01 adds the generic runtime kernel:
 // typed configuration, and in later tasks DB pool/transactions, migration
 // runner, structured logging and secret loading.
 export const PACKAGE_NAME = "@pcms/core";
+
+export {
+  BLOCK_TYPE_ID_MAX_LENGTH,
+  BLOCK_TYPE_ID_SOURCE,
+  EXTENSION_BLOCK_TYPE_ID_SOURCE,
+} from "./block-type-id.js";
 
 export { type Clock, fixedClock, systemClock } from "./clock.js";
 export {

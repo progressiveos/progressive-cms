@@ -17,6 +17,10 @@ export interface OperationContextLike {
   };
   readonly transport: string;
   readonly requestId: string;
+  /** Opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01) when the
+   * HTTP transport resolved a trustworthy peer. The service-account actor
+   * stays the primary MCP identity; this is an additional signal only. */
+  readonly sourceKey?: string;
 }
 
 /** The bound application operations the tools call.

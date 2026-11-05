@@ -1,9 +1,9 @@
 {
   "name": "progressive-cms",
-  "version": "1.0.0-rc.35",
+  "version": "1.0.0-rc.36",
   "private": true,
   "type": "module",
-  "description": "Progressive CMS \u2014 modular monolith CMS platform (see docs/specs/INDEX.md)",
+  "description": "Progressive CMS — modular monolith CMS platform",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -30,7 +30,6 @@
     "scan:admin-bundle": "node scripts/scan-admin-bundle.mjs",
     "scan": "npm run scan:audit && npm run scan:licenses && npm run scan:admin-bundle",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run check:i18n && npm test && npm run build && npm run scan",
-    "test:browser": "PCMS_ADMIN_COMPOSITION=\"${PCMS_ADMIN_COMPOSITION:-ui-test}\" npm run build:admin && playwright test",
     "prepare:extensions": "node scripts/compose-first-party.mjs prepare-supply && node scripts/compose-first-party.mjs emit-admin standard apps/admin/src/extension/contributions.generated.ts"
   },
   "devDependencies": {

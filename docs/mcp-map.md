@@ -80,7 +80,7 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_list_theme_revisions](#cms_list_theme_revisions) | List retained theme revisions for the current site; excludes pruned snapshots. | `theme.read` | true |
 | [cms_cleanup_theme_revisions](#cms_cleanup_theme_revisions) | Preview old theme snapshots (default dry_run=true, theme.read); apply with dry_run=false, explicit revision_ids and expected_generation (theme.write). Keeps active, previous good, latest five and snapshots used within one day. At most 100 per batch. Pruning is irreversible; retry pending file removal with the same IDs. | `theme.read` | false |
 | [cms_get_active_theme](#cms_get_active_theme) | Identity and generations of the theme the public renderer actually serves (served version, installed catalog head, revision_id, theme_generation). Read this before editing: the next update must be newer than installed_head_version, and expected_generation is what CAS wants. | `theme.read` | true |
-| [cms_export_theme](#cms_export_theme) | Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64. | `theme.read` | true |
+| [cms_export_theme](#cms_export_theme) | Descriptor of the served theme as a.pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64. | `theme.read` | true |
 | [cms_list_installed_themes](#cms_list_installed_themes) | Installed theme packages in the catalog with their versions and whether each is the render target or the active theme. | `theme.read` | true |
 | [cms_validate_theme_package](#cms_validate_theme_package) | Validate a staged package (package_ref from the REST upload) without changing the site: identity, version, digest, typed diagnostics and a candidate render-stack build. Nothing is installed, activated or registered. | `theme.validate` | true |
 | [cms_install_theme_package](#cms_install_theme_package) | Install a staged package (package_ref) as a catalog candidate. Never activates: use cms_activate_theme with expected_generation. | `theme.write` | false |
@@ -89,7 +89,7 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_rollback_theme](#cms_rollback_theme) | Live activation of a retained revision (revision_id from cms_list_theme_revisions) with lifecycle CAS on expected_generation. Requires theme.write AND theme.activate. | `theme.write` | false |
 | [cms_get_server_info](#cms_get_server_info) | Server identity and subsystem contract versions. | actor/domain checks | true |
 | [cms_get_capabilities](#cms_get_capabilities) | Capability report for the current actor: installed subsystems, allowed operation classes, contract versions. | actor/domain checks | true |
-| [cms_get_current_actor](#cms_get_current_actor) | Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows (spec §53). | actor/domain checks | true |
+| [cms_get_current_actor](#cms_get_current_actor) | Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows. | actor/domain checks | true |
 | [cms_get_agent_bootstrap](#cms_get_agent_bootstrap) | M16 agent bootstrap: target site, environment classification, actor + effective scopes, contract versions, capabilities, installed skills with compatibility, preview/domain readiness. Secret-free; call this before any workflow. | actor/domain checks | true |
 | [cms_resolve_external_identity](#cms_resolve_external_identity) | Resolve an external source item (source_namespace + external_id) to its bound entry, with the human-edit reconciliation verdict (IN_SYNC / HUMAN_EDIT_CONFLICT / BASELINE_UNSET) — never overwrite on conflict (M16). | `content.read` | true |
 | [cms_bind_external_identity](#cms_bind_external_identity) | Bind an external source item to an entry and/or refresh the agent sync baseline (last applied generation, source hash, run id). Idempotent for the same entry; conflicts on a different bound entry (M16). | `content.edit` | false |
@@ -103,33 +103,33 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_list_navigation_sets](#cms_list_navigation_sets) | Navigation sets. | `navigation.read` | true |
 | [cms_get_navigation_tree](#cms_get_navigation_tree) | Materialized navigation tree by set id or key. | `navigation.read` | true |
 | [cms_list_media_presets](#cms_list_media_presets) | Registered media presets. | `media.read` | true |
-| [cms_search_query](#cms_search_query) | Public site search over the derived PostgreSQL full-text index (bounded, paginated; Search spec §23). Same site/locale scoping as REST. | actor/domain checks | true |
-| [cms_search_admin](#cms_search_admin) | Authorized admin search across the public index, draft titles, media metadata and navigation labels (Search spec §24). | `search.admin` | true |
-| [cms_get_indexnow_settings](#cms_get_indexnow_settings) | IndexNow settings (site-level, DISABLED by default): enabled state, notify flags, CAS generation (IndexNow spec §29). | `seo.read` | true |
+| [cms_search_query](#cms_search_query) | Public site search over the derived PostgreSQL full-text index (bounded, paginated). Same site/locale scoping as REST. | actor/domain checks | true |
+| [cms_search_admin](#cms_search_admin) | Authorized admin search across the public index, draft titles, media metadata and navigation labels. | `search.admin` | true |
+| [cms_get_indexnow_settings](#cms_get_indexnow_settings) | IndexNow settings (site-level, DISABLED by default): enabled state, notify flags, CAS generation. | `seo.read` | true |
 | [cms_update_indexnow_settings](#cms_update_indexnow_settings) | Enable/disable IndexNow and its notify flags (CAS on expected_generation; enabling generates the verification key and queues at most ONE homepage notification — never a backfill). | `seo.site_settings` | false |
 | [cms_get_indexnow_status](#cms_get_indexnow_status) | IndexNow delivery status: state, key file URL, pending count, last HTTP result, diagnostics. Never claims indexing. | `seo.read` | true |
 | [cms_check_indexnow](#cms_check_indexnow) | Local IndexNow checks + enqueue the single homepage verification notification (delivered asynchronously by the worker). | `seo.site_settings` | false |
 | [cms_rotate_indexnow_key](#cms_rotate_indexnow_key) | Rotate the IndexNow verification key (queued jobs resolve the key at send time; audit recorded). | `seo.site_settings` | false |
-| [cms_get_analytics_settings](#cms_get_analytics_settings) | Analytics & tagging settings with CAS generation: enabled providers, ids, network rules (Analytics spec §10). | `analytics.read` | true |
+| [cms_get_analytics_settings](#cms_get_analytics_settings) | Analytics & tagging settings with CAS generation: enabled providers, ids, network rules. | `analytics.read` | true |
 | [cms_update_analytics_settings](#cms_update_analytics_settings) | Save analytics & tagging settings (CAS on expected_generation; strict validation, typed provider configs only — arbitrary script/HTML is impossible by contract). | `analytics.manage` | false |
 | [cms_list_analytics_providers](#cms_list_analytics_providers) | Registered analytics tag providers: ids, titles, strict config schemas, privacy categories. | `analytics.read` | true |
 | [cms_analytics_doctor](#cms_analytics_doctor) | Analytics installation diagnostics: config validity, render-plan probe, slot presence, CSP compatibility, duplication warnings. | `analytics.read` | true |
-| [cms_get_search_status](#cms_get_search_status) | Search index health: document count, index version vs expected, last event, reindex progress (Search spec §26). | `search.diagnostics` | true |
+| [cms_get_search_status](#cms_get_search_status) | Search index health: document count, index version vs expected, last event, reindex progress. | `search.diagnostics` | true |
 | [cms_get_search_capabilities](#cms_get_search_capabilities) | Machine-readable search capabilities: entity types, filters, sorts, hard limits. | actor/domain checks | true |
-| [cms_validate_search_document](#cms_validate_search_document) | Re-derive one entity's public search document and return structural issues without exposing content (Search spec §31). | `search.admin` | true |
-| [cms_reindex_search](#cms_reindex_search) | Start (or resume) a full shadow-epoch reindex; returns run progress fields (Search spec §19/§20). | `search.reindex` | false |
-| [cms_list_forms](#cms_list_forms) | List form definitions with their current schema version (Forms spec §36). | `forms.read_definition` | true |
-| [cms_get_form_definition](#cms_get_form_definition) | One form definition: stable identity, field set and server-validation rules of the current version (Forms spec §4–§8). | `forms.read_definition` | true |
-| [cms_list_quizzes](#cms_list_quizzes) | List quiz definitions with their current schema version (Forms spec §36). | `quizzes.read_definition` | true |
-| [cms_get_quiz_definition](#cms_get_quiz_definition) | One quiz definition: steps, questions, declarative branching/scoring rules and outcomes (Forms spec §9–§15). | `quizzes.read_definition` | true |
-| [cms_get_quiz_public_schema](#cms_get_quiz_public_schema) | Sanitized public quiz schema (steps/questions only — no scoring weights or branch targets) for rendering clients (Forms spec §36). | `quizzes.read_definition` | true |
-| [cms_list_submissions](#cms_list_submissions) | Bounded, cursor-paginated form submission history (Forms spec §36; interactions.read). | `interactions.read` | true |
+| [cms_validate_search_document](#cms_validate_search_document) | Re-derive one entity's public search document and return structural issues without exposing content. | `search.admin` | true |
+| [cms_reindex_search](#cms_reindex_search) | Start (or resume) a full shadow-epoch reindex; returns run progress fields. | `search.reindex` | false |
+| [cms_list_forms](#cms_list_forms) | List form definitions with their current schema version. | `forms.read_definition` | true |
+| [cms_get_form_definition](#cms_get_form_definition) | One form definition: stable identity, field set and server-validation rules of the current version. | `forms.read_definition` | true |
+| [cms_list_quizzes](#cms_list_quizzes) | List quiz definitions with their current schema version. | `quizzes.read_definition` | true |
+| [cms_get_quiz_definition](#cms_get_quiz_definition) | One quiz definition: steps, questions, declarative branching/scoring rules and outcomes. | `quizzes.read_definition` | true |
+| [cms_get_quiz_public_schema](#cms_get_quiz_public_schema) | Sanitized public quiz schema (steps/questions only — no scoring weights or branch targets) for rendering clients. | `quizzes.read_definition` | true |
+| [cms_list_submissions](#cms_list_submissions) | Bounded, cursor-paginated form submission history (interactions.read). | `interactions.read` | true |
 | [cms_get_submission](#cms_get_submission) | One form submission with normalized payload and consent snapshot (interactions.read; PII). | `interactions.read` | true |
 | [cms_list_quiz_runs](#cms_list_quiz_runs) | Bounded quiz run history with server-computed score/outcome (interactions.read). | `interactions.read` | true |
 | [cms_get_quiz_run](#cms_get_quiz_run) | One quiz run: lifecycle, score/outcome and all server-recorded answers (interactions.read). | `interactions.read` | true |
 | [cms_list_leads](#cms_list_leads) | Bounded lead list — PII, permission-gated (leads.read). | `leads.read` | true |
 | [cms_update_lead_status](#cms_update_lead_status) | Lead lifecycle transition; emits LeadStatusChanged atomically (leads.manage). | `leads.manage` | false |
-| [cms_export_interactions](#cms_export_interactions) | Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (Forms spec §29; interactions.export / leads.export). | `interactions.export` | true |
+| [cms_export_interactions](#cms_export_interactions) | Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (interactions.export / leads.export). | `interactions.export` | true |
 | [cms_search_media](#cms_search_media) | Bounded media search with typed filters (text, kind). Follow next_cursor until has_more=false for a full catalog. | `media.read` | true |
 | [cms_get_media](#cms_get_media) | Full media asset view: versions and variants. | `media.read` | true |
 | [cms_regenerate_media_variants](#cms_regenerate_media_variants) | Generate missing active-theme variants for one raster image. Keeps the MediaAsset ID, original bytes, and version; returns per-preset failures for retry. Requires media.write. | `media.write` | false |
@@ -616,7 +616,7 @@ return operations.getActiveTheme(ctx);
 
 ### cms_export_theme
 
-Descriptor of the served theme as a .pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64.
+Descriptor of the served theme as a.pcTheme package: theme_id, served/installed versions, revision_id, theme_generation, package_sha256, size_bytes, download_path. The archive BYTES are downloaded over REST (GET /api/v1/themes/source/package?expected_generation=N, bearer token) — this tool never returns binary or base64.
 
 Permission annotation: `theme.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -908,7 +908,7 @@ return operations.buildCapabilities(ctx);
 
 ### cms_get_current_actor
 
-Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows (spec §53).
+Non-secret projection of the authenticated actor (scopes, site/environment binding) — agents detect missing permissions before large workflows.
 
 Permission annotation: not declared; actor/domain checks remain. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1327,7 +1327,7 @@ return { items: operations.listMediaPresets() };
 
 ### cms_search_query
 
-Public site search over the derived PostgreSQL full-text index (bounded, paginated; Search spec §23). Same site/locale scoping as REST.
+Public site search over the derived PostgreSQL full-text index (bounded, paginated). Same site/locale scoping as REST.
 
 Permission annotation: not declared; actor/domain checks remain. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1406,7 +1406,7 @@ return operations.searchQuery({
 
 ### cms_search_admin
 
-Authorized admin search across the public index, draft titles, media metadata and navigation labels (Search spec §24).
+Authorized admin search across the public index, draft titles, media metadata and navigation labels.
 
 Permission annotation: `search.admin`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1457,7 +1457,7 @@ return operations.searchAdmin({
 
 ### cms_get_indexnow_settings
 
-IndexNow settings (site-level, DISABLED by default): enabled state, notify flags, CAS generation (IndexNow spec §29).
+IndexNow settings (site-level, DISABLED by default): enabled state, notify flags, CAS generation.
 
 Permission annotation: `seo.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1592,7 +1592,7 @@ return operations.rotateIndexNowKey(ctx);
 
 ### cms_get_analytics_settings
 
-Analytics & tagging settings with CAS generation: enabled providers, ids, network rules (Analytics spec §10).
+Analytics & tagging settings with CAS generation: enabled providers, ids, network rules.
 
 Permission annotation: `analytics.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1703,7 +1703,7 @@ return operations.runAnalyticsDoctor(ctx);
 
 ### cms_get_search_status
 
-Search index health: document count, index version vs expected, last event, reindex progress (Search spec §26).
+Search index health: document count, index version vs expected, last event, reindex progress.
 
 Permission annotation: `search.diagnostics`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1751,7 +1751,7 @@ return operations.getSearchCapabilities();
 
 ### cms_validate_search_document
 
-Re-derive one entity's public search document and return structural issues without exposing content (Search spec §31).
+Re-derive one entity's public search document and return structural issues without exposing content.
 
 Permission annotation: `search.admin`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1791,7 +1791,7 @@ return operations.validateSearchDocument({
 
 ### cms_reindex_search
 
-Start (or resume) a full shadow-epoch reindex; returns run progress fields (Search spec §19/§20).
+Start (or resume) a full shadow-epoch reindex; returns run progress fields.
 
 Permission annotation: `search.reindex`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1821,7 +1821,7 @@ return operations.reindexSearch({
 
 ### cms_list_forms
 
-List form definitions with their current schema version (Forms spec §36).
+List form definitions with their current schema version.
 
 Permission annotation: `forms.read_definition`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1855,7 +1855,7 @@ return operations.listForms(ctx, {
 
 ### cms_get_form_definition
 
-One form definition: stable identity, field set and server-validation rules of the current version (Forms spec §4–§8).
+One form definition: stable identity, field set and server-validation rules of the current version.
 
 Permission annotation: `forms.read_definition`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1887,7 +1887,7 @@ return operations.getFormDefinition(ctx, args["form_id"]);
 
 ### cms_list_quizzes
 
-List quiz definitions with their current schema version (Forms spec §36).
+List quiz definitions with their current schema version.
 
 Permission annotation: `quizzes.read_definition`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1921,7 +1921,7 @@ return operations.listQuizzes(ctx, {
 
 ### cms_get_quiz_definition
 
-One quiz definition: steps, questions, declarative branching/scoring rules and outcomes (Forms spec §9–§15).
+One quiz definition: steps, questions, declarative branching/scoring rules and outcomes.
 
 Permission annotation: `quizzes.read_definition`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1953,7 +1953,7 @@ return operations.getQuizDefinition(ctx, args["quiz_id"]);
 
 ### cms_get_quiz_public_schema
 
-Sanitized public quiz schema (steps/questions only — no scoring weights or branch targets) for rendering clients (Forms spec §36).
+Sanitized public quiz schema (steps/questions only — no scoring weights or branch targets) for rendering clients.
 
 Permission annotation: `quizzes.read_definition`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -1985,7 +1985,7 @@ return operations.getQuizPublicSchema(ctx, args["quiz_id"]);
 
 ### cms_list_submissions
 
-Bounded, cursor-paginated form submission history (Forms spec §36; interactions.read).
+Bounded, cursor-paginated form submission history (interactions.read).
 
 Permission annotation: `interactions.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 
@@ -2246,7 +2246,7 @@ return operations.updateLeadStatus(ctx, {
 
 ### cms_export_interactions
 
-Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (Forms spec §29; interactions.export / leads.export).
+Permission-gated, audited CSV/JSON export of submissions, quiz runs or leads (interactions.export / leads.export).
 
 Permission annotation: `interactions.export`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
 

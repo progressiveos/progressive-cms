@@ -3,7 +3,7 @@
 **Version:** 2.0.0 · **Core:** `>=1.0.0-rc.1 <2.0.0` · **Extension Contract:** `2.0`
 
 Build trusted Progressive CMS extensions against the supported public SDK.
-Read [`PUBLIC-EXTENSION-CONTRACT.md`](../../docs/specs/PUBLIC-EXTENSION-CONTRACT.md)
+Read [the public Extension Contract guide](../../docs/extensions.md)
 and the relevant topic in [`references/INDEX.md`](../references/INDEX.md) first.
 
 ## Manifest and SDK
@@ -59,5 +59,4 @@ and the relevant topic in [`references/INDEX.md`](../references/INDEX.md) first.
 ## Examples
 
 See `extensions/progressive-media-unsplash`, `progressive-media-runware`,
-`progressive-prompt-enhancer` and the independent fixture under
-`extensions/progressive-platform-fixture`.
+`progressive-prompt-enhancer`.

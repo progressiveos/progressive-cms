@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Application operation layer + REST /api/v1 transport (M09; API/MCP/CLI spec §2/§78)",
+  "description": "Application operation layer + REST /api/v1 transport",
   "exports": {
     ".": "./src/index.ts"
   },

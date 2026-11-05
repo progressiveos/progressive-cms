@@ -48,6 +48,7 @@ export {
   type ThemeEngineOptions,
 } from "./engine/liquid.js";
 export { isSafeHtml, type SafeHtml, safeHtml } from "./engine/safe-html.js";
+export { isSafeMarkdown, type SafeMarkdown, safeMarkdown } from "./engine/safe-markdown.js";
 export { ThemeError } from "./errors.js";
 export {
   type CapabilityProvider,
@@ -207,6 +208,11 @@ export type {
 export const PACKAGE_NAME = "@pcms/themes";
 
 export {
+  compileMarkdownDiscoveryPlan,
+  type MarkdownDiscoveryCompilation,
+  type MarkdownDiscoveryPlan,
+} from "./engine/markdown-discovery.js";
+export {
   type DesignTokenDraft,
   extractDesignTokens,
   type FigmaFile,
@@ -228,6 +234,7 @@ export {
   validateThemeEntryNames,
   validateThemePackage,
 } from "./install-package.js";
+export type { ThemeMarkdownContract } from "./manifest/schema.js";
 export {
   removeThemeRevisionFiles,
   restoreThemeCatalog,

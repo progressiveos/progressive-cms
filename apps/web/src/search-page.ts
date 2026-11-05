@@ -9,7 +9,12 @@
 // the fallback so the route works theme-less.
 
 import type { SystemDocumentInjection } from "@pcms/analytics";
-import { type ApplicationServices, createRateLimiter } from "@pcms/api";
+import {
+  type ApplicationServices,
+  createRateLimiter,
+  RateLimitError,
+  rateLimitHeaders,
+} from "@pcms/api";
 import { escapeHtmlString as escapeHtml } from "@pcms/core";
 import { PREVIEW_RESPONSE_HEADERS } from "@pcms/publication";
 import type { SearchResultItemViewModel, SearchResultPageViewModel } from "@pcms/themes";
@@ -159,7 +164,9 @@ export function createSearchPageHandler(options: {
     try {
       // Rate-limit per client, never one shared bucket: a single key would
       // let one visitor exhaust everyone's search budget (self-DoS).
-      searchRateLimit(request.ip);
+      for (const [name, value] of Object.entries(rateLimitHeaders(searchRateLimit(request.ip)))) {
+        void reply.header(name, value);
+      }
       const result = await application.searchQuery({
         ...params,
         limit: 20,
@@ -188,6 +195,11 @@ export function createSearchPageHandler(options: {
         );
       return;
     } catch (error) {
+      if (error instanceof RateLimitError) {
+        for (const [name, value] of Object.entries(rateLimitHeaders(error.rateLimit))) {
+          void reply.header(name, value);
+        }
+      }
       const code = (error as { code?: string }).code ?? "SEARCH_QUERY_INVALID";
       const status =
         code === "SEARCH_RATE_LIMITED" ? 429 : code === "SEARCH_INDEX_UNAVAILABLE" ? 503 : 400;

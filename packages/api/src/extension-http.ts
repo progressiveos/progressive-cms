@@ -39,6 +39,14 @@ export interface ExtensionHttpFacts {
     /** Selected headers, already lowercased names. */
     readonly headers: Readonly<Record<string, string | undefined>>;
   };
+  /**
+   * Transport-resolved opaque network-source identifier
+   * (CORE-SHOP-SECURITY-SOURCE-01), computed by the composition root from
+   * the trustworthy peer — never from client headers. Absent = no source
+   * signal (no configured secret, unresolvable address, or non-HTTP
+   * transport); handlers must not treat absence as a shared bucket.
+   */
+  readonly sourceKey?: string;
 }
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -150,7 +158,7 @@ export type ExtensionDispatchResult =
     }
   | {
       readonly kind: "redirect";
-      readonly status: 301 | 302 | 308;
+      readonly status: 301 | 302 | 303 | 308;
       readonly location: string;
       readonly setCookie?: string;
     }
@@ -540,6 +548,7 @@ export function createExtensionHttpRouter(deps: {
               anonymous: route.visibility === "public",
               guestId: guestIdentity?.id ?? null,
               ...(facts.locale === undefined ? {} : { locale: facts.locale }),
+              ...(facts.sourceKey === undefined ? {} : { sourceKey: facts.sourceKey }),
             },
           );
           const activeMount = await deps.extensionRoutes.activeFor(candidate.extensionId);
@@ -687,7 +696,7 @@ export function createExtensionHttpRouter(deps: {
           if (typeof shape.location === "string") {
             return {
               kind: "redirect",
-              status: shape.status === 301 ? 301 : 302,
+              status: shape.status === 301 ? 301 : shape.status === 303 ? 303 : 302,
               location: shape.location,
               ...(guestIdentity?.setCookie === undefined
                 ? {}

@@ -27,7 +27,7 @@ export const analytics = defineFragment(
       "Вебвизор также нужно разрешить в настройках самого счётчика Яндекс.Метрики. Поля форм защищены (ym-disable-keys), содержимое полей не попадает в записи.",
     "analytics.metrica_debug": "Разрешить проверку счётчика в Яндекс Метрике",
     "analytics.metrica_debug_note":
-      "Включите этот переключатель, нажмите «Сохранить» вверху страницы и заново откройте проверку в Метрике. Выходить из админки не нужно. Технический режим сайта должен быть выключен: он закрывает сайт от Яндекса и других посетителей (HTTP 503). На время проверки разрешаются скрипты с yastatic.net и стилевые атрибуты во всём документе. После проверки выключите переключатель и сохраните.",
+      "Включите переключатель и нажмите «Сохранить» вверху страницы — правила, добавленные в списке, тоже сохраняются этой кнопкой. Затем заново откройте проверку в Метрике; выходить из админки не нужно. Технический режим сайта должен быть выключен: он отвечает Яндексу и посетителям кодом 503. На время проверки скрипты с yastatic.net и inline-стили (атрибуты и блоки <style>) разрешаются во всём документе. После проверки выключите переключатель и сохраните, чтобы вернуть строгую CSP.",
     "analytics.metrica_gtm_warning":
       "Метрика настроена вместе с GTM: если тот же счётчик развёрнут и внутри контейнера GTM, хиты могут дублироваться.",
     "analytics.ga4_id": "Measurement ID",
@@ -91,7 +91,7 @@ export const analytics = defineFragment(
       "Webvisor must also be enabled in the Yandex Metrica counter settings. Form fields are protected (ym-disable-keys); field values never enter recordings.",
     "analytics.metrica_debug": "Allow counter checking in Yandex Metrica",
     "analytics.metrica_debug_note":
-      "Enable this switch, click Save at the top and reopen the check in Metrica. No Admin logout is needed. Site maintenance mode must be off: it blocks Yandex and other visitors (HTTP 503). Checker scripts from yastatic.net and style attributes throughout the document are allowed temporarily. Disable and save after checking.",
+      "Enable this switch and click Save at the top; network rules added below are saved by the same button. Then reopen the check in Metrica. No Admin logout is needed. Site maintenance mode must be off: it returns HTTP 503 to Yandex and visitors. Checker scripts from yastatic.net and inline styles (style attributes and <style> blocks) are temporarily allowed throughout the document. Disable and save after checking to restore the strict CSP.",
     "analytics.metrica_gtm_warning":
       "Metrica is configured alongside GTM: if the same counter is also deployed inside the GTM container, hits may double.",
     "analytics.ga4_id": "Measurement ID",

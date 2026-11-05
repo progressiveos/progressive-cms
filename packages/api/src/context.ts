@@ -82,12 +82,13 @@ import {
   validateContentPayload,
   validateRichText,
 } from "@pcms/content";
-import type { Clock, DbPool, ResolvedSecrets } from "@pcms/core";
+import type { Clock, DbClient, DbPool, ResolvedSecrets } from "@pcms/core";
 import {
   CONFIG_SCHEMA_VERSION,
   injectAfterOpeningTag,
   loadMigrations,
   migrationStatus,
+  parseExtensionPaymentGrants,
 } from "@pcms/core";
 import {
   type CapabilityRegistry,
@@ -109,6 +110,7 @@ import {
   type ExtensionLifecycleService,
   type ExtensionManifest,
   getExtensionRuntimeSecret,
+  INSTALLATIONS_TABLE,
   manifestFingerprint,
   parseReleaseManifest,
   preflightOutcome,
@@ -264,6 +266,7 @@ import {
   type SeoDiscovery,
   type SeoEnvironment,
   type SeoStore,
+  type SitemapCandidate,
 } from "@pcms/seo";
 import {
   createThemeDiscovery,
@@ -306,6 +309,14 @@ export interface OperationContext {
   readonly actor: ActorContext;
   readonly transport: "rest" | "mcp" | "cli";
   readonly requestId: string;
+  /**
+   * Opaque server-derived network-source identifier (CORE-SHOP-SECURITY-SOURCE-01),
+   * HMAC'd from the transport-resolved peer over the installation secret.
+   * Present only when the transport resolved a trustworthy client address and
+   * the installation configured `http.sourceKeySecretRef`; CLI never carries
+   * it. Never derived from client-controlled headers, never a shared bucket.
+   */
+  readonly sourceKey?: string;
 }
 
 /** Maps the M08 ActorContext types onto the revisions/publication actor classes. */
@@ -448,6 +459,7 @@ export interface ApplicationServicesInput {
   readonly registerFakePaymentProvider?: boolean;
   /** M14: trusted deployed extension artifacts (composition-time only). */
   readonly extensionCatalog?: ExtensionCatalog;
+  readonly extensionPaymentSubjectGrants?: Readonly<Record<string, readonly string[]>>;
   /**
    * ADR-0013: resolves extension runtime secret slots (Admin-managed store).
    * Absent ⇒ provider secret slots report unconfigured.
@@ -483,6 +495,7 @@ export interface ExtensionsServices {
   readonly deprecations: DeprecationRegistry;
   readonly contractVersions: ReturnType<typeof createSystemContractVersionRegistry>;
   readonly lifecycle: ExtensionLifecycleService;
+  readonly paymentSubjectGrants: Readonly<Record<string, readonly string[]>>;
   readonly releaseManifest: ReleaseManifestV1 | null;
   /** Effective capability provisions (system + enabled extensions). */
   capabilities(): Promise<
@@ -774,6 +787,8 @@ function entryEntityAdapter(deps: {
   entries: EntriesService;
   contentTypes: ContentTypeRegistry;
   blocks: BlockRegistry;
+  extensionBlockOwners: ReadonlyMap<string, string>;
+  enabledExtensionIds: (ids: readonly string[], executor?: unknown) => Promise<readonly string[]>;
   prepareImage: (id: string) => Promise<void>;
   /** ACTIVE theme manifest + preset ids, resolved live (not the boot seed). */
   resolveFeedTheme: () => Promise<{
@@ -961,6 +976,28 @@ function entryEntityAdapter(deps: {
           for (const issue of blockResult.issues) {
             issues.push({ code: issue.code, message: issue.message, severity: "error" });
           }
+        } else if (ctx.revisionState !== "SEALED" && deps.extensionBlockOwners.size > 0) {
+          const used = new Set<string>();
+          const visit = (nodes: typeof blockResult.value.blocks): void => {
+            for (const node of nodes) {
+              const owner = deps.extensionBlockOwners.get(node.type);
+              if (owner !== undefined) used.add(owner);
+              visit(node.children);
+            }
+          };
+          visit(blockResult.value.blocks);
+          if (used.size > 0) {
+            const enabled = new Set(await deps.enabledExtensionIds([...used], ctx.executor));
+            for (const owner of used) {
+              if (!enabled.has(owner)) {
+                issues.push({
+                  code: "BLOCK_EXTENSION_UNAVAILABLE",
+                  message: `extension "${owner}" must be enabled to seal its blocks`,
+                  severity: "error",
+                });
+              }
+            }
+          }
         }
         // History is never re-judged: a theme change after publication must
         // not make a SEALED revision look broken.
@@ -1131,6 +1168,19 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
   const blocks = createBlockRegistry();
   registerFirstPartyBlocksV1(blocks);
   registerInteractionBlocks(blocks);
+  const extensionCatalog = input.extensionCatalog ?? createExtensionCatalog();
+  const extensionBlockOwners = new Map<string, string>();
+  for (const artifact of extensionCatalog.list()) {
+    for (const block of artifact.manifest.registrations.blocks ?? []) {
+      blocks.registerBlockType({
+        typeId: block.block_type,
+        schemaVersion: 1,
+        propsSchema: block.props_schema ?? { type: "object" },
+        childrenPolicy: "none",
+      });
+      extensionBlockOwners.set(block.block_type, artifact.manifest.id);
+    }
+  }
   const contentDiscovery = createContentDiscovery({ contentTypes, fields });
   const blockDiscovery = createBlockDiscovery(blocks);
 
@@ -1161,6 +1211,15 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
       entries,
       contentTypes,
       blocks,
+      extensionBlockOwners,
+      enabledExtensionIds: async (ids, executor) => {
+        const db = executor === undefined ? pool : (executor as DbClient);
+        const result = await db.query<{ extension_id: string }>(
+          `SELECT extension_id FROM ${INSTALLATIONS_TABLE} WHERE state = 'ENABLED' AND extension_id = ANY($1)`,
+          [ids],
+        );
+        return result.rows.map((row) => row.extension_id);
+      },
       prepareImage: prepareRichTextImage,
       resolveFeedTheme: () => resolveActiveTheme(),
     }),
@@ -2026,7 +2085,7 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     },
     // M17 §44: sitemap candidates = canonical published entry routes plus the
     // homepage binding; noindex comes from each entry's SEO document.
-    getSitemapCandidates: async () => {
+    getSitemapCandidates: async (options) => {
       // Locale-aware (opt-in multilingual): publications join on the route's
       // locale context (legacy sentinels 'x-default'/'default' match);
       // secondary routes emit their prefixed public path; reciprocal
@@ -2041,6 +2100,23 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
         raw === "x-default" || raw === "default" || raw === ""
           ? localizationSettings.defaultLocale
           : raw;
+      const visibleHomeByLocale = new Map<string, string>();
+      for (const member of homeMembers) {
+        if (member.archivedAt !== null) continue;
+        const previous = visibleHomeByLocale.get(member.locale);
+        if (previous === undefined || member.id < previous)
+          visibleHomeByLocale.set(member.locale, member.id);
+      }
+      const isServedHome = (entryId: string, routeLocale: string): boolean => {
+        if (!homeIds.has(entryId)) return true;
+        const locale = localeCode(routeLocale);
+        return (
+          entryId ===
+          (locale === localizationSettings.defaultLocale
+            ? site?.homeEntryId
+            : visibleHomeByLocale.get(locale))
+        );
+      };
       const publicPath = (entryId: string, routeLocale: string, path: string): string =>
         localizedRoutePath({
           locale: routeLocale === localizationSettings.defaultLocale ? "x-default" : routeLocale,
@@ -2052,24 +2128,125 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
         route_locale: string;
         published_at: Date | null;
         seo_payload: unknown;
+        markdown_revision_id: string | null;
+        markdown_enabled: boolean | null;
+        content_type_id: string;
+        template_key: string | null;
       }>(
-        `SELECT r.target_id::text AS entry_id, r.path, r.locale AS route_locale, p.published_at, sd.payload AS seo_payload
+        `SELECT r.target_id::text AS entry_id, r.path, r.locale AS route_locale, p.published_at, sd.payload AS seo_payload,
+                rev.id::text AS markdown_revision_id, ms.enabled AS markdown_enabled,
+                ent.content_type_id, ent.template_key
          FROM routes r
          JOIN publications p ON p.entity_type = 'entry' AND p.entity_id::text = r.target_id AND p.state = 'PUBLISHED'
             AND p.context = CASE WHEN r.locale IN ('x-default', 'default') THEN 'default' ELSE r.locale END
+         JOIN entries ent ON ent.id = p.entity_id
+         LEFT JOIN revisions rev ON rev.id = p.current_revision_id AND rev.entity_type = p.entity_type
+            AND rev.entity_id = p.entity_id AND rev.state = 'SEALED' AND rev.locale = p.context
+         LEFT JOIN agent_markdown_settings ms ON ms.site_key = $3 AND ms.entry_id = p.entity_id
          LEFT JOIN seo_documents sd ON sd.entry_id::text = r.target_id
-         WHERE r.retired_at IS NULL AND r.is_canonical AND r.target_type = 'entry'
+         WHERE r.site_id = $2 AND r.retired_at IS NULL AND r.is_canonical AND r.target_type = 'entry'
+           AND (NOT $4::boolean OR r.domain_binding_id IS NULL)
          UNION ALL
-         SELECT he.id::text, '/', CASE WHEN he.locale IN ('default', 'x-default', $1) THEN 'x-default' ELSE he.locale END, hp.published_at, shd.payload
+         SELECT he.id::text, '/', CASE WHEN he.locale IN ('default', 'x-default', $1) THEN 'x-default' ELSE he.locale END, hp.published_at, shd.payload,
+                hrev.id::text, hms.enabled, he.content_type_id, he.template_key
          FROM sites s
          JOIN entries home ON home.id = s.home_entry_id
          JOIN entries he ON COALESCE(he.translation_group_id, he.id) = COALESCE(home.translation_group_id, home.id)
          JOIN publications hp ON hp.entity_type = 'entry' AND hp.entity_id = he.id AND hp.state = 'PUBLISHED'
             AND hp.context = CASE WHEN he.locale IN ('default', 'x-default', $1) THEN 'default' ELSE he.locale END
+         LEFT JOIN revisions hrev ON hrev.id = hp.current_revision_id AND hrev.entity_type = hp.entity_type
+            AND hrev.entity_id = hp.entity_id AND hrev.state = 'SEALED' AND hrev.locale = hp.context
+         LEFT JOIN agent_markdown_settings hms ON hms.site_key = $3 AND hms.entry_id = hp.entity_id
          LEFT JOIN seo_documents shd ON shd.entry_id = he.id
-         WHERE s.home_entry_id IS NOT NULL`,
-        [localizationSettings.defaultLocale],
+         WHERE s.id = $2 AND s.home_entry_id IS NOT NULL`,
+        [
+          localizationSettings.defaultLocale,
+          site?.id ?? null,
+          defaultSiteKey,
+          options?.includeMarkdown === true,
+        ],
       );
+      const markdownRevisions = new Map<
+        string,
+        {
+          payload: unknown;
+          sidecar: unknown;
+          mediaVersions: Readonly<Record<string, number>> | null;
+        }
+      >();
+      if (options?.includeMarkdown) {
+        const eligible = new Map(
+          result.rows
+            .filter((row) => {
+              const locale = localeCode(row.route_locale);
+              const path = publicPath(row.entry_id, row.route_locale, row.path);
+              return (
+                row.markdown_revision_id !== null &&
+                isServedHome(row.entry_id, row.route_locale) &&
+                row.markdown_enabled !== false &&
+                !isNoindex(
+                  (row.seo_payload as { robots_policy?: never } | null)?.robots_policy ?? null,
+                ) &&
+                (locale === localizationSettings.defaultLocale ||
+                  (localizationSettings.enabled &&
+                    localizationSettings.locales.includes(locale))) &&
+                /^\/(?!\/)[^\s<>\\?#]*$/.test(path)
+              );
+            })
+            .map((row) => [publicPath(row.entry_id, row.route_locale, row.path), row] as const),
+        );
+        const requests = [...eligible.entries()]
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .slice(0, 1000)
+          .map(([, row], index) => ({
+            entry_id: row.entry_id,
+            revision_id: row.markdown_revision_id,
+            context: ["default", "x-default"].includes(row.route_locale)
+              ? "default"
+              : row.route_locale,
+            ord: index,
+          }));
+        if (requests.length > 0) {
+          // Bound the uncompressed JSON before returning any revision to the web process.
+          const batch = await pool.query<{
+            revision_id: string;
+            payload: unknown;
+            sidecar: unknown;
+            media_versions: Readonly<Record<string, number>> | null;
+          }>(
+            `WITH requests AS MATERIALIZED (
+               SELECT entry_id::uuid, revision_id::uuid, context, ord
+               FROM jsonb_to_recordset($1::jsonb)
+                 AS request(entry_id text, revision_id text, context text, ord integer)
+             ), sizes AS MATERIALIZED (
+               SELECT request.revision_id, request.ord,
+                      octet_length(rev.payload::text)::bigint + COALESCE(octet_length(rev.sidecar::text), 0) + COALESCE(octet_length(rev.media_versions::text), 0) AS bytes
+               FROM requests request
+               JOIN publications p ON p.entity_type = 'entry' AND p.entity_id = request.entry_id
+                 AND p.context = request.context AND p.state = 'PUBLISHED'
+                 AND p.current_revision_id = request.revision_id
+               JOIN revisions rev ON rev.id = p.current_revision_id AND rev.entity_type = p.entity_type
+                 AND rev.entity_id = p.entity_id AND rev.state = 'SEALED' AND rev.locale = p.context
+               LEFT JOIN agent_markdown_settings ms ON ms.site_key = $4 AND ms.entry_id = p.entity_id
+               WHERE COALESCE(ms.enabled, true)
+             ), budget AS MATERIALIZED (
+               SELECT revision_id, ord, bytes,
+                      sum(CASE WHEN bytes <= $2 THEN bytes ELSE 0 END) OVER (ORDER BY ord) AS used
+               FROM sizes
+             )
+             SELECT budget.revision_id::text, rev.payload, rev.sidecar, rev.media_versions
+             FROM budget JOIN revisions rev ON rev.id = budget.revision_id
+             WHERE budget.bytes <= $2 AND budget.used <= $3 ORDER BY budget.ord`,
+            [JSON.stringify(requests), 128 * 1024, 2 * 1024 * 1024, defaultSiteKey],
+          );
+          for (const row of batch.rows)
+            markdownRevisions.set(row.revision_id, {
+              payload: row.payload,
+              sidecar: row.sidecar,
+              mediaVersions: row.media_versions,
+            });
+        }
+      }
       // Translation groups of the routed entries → alternates.
       const entryIds = result.rows.map((row) => row.entry_id);
       const alternatesByGroup = new Map<string, { hreflang: string; href: string }[]>();
@@ -2089,12 +2266,12 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
            FROM entries e
            JOIN publications mp ON mp.entity_type = 'entry' AND mp.entity_id = e.id AND mp.state = 'PUBLISHED'
               AND mp.context = CASE WHEN e.locale IN ('x-default', 'default') THEN 'default' ELSE e.locale END
-           LEFT JOIN routes r ON r.target_id = e.id::text AND r.retired_at IS NULL AND r.is_canonical AND r.target_type = 'entry'
+           LEFT JOIN routes r ON r.site_id = $2 AND r.target_id = e.id::text AND r.retired_at IS NULL AND r.is_canonical AND r.target_type = 'entry'
               AND r.locale = CASE WHEN e.locale IN ('x-default', 'default') THEN 'x-default' ELSE e.locale END
            WHERE COALESCE(e.translation_group_id::text, e.id::text) IN (
              SELECT COALESCE(translation_group_id::text, id::text) FROM entries WHERE id::text = ANY($1::text[])
            )`,
-          [entryIds],
+          [entryIds, site?.id ?? null],
         );
         const origin = await primaryOrigin();
         for (const row of members.rows) {
@@ -2110,19 +2287,42 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
           alternatesByGroup.set(row.group_id, group);
         }
       }
-      const candidates = result.rows.map((row) => {
-        const alternates = alternatesByGroup.get(groupOf.get(row.entry_id) ?? row.entry_id);
-        return {
-          entryId: row.entry_id,
-          path: publicPath(row.entry_id, row.route_locale, row.path),
-          lastmod: row.published_at == null ? null : new Date(row.published_at).toISOString(),
-          noindex: isNoindex(
-            (row.seo_payload as { robots_policy?: never } | null)?.robots_policy ?? null,
-          ),
-          eligibility: { public: true, http200: true },
-          ...(alternates === undefined ? {} : { alternates }),
-        };
-      });
+      const candidates: SitemapCandidate[] = result.rows
+        .filter((row) => !options?.includeMarkdown || isServedHome(row.entry_id, row.route_locale))
+        .map((row) => {
+          const alternates = alternatesByGroup.get(groupOf.get(row.entry_id) ?? row.entry_id);
+          const revision = row.markdown_revision_id
+            ? markdownRevisions.get(row.markdown_revision_id)
+            : undefined;
+          const fields = (revision?.payload as { fields?: Record<string, unknown> } | null)?.fields;
+          return {
+            entryId: row.entry_id,
+            path: publicPath(row.entry_id, row.route_locale, row.path),
+            locale: localeCode(row.route_locale),
+            ...(revision !== undefined
+              ? {
+                  markdown: {
+                    enabled: row.markdown_enabled ?? true,
+                    title: fields?.title,
+                    intro: fields?.intro,
+                    seo: row.seo_payload,
+                    payload: revision.payload,
+                    sidecar: revision.sidecar,
+                    mediaVersions: revision.mediaVersions,
+                    contentTypeId: row.content_type_id,
+                    templateKey: row.template_key,
+                    isHome: homeIds.has(row.entry_id),
+                  },
+                }
+              : {}),
+            lastmod: row.published_at == null ? null : new Date(row.published_at).toISOString(),
+            noindex: isNoindex(
+              (row.seo_payload as { robots_policy?: never } | null)?.robots_policy ?? null,
+            ),
+            eligibility: { public: true, http200: true },
+            ...(alternates === undefined ? {} : { alternates }),
+          };
+        });
       // Extension sitemap sources (ADR-0018 §4): cursor/batch with a global
       // ceiling; a failing source is skipped for this run (search/sitemap is
       // derived — the next publication or reindex retries it).
@@ -2630,7 +2830,6 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
       }
     }
   }
-  const extensionCatalog = input.extensionCatalog ?? createExtensionCatalog();
   const extensionSystemCapabilities =
     input.extensionSystemCapabilities ?? createCapabilityRegistry();
   if (input.extensionSystemCapabilities === undefined) {
@@ -2731,7 +2930,7 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
           }
           values[requirement] = value;
         }
-        provider.verifyCallback(request, { values });
+        await provider.verifyCallback(request, { values });
       },
       // Malformed bodies must not crash the pipeline before verification
       // records a FAILED event — treat them as "no provider event id".
@@ -2761,19 +2960,9 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
   let paymentsCompositionChain: Promise<void> = Promise.resolve();
   const composePaymentProviders = (): Promise<void> => {
     const run = async (): Promise<void> => {
-      let revision: string;
-      try {
-        revision = await extensionLifecycle.revision();
-      } catch {
-        return; // pre-M14 database: zero providers, fail-closed
-      }
+      const revision = await extensionLifecycle.revision();
       if (revision === paymentsCompositionRevision) return;
-      let enabledExtensionIds: string[] = [];
-      try {
-        enabledExtensionIds = await extensionLifecycle.enabledIds();
-      } catch {
-        enabledExtensionIds = [];
-      }
+      const enabledExtensionIds = await extensionLifecycle.enabledIds();
       const composed: PaymentProvider[] = [];
       for (const registration of composeExtensionRegistrations(
         extensionCatalog,
@@ -3057,6 +3246,9 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     deprecations: extensionDeprecations,
     contractVersions,
     lifecycle: extensionLifecycle,
+    paymentSubjectGrants:
+      input.extensionPaymentSubjectGrants ??
+      parseExtensionPaymentGrants(process.env.PCMS_EXTENSION_PAYMENT_GRANTS),
     releaseManifest,
     capabilities: effectiveCapabilities,
     scanCompatibility: scanExtensionsCompatibility,

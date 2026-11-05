@@ -31,6 +31,15 @@ export interface AppConfig {
      */
     trustedProxies: string[];
     /**
+     * Name inside `secrets` holding the HMAC key for the opaque network-source
+     * identifier extensions receive as `sourceKey` (CORE-SHOP-SECURITY-SOURCE-01).
+     * Optional: absent → extension call contexts carry no sourceKey (the
+     * feature is off, CMS behavior unchanged). Rotating the secret changes
+     * every derived key at once (anti-abuse windows reset). A configured
+     * secret shorter than 16 characters aborts process startup (fail-secure).
+     */
+    sourceKeySecretRef?: string;
+    /**
      * Anonymous-per-IP request budget for /api/v1/* (audit 2026-09-27 F-21).
      * A refill-bucket caps sustained abuse (scrapers, runaway pollers, stolen
      * credentials) while leaving admin/CLI traffic ample headroom. Default
@@ -38,6 +47,12 @@ export interface AppConfig {
      * explicit operator opt-out when an upstream proxy already limits).
      */
     apiRateLimitPerMinute?: number;
+    /** Site-owned security disclosure contact, published only when configured. */
+    securityTxt?: {
+      contact: string;
+      expires: string;
+      preferredLanguages?: string;
+    };
     /**
      * Session-cookie transport guard (owner directive 2026-09-30: LAN/demo
      * installs must be able to log in before TLS exists). Default: secure in
@@ -276,6 +291,25 @@ export const CONFIG_SCHEMA = {
           maxItems: 32,
         },
         apiRateLimitPerMinute: { type: "integer", minimum: 0, maximum: 100000 },
+        sourceKeySecretRef: { type: "string", pattern: SECRET_NAME },
+        securityTxt: {
+          type: "object",
+          additionalProperties: false,
+          required: ["contact", "expires"],
+          properties: {
+            contact: {
+              type: "string",
+              maxLength: 2048,
+              pattern: "^(https://|mailto:)[^\\s\\u0000-\\u001f\\u007f]+$",
+            },
+            expires: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+            preferredLanguages: {
+              type: "string",
+              maxLength: 128,
+              pattern: "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*(, *[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*)*$",
+            },
+          },
+        },
         cookieSecure: { type: "boolean" },
       },
     },

@@ -18,6 +18,7 @@ import {
 import { formatDateTime, formatFileSize, t } from "../../i18n/index.js";
 import { navigate, useRoute } from "../../layout/router.js";
 import { MaintenanceScreen } from "../maintenance/MaintenanceScreen.js";
+import { AgentMarkdownCard } from "./AgentMarkdownCard.js";
 import { IndexNowCard } from "./IndexNowCard.js";
 import { LanguagesCard } from "./LanguagesCard.js";
 
@@ -131,6 +132,7 @@ export function SettingsScreen() {
           <SiteTab />
           <LanguagesCard />
           <IndexNowCard />
+          <AgentMarkdownCard />
         </>
       )}
     </div>

@@ -13,6 +13,7 @@
 // Later tasks layer *semantic* validation on top of this structural contract:
 // placements depth/type policy (T011), settings/token bridge (T014), preset
 // discovery (T015), asset/JS/CSP policy (T017/T018).
+import { BLOCK_TYPE_ID_MAX_LENGTH, BLOCK_TYPE_ID_SOURCE } from "@pcms/core";
 import Ajv from "ajv";
 import { ThemeError } from "../errors.js";
 import { isValidVersionRange } from "./semver.js";
@@ -36,7 +37,7 @@ const PLACEMENT_ID_PATTERN = "^[a-z][a-z0-9_-]{0,31}(\\.[a-z][a-z0-9_-]{0,31}){1
 /** Content Type acceptance key: `key@version` (Theme spec §12). */
 const CONTENT_TYPE_KEY_PATTERN = "^[a-z][a-z0-9_]{0,63}@[1-9]\\d*$";
 /** Block renderer mapping key: `type@schemaVersion` (Theme spec §17). */
-const BLOCK_TYPE_KEY_PATTERN = "^[a-z][a-z0-9_]{0,63}@[1-9]\\d*$";
+const BLOCK_TYPE_KEY_PATTERN = `^(?=.{1,${BLOCK_TYPE_ID_MAX_LENGTH}}@)${BLOCK_TYPE_ID_SOURCE}@[1-9]\\d*$`;
 /** Theme-relative template/component/block/asset paths — no traversal. */
 const THEME_FILE_PATTERN =
   "^(templates|components|blocks|assets)/[a-z0-9][a-z0-9._/-]{0,127}\\.(liquid|css|js|svg|png|jpg|jpeg|webp|avif|woff2|json|txt)$";
@@ -234,6 +235,28 @@ export const THEME_MANIFEST_JSON_SCHEMA = {
       properties: {
         id: { type: "string", pattern: KEY_PATTERN },
         file: { type: "string", pattern: "^templates/[a-z0-9][a-z0-9._/-]{0,127}\\.liquid$" },
+        markdown_file: {
+          type: "string",
+          pattern: "^templates/[a-z0-9][a-z0-9._/-]{0,127}\\.liquid$",
+        },
+        markdown_contract: {
+          type: "object",
+          additionalProperties: false,
+          required: ["version", "dependencies"],
+          properties: {
+            version: { const: 1 },
+            dependencies: {
+              type: "array",
+              maxItems: 128,
+              uniqueItems: true,
+              items: {
+                type: "string",
+                maxLength: 200,
+                pattern: "^[a-z][a-z0-9_]*(\\.[a-z0-9_*]+)*$",
+              },
+            },
+          },
+        },
         /** Content Types the template accepts — never inferred from names (§12). */
         accepts_content_types: {
           type: "array",
@@ -283,6 +306,7 @@ export const THEME_MANIFEST_JSON_SCHEMA = {
          * picker. Default true for backward compatibility. */
         editor_selectable: { type: "boolean" },
       },
+      allOf: [{ if: { required: ["markdown_contract"] }, then: { required: ["markdown_file"] } }],
     },
     component: {
       type: "object",
@@ -433,9 +457,17 @@ export const THEME_MANIFEST_JSON_SCHEMA = {
 } as const;
 
 /** Manifest sub-types (structural mirrors of the JSON Schema). */
+export interface ThemeMarkdownContract {
+  readonly version: 1;
+  /** Actual source dependencies must be covered; this is not a trusted availability flag. */
+  readonly dependencies: readonly string[];
+}
+
 export interface ThemeManifestTemplate {
   readonly id: string;
   readonly file: string;
+  readonly markdown_file?: string;
+  readonly markdown_contract?: ThemeMarkdownContract;
   readonly accepts_content_types: readonly string[];
   /** Extension views overridden by this template (ADR-0018 §3). */
   readonly accepts_views?: readonly string[];
@@ -568,6 +600,12 @@ function collectFilePaths(manifest: Record<string, unknown>): [string, unknown][
     for (const [index, item] of (manifest[key] as unknown[] | undefined)?.entries() ?? []) {
       entries.push([`/${key}/${index}/file`, (item as Record<string, unknown>)?.file]);
     }
+  }
+  for (const [index, item] of (manifest.templates as unknown[] | undefined)?.entries() ?? []) {
+    entries.push([
+      `/templates/${index}/markdown_file`,
+      (item as Record<string, unknown>)?.markdown_file,
+    ]);
   }
   const assets = manifest.assets as Record<string, unknown> | undefined;
   if (assets) {

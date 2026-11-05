@@ -4,7 +4,7 @@
 как запустить, собрать, валидировать тему и как менять типовые вещи без знания CMS Core.
 
 - Theme ID: `reference-theme-v1`, версия: `1.2.3`
-- Theme Contract: `^1.0` (см. `docs/specs/Progressive_CMS_Theme_Contract_v1_Spec.md`)
+- Theme Contract: `^1.0` (см. [themes.md](../../docs/themes.md))
 
 ## Как запустить / собрать / валидировать
 
@@ -12,7 +12,7 @@
 npm ci                                                     # зависимости
 npm run cms -- theme validate themes/reference-theme-v1 --json   # валидация темы
 npm run cms -- site validate --theme themes/reference-theme-v1 --json  # совместимость с контентом
-npm test                                                   # юнит- и рендер-тесты
+npm test                                                   # публичные unit-тесты
 ```
 
 Сборка не обязательна: тема работает из исходников. Прод-правило — фингерпринты
@@ -94,7 +94,7 @@ CSS-брейкпоинты (тема): `--bp-tablet: 768px`, `--bp-desktop: 1080
 ## Media presets
 
 `hero` 1600×900 eager · `card` 800×600 · `thumbnail` 96×96 · `gallery` 1200×900 · `social-display` 1200×630.
-Тема НЕ строит URL с `?w=&h=` — она получает готовые derivatives из Media View Model (M05).
+Тема НЕ строит URL с `?w=&h=` — она получает готовые derivatives из Media View Model.
 
 ## Globals
 
@@ -110,13 +110,13 @@ CSP строит CMS из `assets.csp` темы (разрешён только `
 
 ## Forms integration boundary
 
-`form`/`quiz` блоки и CTA `action=form` появятся в M12 (Forms, Quizzes & Leads):
-тема получает Form View Model и рендерит её; собственных обработчиков форм у темы нет.
+Для `form`/`quiz` и CTA `action=form` тема использует публичную модель формы
+из Core; собственных обработчиков отправки у темы нет.
 
 ## Preview
 
 Превью кандидатной темы без активации: `createThemePreview` из `@pcms/themes`
-(см. `tests/themes/preview.test.ts`); подписанные preview-URL придут с Preview-подсистемой.
+с подписанным preview-URL.
 
 ## Common-change recipes
 
@@ -147,8 +147,8 @@ CSP строит CMS из `assets.csp` темы (разрешён только `
 запись в `templates[]` манифеста с `accepts_content_types`; 3) прогнать
 `cms theme validate` + рендер-тест. Новая запись обратимо совместима (minor).
 
-**Как проверить mobile menu.** `npm test` (placement-тесты), затем Playwright-смоук
-(T023): viewport 375×812, клик по «Меню», `aria-expanded` переключается, навигация видима.
+**Как проверить mobile menu.** При viewport 375×812 клик по «Меню» должен
+переключать `aria-expanded` и показывать навигацию.
 
 ## Release
 
@@ -157,14 +157,13 @@ SemVer: patch — багфиксы презентации; minor — новые 
 
 ## Известные ограничения
 
-- Карта — «каркас» без провайдера (подключение провайдера — решение сайта, M05/M13).
+- Карта — «каркас» без провайдера (подключение провайдера — решение сайта).
 - Видео YouTube рендерится facade-iframe с `youtube-nocookie` (задекларировано в CSP).
-- Мультиязычность контента появляется с Routing/i18n (M04+), тема locale-agnostic.
-- `form`/`quiz` рендереры появятся в M12.
+- Локаль контента определяется Routing/i18n; тема использует переданный locale.
 
-## Human-maintainability checklist (acceptance, spec §61)
+## Изменение темы
 
-Тема проходит gate, если любое типовое изменение делается без: правок Core,
+Типовые изменения темы выполняются без правок Core,
 знания SQL, реверс-инжиниринга бандла, обязательного LLM, правок compiled-артефактов.
 
 | Хочу изменить | Где | Что трогать нельзя |
@@ -183,8 +182,6 @@ SemVer: patch — багфиксы презентации; minor — новые 
 
 ```bash
 npm run cms -- theme validate themes/reference-theme-v1 --json
-npm test -- tests/themes/reference-theme.test.ts
-npm run test:browser
 ```
 
 ## Поиск по сайту
@@ -198,4 +195,4 @@ npm run test:browser
 Карточка получает `item.fields` (все опубликованные поля), `item.seo`,
 summary/snippet/даты и `media[item.fields.hero_image].presets.thumbnail`.
 Выбирайте нужные поля явно. Пагинация использует `search.next_url`.
-Полный контракт: [PUBLIC-SITE-SEARCH.md](../../docs/handoff/PUBLIC-SITE-SEARCH.md).
+Контракт поиска описан в публичном руководстве [search.md](../../docs/search.md).

@@ -151,6 +151,7 @@ export type ComposedRegistration =
       readonly eventType: string;
       readonly subscriptionId: string;
       readonly handler: string;
+      readonly transactional: boolean;
     }
   | {
       readonly kind: "job";
@@ -325,6 +326,7 @@ export function composeExtensionRegistrations(
         eventType: subscription.event_type,
         subscriptionId: subscription.subscription_id,
         handler: subscription.handler,
+        transactional: subscription.transactional === true,
       });
     }
     for (const job of manifest.registrations.jobs) {

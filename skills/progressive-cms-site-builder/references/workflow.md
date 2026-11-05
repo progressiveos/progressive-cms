@@ -25,7 +25,7 @@ curl --fail-with-body "$PCMS_API_URL/api/v1/agent/bootstrap" \
 
 Read `server.cms_version` as `PCMS_CORE_VERSION` for compatibility/validation. Inspect permissions, preview readiness and primary domain. If MCP is configured, list its tools first and use discovered equivalents; REST is the fallback. The actual target version is independent of the Skill version.
 
-Translate the brief into pages, editable types, language, parents, menus and required form delivery. Check `/discovery/content/types`, `/discovery/blocks` and `/discovery/theme` before choosing keys. Use only the page inventory the brief calls for.
+Translate the brief into pages, editable types, language, parents, menus and required form delivery. Check `/discovery/content/types`, `/discovery/blocks` and `/discovery/theme` before choosing keys. Use only the page inventory the brief calls for. Extension block ids are lowercase dotted names from the deployed catalogue; match the discovered props schema and use a theme renderer key `<block_type>@1`. The owning extension must be enabled when sealing a new revision that uses its block.
 
 ## Declare model, then theme
 

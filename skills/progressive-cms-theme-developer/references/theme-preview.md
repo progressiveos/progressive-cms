@@ -89,10 +89,3 @@ HTML рендерится темой `theme` из токена: шаблоны, 
   применимы только к активной теме).
 - `GET /preview` (JSON-состояние) в поле `theme` возвращает, какая тема
   подписана в токене.
-
-## Регрессии
-
-- `tests/publication/preview.test.ts` — токен несёт/возвращает `theme`.
-- `tests/apps/site-render.test.ts` — «preview renders a candidate theme»:
-  одна и та же ревизия рендерится активной темой без `theme` и кандидатом
-  с ним; неизвестная тема и traversal — типизированный 404.

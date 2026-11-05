@@ -15,7 +15,7 @@ import {
 import { ApiError } from "../../errors.js";
 import { readBindingFeedOptions } from "../../feed-options.js";
 import type { ApiRoute } from "../registry.js";
-import { createRateLimiter } from "./search.js";
+import { createRateLimiter, rateLimitHeaders } from "./search.js";
 
 const STABLE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -94,7 +94,15 @@ function cardTeaser(fields: Record<string, unknown>): string | null {
 }
 
 export function makeCollectionsRoutes(): ApiRoute[] {
-  const rateLimit = createRateLimiter({ now: () => new Date() });
+  const rateLimit = createRateLimiter(
+    { now: () => new Date() },
+    {
+      capacity: 40,
+      refillPerSecond: 2,
+      exceededCode: "SEARCH_RATE_LIMITED",
+      exceededMessage: "collection rate limit exceeded, retry shortly",
+    },
+  );
   return [
     {
       spec: {
@@ -108,7 +116,7 @@ export function makeCollectionsRoutes(): ApiRoute[] {
         querySchema: COLLECTIONS_QUERY_SCHEMA,
       },
       async handle(app, _ctx, request) {
-        rateLimit(request.ip);
+        const rate = rateLimit(request.ip);
         const params = request.params as { key: string };
         const binding = app.themeDiscovery?.getManifest().collections?.[params.key];
         if (binding === undefined) {
@@ -188,6 +196,7 @@ export function makeCollectionsRoutes(): ApiRoute[] {
         });
         return {
           status: 200,
+          headers: rateLimitHeaders(rate),
           body: {
             collection: params.key,
             total: feed.total,

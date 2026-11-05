@@ -11,7 +11,7 @@
 // own block types later — the Forms subsystem registers `form`/`quiz` in M12
 // (Content spec §35 contract note, ADR-0005).
 
-import type { StableId } from "@pcms/core";
+import { BLOCK_TYPE_ID_MAX_LENGTH, BLOCK_TYPE_ID_SOURCE, type StableId } from "@pcms/core";
 import Ajv from "ajv";
 import { BlocksError } from "./errors.js";
 
@@ -75,7 +75,7 @@ export interface RegisteredBlockType {
   ) => ReadonlyArray<{ code: string; message: string }> | null;
 }
 
-const TYPE_ID_RE = /^[a-z][a-z0-9_]{0,63}$/;
+const TYPE_ID_RE = new RegExp(`^${BLOCK_TYPE_ID_SOURCE}$`);
 const VARIANT_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 
 /** Canonical block props migration path (Content spec §70). */
@@ -183,10 +183,10 @@ export function createBlockRegistry(): BlockRegistry {
 
     registerBlockType(descriptor: BlockTypeDescriptor): RegisteredBlockType {
       const { typeId, schemaVersion, propsSchema } = descriptor;
-      if (!TYPE_ID_RE.test(typeId)) {
+      if (typeId.length > BLOCK_TYPE_ID_MAX_LENGTH || !TYPE_ID_RE.test(typeId)) {
         throw new BlocksError(
           "BLOCK_TYPE_ID_INVALID",
-          `block type id "${typeId}" must be lowercase snake_case (≤64 chars)`,
+          `block type id "${typeId}" must be a valid Core or extension block identifier`,
         );
       }
       if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {

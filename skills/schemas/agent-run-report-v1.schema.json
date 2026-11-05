@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://progressive-cms.dev/schemas/agent-run-report-v1.json",
   "title": "Progressive CMS agent run report v1",
-  "description": "Structured end-of-run report for both first-party Agent Skills (PCMS-SKILL-T011). Secret-free by contract: no token values, credentials, secrets or secret references.",
+  "description": "Structured end-of-run report for both first-party Agent Skills. Secret-free by contract: no token values, credentials, secrets or secret references.",
   "type": "object",
   "additionalProperties": false,
   "required": [

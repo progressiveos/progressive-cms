@@ -11,7 +11,8 @@
 //  - `ownPropertyOnly` blocks prototype-chain escapes like `x.constructor`;
 //  - bounded resources: parseLimit / renderLimit guard DoS-sized templates.
 import { Liquid, type LiquidOptions } from "liquidjs";
-import { isSafeHtml, stringifyOutput } from "./safe-html.js";
+import { stringifyOutput } from "./safe-html.js";
+import { isSafeMarkdown } from "./safe-markdown.js";
 
 /** Theme source snapshot: template name (no directories) → source text. */
 export type TemplateSnapshot = Readonly<Record<string, string>>;
@@ -21,6 +22,7 @@ export interface ThemeEngineOptions {
   readonly templates: TemplateSnapshot;
   /** Per-render time budget in ms (LiquidJS renderLimit); default 1000. */
   readonly renderTimeBudgetMs?: number;
+  readonly outputFormat?: "html" | "markdown";
 }
 
 const DEFAULT_RENDER_TIME_BUDGET_MS = 1000;
@@ -37,7 +39,8 @@ export function createThemeEngine(options: ThemeEngineOptions): Liquid {
     strictFilters: true,
     // Optional content fields may be absent; templates use `| default`.
     strictVariables: false,
-    outputEscape: (value: unknown) => stringifyOutput(value),
+    outputEscape: (value: unknown) =>
+      options.outputFormat === "markdown" ? stringifyMarkdown(value) : stringifyOutput(value),
     parseLimit: 1_000_000,
     renderLimit: options.renderTimeBudgetMs ?? DEFAULT_RENDER_TIME_BUDGET_MS,
   };
@@ -63,6 +66,16 @@ export function createThemeEngine(options: ThemeEngineOptions): Liquid {
     return formatUtcDate(parsed, typeof args[0] === "string" ? args[0] : undefined);
   });
   return engine;
+}
+
+function stringifyMarkdown(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (isSafeMarkdown(value)) return value.markdown;
+  const text =
+    typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? String(value)
+      : (JSON.stringify(value) ?? "");
+  return text.replace(/[\r\n]+/g, " ").replace(/([\\`*_{}[\]()#+\-.!<>|])/g, "\\$1");
 }
 
 function formatUtcDate(date: Date, format?: string): string {

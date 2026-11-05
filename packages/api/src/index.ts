@@ -43,6 +43,7 @@ export * from "./http/pagination.js";
 export * from "./http/plugin.js";
 export * from "./http/registry.js";
 export { makeAgentRoutes } from "./http/routes/agent.js";
+export { makeAgentMarkdownRoutes } from "./http/routes/agent-markdown.js";
 export { makeAnalyticsRoutes } from "./http/routes/analytics.js";
 export { makePcpubBundleRoutes } from "./http/routes/bundles-pcpub.js";
 export { makeCollectionsRoutes } from "./http/routes/collections.js";
@@ -65,17 +66,21 @@ export { makeRoutingRoutes } from "./http/routes/routing.js";
 export {
   createRateLimiter,
   makeSearchRoutes,
+  RateLimitError,
+  rateLimitHeaders,
   searchCapabilities,
   searchStatus,
 } from "./http/routes/search.js";
 export { makeSeoIndexNowRoutes } from "./http/routes/seo-indexnow.js";
 export { makeSkillsRoutes } from "./http/routes/skills.js";
 export { makeThemeManageRoutes } from "./http/routes/themes-manage.js";
+export * from "./http/source-key.js";
 export * from "./indexnow-ops.js";
 export * from "./integrations-ops.js";
 export * from "./lead-deliveries.js";
 export * from "./mail-ops.js";
 export * from "./maintenance-ops.js";
+export * from "./markdown-settings-ops.js";
 export * from "./mcp-surface.js";
 export * from "./media-acquisition-ops.js";
 export * from "./media-provider-ops.js";

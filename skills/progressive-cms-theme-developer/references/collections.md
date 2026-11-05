@@ -1,4 +1,4 @@
-# Collections — named published feeds (Theme Contract §43)
+# Collections — named published feeds
 
 A named collection is a declarative published-entry feed (news/blog lists
 with server-side pagination and tag filters). The ACTIVE theme declares it;
@@ -67,7 +67,7 @@ block allows it.
 ```
 
 Items carry `entry_id, href, title, description, teaser, date (ISO),
-tags[], image, image_alt, fields{}` — image follows the §81 selection rules;
+tags[], image, image_alt, fields{}` — image follows the shared published-card selection rules;
 resolve bigger variants through the normal `media` scope when needed.
 `description` = teaser → intro → first 200 plain-text body characters;
 `teaser` keeps its historical intro-first chain. URLs (`facet.url`,

@@ -101,7 +101,11 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+const CREATE_CLAIM_KEY = "__pcms_provider_create_submitted";
+
 function rowToPayment(row: PaymentRow): Payment {
+  const metadata = { ...((row.metadata ?? {}) as Record<string, unknown>) };
+  delete metadata[CREATE_CLAIM_KEY];
   return {
     id: row.id as StableId,
     providerInstanceId: row.provider_instance_id,
@@ -113,7 +117,7 @@ function rowToPayment(row: PaymentRow): Payment {
     status: row.status,
     description: row.description,
     idempotencyKey: row.idempotency_key,
-    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    metadata,
     refundedAmount: Number(row.refunded_amount),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -288,6 +292,9 @@ export function createPaymentService(deps: {
       throw new PaymentError("PAYMENT_REQUEST_INVALID", "description exceeds 500 chars");
     }
     if (input.metadata !== undefined) {
+      if (Object.hasOwn(input.metadata, CREATE_CLAIM_KEY)) {
+        throw new PaymentError("PAYMENT_REQUEST_INVALID", "reserved payment metadata key");
+      }
       const keys = Object.keys(input.metadata);
       if (keys.length > 32) {
         throw new PaymentError("PAYMENT_METADATA_TOO_LARGE", "metadata allows at most 32 keys");
@@ -311,6 +318,7 @@ export function createPaymentService(deps: {
       readonly inboundEventId?: string;
       readonly actor?: PaymentActor;
     },
+    expectedClaim?: string,
   ): Promise<Payment> {
     const target: PaymentStatus =
       outcome.status === "SUCCEEDED"
@@ -318,11 +326,37 @@ export function createPaymentService(deps: {
         : outcome.status === "FAILED"
           ? "FAILED"
           : "PENDING";
-    return pool.withTransaction(async (tx) => {
+    const settle = async (tx: DbClient): Promise<Payment> => {
       const locked = await getWithinTx(tx, payment.id, true);
       if (locked === null) throw new PaymentError("PAYMENT_NOT_FOUND", "payment vanished");
-      if (locked.status === target) {
-        // Replay with no state change: idempotent no-op (spec §34/§35).
+      if (expectedClaim !== undefined) {
+        const claim = await tx.query<{ token: string | null }>(
+          `SELECT metadata #>> ARRAY[$2, 'token'] AS token FROM payment WHERE id=$1`,
+          [payment.id, CREATE_CLAIM_KEY],
+        );
+        if (claim.rows[0]?.token !== expectedClaim) {
+          throw new PaymentError("PAYMENT_PROVIDER_UNAVAILABLE", "stale payment create attempt");
+        }
+      }
+      if (
+        outcome.externalId !== undefined &&
+        locked.externalPaymentId !== null &&
+        locked.externalPaymentId !== outcome.externalId
+      ) {
+        throw new PaymentError(
+          "PAYMENT_INBOUND_INVALID",
+          "provider payment reference does not match",
+        );
+      }
+      if (locked.status === target || !canTransition(locked.status, target)) {
+        // A callback may settle first; retain its status and attach the later reference.
+        if (locked.externalPaymentId === null && outcome.externalId !== undefined) {
+          const attached = await tx.query<PaymentRow>(
+            "UPDATE payment SET external_payment_id=$2, updated_at=$3 WHERE id=$1 RETURNING *",
+            [payment.id, outcome.externalId, clock.now()],
+          );
+          return rowToPayment(attached.rows[0]!);
+        }
         return locked;
       }
       assertTransition(locked.status, target);
@@ -345,10 +379,130 @@ export function createPaymentService(deps: {
       });
       await writeOutbox(tx, next, locked.status);
       return next;
+    };
+    return pool.withTransaction(settle);
+  }
+
+  async function insertPaymentIntent(
+    tx: DbClient,
+    paymentId: string,
+    input: CreatePaymentInput,
+    actor?: PaymentActor,
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO payment
+         (id, provider_instance_id, subject_type, subject_id, amount, currency,
+          status, description, idempotency_key, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, 'CREATED', $7, $8, $9)`,
+      [
+        paymentId,
+        input.provider_instance_id,
+        input.subject_type,
+        input.subject_id,
+        round2(input.amount),
+        input.currency,
+        input.description ?? null,
+        input.idempotency_key,
+        JSON.stringify({ ...input.metadata, [CREATE_CLAIM_KEY]: { ready: true } }),
+      ],
+    );
+    await appendEvent(tx, paymentId, {
+      eventType: "CREATED",
+      source: "system",
+      ...(actor === undefined ? {} : { actor }),
     });
   }
 
   return {
+    /** Creates a subject-owned intent under the owner's row lock. The trusted
+     * callback checks ownership, locks/reserves the subject and reads its
+     * immutable snapshot. Provider I/O runs only after this transaction. */
+    async createForExtension(
+      base: {
+        readonly provider_instance_id: string;
+        readonly subject_type: string;
+        readonly subject_id: string;
+        readonly idempotency_key: string;
+        readonly metadata: Record<string, unknown>;
+      },
+      reserve: (tx: DbClient) => Promise<{ readonly amount: number; readonly currency: string }>,
+      actor: PaymentActor,
+    ): Promise<{ readonly payment: Payment; readonly replayed: boolean }> {
+      const instance = await instances.get(base.provider_instance_id);
+      if (instance === null)
+        throw new PaymentError(
+          "PAYMENT_PROVIDER_INSTANCE_NOT_FOUND",
+          "provider instance not found",
+        );
+      if (!instance.enabled)
+        throw new PaymentError("PAYMENT_PROVIDER_UNAVAILABLE", "provider instance disabled");
+      const provider = providers.get(instance.providerType);
+      if (provider === undefined)
+        throw new PaymentError("PAYMENT_PROVIDER_UNKNOWN", "provider is not registered");
+      const result = await pool
+        .withTransaction(async (tx) => {
+          await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+            `pcms:extension-payment-key:${base.idempotency_key}`,
+          ]);
+          const snapshot = await reserve(tx);
+          const input: CreatePaymentInput = { ...base, ...snapshot };
+          validateCreateInput(input);
+          const existing = await tx.query<PaymentRow>(
+            `SELECT * FROM payment WHERE idempotency_key = $1 AND metadata->>'extension_id' = $2`,
+            [input.idempotency_key, input.metadata?.extension_id],
+          );
+          if (existing.rows.length > 0) {
+            const payment = rowToPayment(existing.rows[0]!);
+            if (
+              payment.providerInstanceId !== instance.id ||
+              payment.subjectType !== input.subject_type ||
+              payment.subjectId !== input.subject_id ||
+              payment.amount !== round2(input.amount) ||
+              payment.currency !== input.currency ||
+              payment.metadata.extension_id !== input.metadata?.extension_id
+            )
+              throw new PaymentError(
+                "PAYMENT_DUPLICATE_REQUEST",
+                "idempotency key already used with a different payload",
+              );
+            return { payment, replayed: true };
+          }
+          const active = await tx.query<PaymentRow>(
+            `SELECT * FROM payment WHERE subject_type = $1 AND subject_id = $2
+             AND status IN ('CREATED', 'PENDING', 'SUCCEEDED', 'PARTIALLY_REFUNDED') LIMIT 1`,
+            [input.subject_type, input.subject_id],
+          );
+          if (active.rows.length > 0)
+            throw new PaymentError(
+              "PAYMENT_DUPLICATE_REQUEST",
+              "subject already has an active or successful payment",
+            );
+          const paymentId = newStableId();
+          await insertPaymentIntent(tx, paymentId, input, actor);
+          const payment = await getWithinTx(tx, paymentId, false);
+          if (payment === null)
+            throw new PaymentError("PAYMENT_NOT_FOUND", "payment vanished after insert");
+          return { payment, replayed: false };
+        })
+        .catch((error: unknown) => {
+          const dbError = error as { code?: string; constraint?: string };
+          if (
+            dbError.code === "23505" &&
+            dbError.constraint === "payment_provider_instance_id_idempotency_key_key"
+          ) {
+            throw new PaymentError(
+              "PAYMENT_DUPLICATE_REQUEST",
+              "idempotency key already used with a different payload",
+            );
+          }
+          throw error;
+        });
+      if (result.payment.status === "CREATED" && result.payment.externalPaymentId === null) {
+        const settled = await this.callProviderAndSettle(provider, instance, result.payment, actor);
+        return { payment: settled.payment, replayed: result.replayed };
+      }
+      return result;
+    },
     /**
      * Create with CMS-owned idempotency (spec §33): replays of the same
      * (provider instance, idempotency_key) return the SAME logical payment;
@@ -409,28 +563,7 @@ export function createPaymentService(deps: {
       const paymentId = newStableId();
       try {
         await pool.withTransaction(async (tx) => {
-          await tx.query(
-            `INSERT INTO payment
-               (id, provider_instance_id, subject_type, subject_id, amount, currency,
-                status, description, idempotency_key, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6, 'CREATED', $7, $8, $9)`,
-            [
-              paymentId,
-              instance.id,
-              input.subject_type,
-              input.subject_id,
-              round2(input.amount),
-              input.currency,
-              input.description ?? null,
-              input.idempotency_key,
-              JSON.stringify(input.metadata ?? {}),
-            ],
-          );
-          await appendEvent(tx, paymentId, {
-            eventType: "CREATED",
-            source: "system",
-            ...(actor === undefined ? {} : { actor }),
-          });
+          await insertPaymentIntent(tx, paymentId, input, actor);
         });
       } catch (error) {
         if ((error as { code?: string }).code === "23505") {
@@ -455,6 +588,42 @@ export function createPaymentService(deps: {
       actor?: PaymentActor,
     ): Promise<{ readonly payment: Payment; readonly replayed: boolean }> {
       const secrets = resolveProviderSecrets(instance, provider.secretRequirements);
+      const retryable = provider.capabilities().providerIdempotency;
+      const claim = newStableId();
+      // A short committed CAS, not a connection or transaction held over I/O.
+      // Missing legacy markers are unknown outcomes for non-idempotent providers.
+      // Only an idempotent provider can reclaim an expired idempotent lease.
+      const acquired = await pool.query<{ id: string }>(
+        `UPDATE payment SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), ARRAY[$2],
+           jsonb_build_object('token', $3::text, 'at', clock_timestamp(), 'retryable', $4::boolean))
+         WHERE id=$1 AND status='CREATED' AND external_payment_id IS NULL AND (
+           metadata #> ARRAY[$2, 'ready'] = 'true'::jsonb OR
+           ($4::boolean AND NOT COALESCE(metadata ? $2, false)) OR (
+             $4::boolean AND metadata #> ARRAY[$2, 'retryable'] = 'true'::jsonb AND
+             (metadata #>> ARRAY[$2, 'at'])::timestamptz < clock_timestamp() - interval '5 minutes'
+           )
+         ) RETURNING id`,
+        [payment.id, CREATE_CLAIM_KEY, claim, retryable],
+      );
+      if (acquired.rows.length === 0) {
+        const current = await getWithinTx(pool, payment.id, false);
+        if (current === null) throw new PaymentError("PAYMENT_NOT_FOUND", "payment not found");
+        if (current.status !== "CREATED" || current.externalPaymentId !== null)
+          return { payment: current, replayed: true };
+        throw new PaymentError(
+          "PAYMENT_PROVIDER_UNAVAILABLE",
+          retryable
+            ? "payment creation is already in progress"
+            : "provider create outcome is unknown; manual reconciliation required",
+        );
+      }
+      const releaseRetryableClaim = async () => {
+        if (!retryable) return;
+        await pool.query(
+          `UPDATE payment SET metadata = metadata - $2 WHERE id=$1 AND metadata #>> ARRAY[$2, 'token'] = $3`,
+          [payment.id, CREATE_CLAIM_KEY, claim],
+        );
+      };
       let result: import("./providers.js").ProviderCreateResult;
       try {
         result = await provider.createPayment(
@@ -469,25 +638,32 @@ export function createPaymentService(deps: {
           secrets,
         );
       } catch (error) {
+        await releaseRetryableClaim();
         if (error instanceof PaymentError) throw error;
-        // Outage: the logical payment SURVIVES as CREATED; the same request
-        // replayed with the same key resumes (spec §1/§33).
         throw new PaymentError(
           "PAYMENT_PROVIDER_UNAVAILABLE",
           `provider create failed: ${(error instanceof Error ? error.message : String(error)).slice(0, 160)}`,
           { cause: error },
         );
       }
-      const next = await applyProviderOutcome(
-        payment,
-        {
-          status: result.status,
-          externalId: result.externalId,
-          ...(result.providerStatus === undefined ? {} : { providerStatus: result.providerStatus }),
-        },
-        { source: "provider", ...(actor === undefined ? {} : { actor }) },
-      );
-      return { payment: next, replayed: payment.status !== "CREATED" };
+      try {
+        const next = await applyProviderOutcome(
+          payment,
+          {
+            status: result.status,
+            externalId: result.externalId,
+            ...(result.providerStatus === undefined
+              ? {}
+              : { providerStatus: result.providerStatus }),
+          },
+          { source: "provider", ...(actor === undefined ? {} : { actor }) },
+          claim,
+        );
+        return { payment: next, replayed: payment.status !== "CREATED" };
+      } catch (error) {
+        await releaseRetryableClaim();
+        throw error;
+      }
     },
 
     /**
@@ -537,13 +713,12 @@ export function createPaymentService(deps: {
         // the tx back; the upstream inbound record keeps its dedupe/audit
         // trail and is marked failed by the composition layer.
         if (
-          input.parsed.amount !== undefined &&
-          (input.parsed.amount !== payment.amount ||
-            (input.parsed.currency !== undefined && input.parsed.currency !== payment.currency))
+          (input.parsed.amount !== undefined && input.parsed.amount !== payment.amount) ||
+          (input.parsed.currency !== undefined && input.parsed.currency !== payment.currency)
         ) {
           throw new PaymentError(
             "PAYMENT_INBOUND_INVALID",
-            "callback amount does not match the payment",
+            "callback amount or currency does not match the payment",
           );
         }
         const target: PaymentStatus =
@@ -1083,7 +1258,10 @@ export function createPaymentService(deps: {
      * REQUESTED — single-flight per payment is enforced by the DB. */
     async claimDueRefundIntents(limit: number) {
       const result = await pool.query<{ id: string }>(
-        `SELECT id FROM payment_refund WHERE status = 'REQUESTED' ORDER BY created_at, id LIMIT $1 FOR UPDATE SKIP LOCKED`,
+        `SELECT r.id FROM payment_refund r
+         WHERE r.status = 'REQUESTED'
+           AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.idempotency_key = 'refund-intent-' || r.id::text)
+         ORDER BY r.created_at, r.id LIMIT $1`,
         [limit],
       );
       return result.rows.map((row) => row.id);

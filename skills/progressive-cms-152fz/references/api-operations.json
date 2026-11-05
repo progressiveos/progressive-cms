@@ -355,7 +355,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Open or create the entry's working draft (Admin spec §24)",
+        "summary": "Open or create the entry's working draft",
         "tags": ["content"],
         "x-permission": "content.edit"
       }
@@ -3945,7 +3945,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23)",
+        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe",
         "tags": ["forms"]
       }
     },
@@ -5284,7 +5284,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
+        "summary": "Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
         "tags": ["themes"],
         "x-permission": "theme.write"
       }

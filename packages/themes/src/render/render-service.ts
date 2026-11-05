@@ -62,6 +62,11 @@ export interface RenderService {
     scope: Readonly<Record<string, unknown>>,
     context?: RenderContext,
   ): Promise<string>;
+  renderMarkdownTemplate(
+    templateId: string,
+    scope: Readonly<Record<string, unknown>>,
+    context?: RenderContext,
+  ): Promise<string>;
   /** Renders a declared component template file directly (PCMS-THEME-T007). */
   renderComponent(
     componentFile: string,
@@ -78,17 +83,22 @@ export interface RenderServiceOptions {
   /** Dev mode: attach engine causes/stacks to renderer errors (§57). */
   readonly devMode?: boolean;
   readonly renderTimeBudgetMs?: number;
+  readonly outputFormat?: "html" | "markdown";
 }
 
 export function createRenderService(options: RenderServiceOptions): RenderService {
   const { manifest, snapshot } = options;
   const engine = createThemeEngine({
     templates: snapshot,
+    ...(options.outputFormat === undefined ? {} : { outputFormat: options.outputFormat }),
     ...(options.renderTimeBudgetMs === undefined
       ? {}
       : { renderTimeBudgetMs: options.renderTimeBudgetMs }),
   });
   const templateFiles = new Map(manifest.templates.map((t) => [t.id, t.file]));
+  const markdownTemplateFiles = new Map(
+    manifest.templates.flatMap((t) => (t.markdown_file ? [[t.id, t.markdown_file] as const] : [])),
+  );
   const componentFiles = new Set(manifest.components.map((c) => c.file));
 
   async function renderFile(
@@ -135,6 +145,19 @@ export function createRenderService(options: RenderServiceOptions): RenderServic
         throw new ThemeError("THEME_TEMPLATE_NOT_FOUND", `unknown template: ${templateId}`, {
           details: { id: templateId, kind: "template", ...context },
         });
+      }
+      return renderFile(file, scope, context, "template", templateId);
+    },
+    async renderMarkdownTemplate(templateId, scope, context = {}) {
+      const file = markdownTemplateFiles.get(templateId);
+      if (file === undefined) {
+        throw new ThemeError(
+          "THEME_TEMPLATE_NOT_FOUND",
+          `no Markdown template for: ${templateId}`,
+          {
+            details: { id: templateId, kind: "markdown-template", ...context },
+          },
+        );
       }
       return renderFile(file, scope, context, "template", templateId);
     },

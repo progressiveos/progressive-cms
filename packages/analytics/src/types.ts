@@ -50,9 +50,8 @@ export interface YandexMetricaConfig {
   readonly accurateTrackBounce: boolean;
   readonly ecommerce: boolean;
   readonly sendTitle: boolean;
-  /** Counter-check debugger allowances (owner 2026-10-18 CSP task A):
-   * style-attribute allowance for the vendor's `_ym_debug=2` check panel.
-   * Diagnostic-grade, default off — never part of ordinary collection. */
+  /** Counter-check debugger inline-style allowances for the vendor's
+   * `_ym_debug=2` check panel. Diagnostic-grade, default off. */
   readonly debugMode: boolean;
   readonly activationPolicy: AnalyticsActivationPolicy;
 }
@@ -99,11 +98,9 @@ export type AnalyticsFragment =
   | { readonly kind: "noscript_image"; readonly src: string };
 
 export interface AnalyticsCspContribution {
-  /** Origins added to the named directives (validated https origins).
-   * `style_src_attr` carries system-owned keyword sources only (the
-   * provider-gated style-attribute allowance) — it is deliberately NOT a
-   * network-rule directive and themes can never declare it (§34 forbids
-   * `unsafe-inline` in theme declarations). */
+  /** Sources added to CSP directives. Network-rule origins are validated
+   * HTTPS; Yandex diagnostic `unsafe-inline` sources are system-owned and
+   * themes cannot declare them (§34). */
   readonly origins: Partial<
     Record<
       | "script_src"

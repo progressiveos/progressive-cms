@@ -15,6 +15,7 @@ export type {
   ExtensionEventHandler,
   ExtensionEventSubscriptionSpec,
   ExtensionEventView,
+  TransactionalExtensionEventHandler,
 } from "./events.js";
 export {
   EXTENSION_CONTRACT_VERSION,
@@ -63,6 +64,8 @@ export type {
   ExtensionDbReader,
   ExtensionHttpCallContext,
   ExtensionJobsPort,
+  ExtensionPaymentSubjectResolver,
+  ExtensionPaymentsPort,
   ExtensionPlatformServices,
   ExtensionPrincipal,
   ExtensionSiteContext,

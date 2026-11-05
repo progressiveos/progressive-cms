@@ -22,6 +22,32 @@ interface RateBucket {
   updatedAt: number;
 }
 
+export interface RateLimitStatus {
+  readonly limit: number;
+  readonly remaining: number;
+  readonly reset: number;
+  readonly retryAfter?: number;
+}
+
+export class RateLimitError extends SearchError {
+  constructor(
+    code: string,
+    message: string,
+    readonly rateLimit: RateLimitStatus,
+  ) {
+    super(code, message);
+  }
+}
+
+export function rateLimitHeaders(status: RateLimitStatus): Record<string, string> {
+  return {
+    "x-ratelimit-limit": String(status.limit),
+    "x-ratelimit-remaining": String(status.remaining),
+    "x-ratelimit-reset": String(status.reset),
+    ...(status.retryAfter === undefined ? {} : { "retry-after": String(status.retryAfter) }),
+  };
+}
+
 export interface RateLimiterOptions {
   readonly capacity: number;
   readonly refillPerSecond: number;
@@ -35,7 +61,7 @@ export function createRateLimiter(clock: { now(): Date }, options?: Partial<Rate
   const exceededCode = options?.exceededCode ?? "SEARCH_RATE_LIMITED";
   const exceededMessage = options?.exceededMessage ?? "search rate limit exceeded, retry shortly";
   const buckets = new Map<string, RateBucket>();
-  return (key: string): void => {
+  return (key: string): RateLimitStatus => {
     if (buckets.size > RATE_BUCKETS_MAX) buckets.clear(); // abuse/rotation bound
     const now = clock.now().getTime();
     const bucket = buckets.get(key) ?? { tokens: capacity, updatedAt: now };
@@ -44,10 +70,20 @@ export function createRateLimiter(clock: { now(): Date }, options?: Partial<Rate
     bucket.updatedAt = now;
     if (bucket.tokens < 1) {
       buckets.set(key, bucket);
-      throw new SearchError(exceededCode as never, exceededMessage);
+      throw new RateLimitError(exceededCode, exceededMessage, {
+        limit: capacity,
+        remaining: 0,
+        reset: Math.ceil((now + ((capacity - bucket.tokens) / refillPerSecond) * 1000) / 1000),
+        retryAfter: Math.max(1, Math.ceil((1 - bucket.tokens) / refillPerSecond)),
+      });
     }
     bucket.tokens -= 1;
     buckets.set(key, bucket);
+    return {
+      limit: capacity,
+      remaining: Math.floor(bucket.tokens),
+      reset: Math.ceil((now + ((capacity - bucket.tokens) / refillPerSecond) * 1000) / 1000),
+    };
   };
 }
 
@@ -103,9 +139,10 @@ export function makeSearchRoutes(): ApiRoute[] {
         // Raw X-Forwarded-For is client-controlled: keying on its first hop
         // let any caller rotate fresh rate-limit buckets at will (and direct
         // clients shared one "local" bucket).
-        rateLimit(request.ip);
+        const rate = rateLimit(request.ip);
         return {
           status: 200,
+          headers: rateLimitHeaders(rate),
           body: await app.searchQuery({
             q: String(query.q ?? ""),
             locale: String(query.locale ?? "default"),

@@ -40,6 +40,8 @@ export interface EnqueueJobInput {
   readonly runAt?: Date;
   /** Stable idempotency key (spec §31): one active/succeeded job per key. */
   readonly idempotencyKey?: string;
+  /** Never automatically recreate even a dead or cancelled job with this key. */
+  readonly preserveTerminalIdempotency?: boolean;
   readonly maxAttempts?: number;
   readonly origin?: string;
   /** Schema-generation stamp written through for extension jobs. */
@@ -224,6 +226,36 @@ export function createJobsService(
     async enqueue(input) {
       const id = newStableId();
       const now = deps.clock.now();
+      if (input.preserveTerminalIdempotency === true) {
+        const key = input.idempotencyKey;
+        if (key === undefined || key.length === 0) {
+          throw new Error("preserveTerminalIdempotency requires an idempotency key");
+        }
+        return pool.withTransaction(async (tx) => {
+          await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [key]);
+          const existing = await tx.query<JobRow>(
+            `SELECT ${COLUMNS} FROM jobs WHERE idempotency_key = $1 ORDER BY created_at, id LIMIT 1`,
+            [key],
+          );
+          if (existing.rows.length > 0)
+            return { job: toRecord(existing.rows[0]!), duplicate: true };
+          const inserted = await tx.query<JobRow>(
+            `INSERT INTO jobs (id, type, payload, run_at, idempotency_key, max_attempts, origin, payload_version)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${COLUMNS}`,
+            [
+              id,
+              input.type,
+              JSON.stringify(input.payload ?? null),
+              input.runAt ?? now,
+              key,
+              input.maxAttempts ?? 5,
+              input.origin ?? null,
+              input.payloadVersion ?? null,
+            ],
+          );
+          return { job: toRecord(inserted.rows[0]!), duplicate: false };
+        });
+      }
       try {
         const inserted = await pool.query<JobRow>(
           `INSERT INTO jobs (id, type, payload, run_at, idempotency_key, max_attempts, origin, payload_version)

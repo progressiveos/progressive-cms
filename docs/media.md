@@ -31,6 +31,12 @@ Use `cms media usage` before archival and inspect references. Give each card an 
 
 Extension media-usage sources continue to guard references from disabled extensions and from uninstalled extensions whose data is retained. Keep the trusted package and source handler available so Core can inspect those references. If the package or handler is missing, Core fails closed and blocks deletion instead of treating the asset as unused; there is no force-delete bypass.
 
+## Public media URLs and privacy
+
+The delivery routes under `/media/a/` are anonymous. Treat every generated URL as public even when it is difficult to guess, appears only in a draft, or is not linked from the current site. Unpublishing or removing an entry does not turn its media URL into an authenticated/private resource. The route contract has no signed-URL or private-media access check.
+
+Images are exposed as generated preset variants; the original full-resolution image blob is not served by these routes. Non-image files have public versioned download paths and a `/current/` path. Versioned files are cached as public and immutable for one year; `/current/` files use a 60-second public cache. A client or intermediary may retain already cached bytes for that period, so removing a page link is not a cache-revocation procedure. Do not upload confidential files to the Media Library.
+
 ## Authoring and template example
 
 `POST /api/v1/media` accepts raw file bytes with `Content-Type: application/octet-stream` and required `X-PCMS-Filename` (1–255 characters). Optional `X-PCMS-Mime-Type` declares the file MIME type, and optional `X-PCMS-Folder-Id` selects a folder; neither bypasses ingestion validation. Successful upload returns HTTP 201 with `media_id`, `version_no`, `sha256`, `size_bytes`, `mime_type` and `duplicate_blob`, plus optional `media_variant_failures` if preset generation failed. `media.write` is distinct from URL import/provider permissions. Use the returned `media_id`, set accessible alt text, and discover the theme's presets. URL import must pass the product's acquisition checks; do not import private URLs or bypass quarantine.

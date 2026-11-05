@@ -68,7 +68,7 @@ export function analyticsDoctor(
       severity: "info",
       provider: "yandex_metrica",
       message:
-        "Counter-check debugger allowances are active (style attributes for the ?_ym_debug=2 check panel); disable after the check",
+        "Counter-check debugger allowances are active (inline style blocks and attributes for the ?_ym_debug=2 check panel); disable after the check",
     });
   }
   if (

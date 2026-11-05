@@ -1,4 +1,4 @@
-# Theme Developer — Static design → CMS semantic mapping (PCMS-SKILL-T008)
+# Theme Developer — Static design → CMS semantic mapping
 
 Methodology for adapting a static/derived design (plain HTML/CSS, Astro,
 Tailwind site, Figma export, legacy template) into a Progressive CMS theme.

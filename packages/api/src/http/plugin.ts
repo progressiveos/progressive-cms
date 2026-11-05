@@ -4,6 +4,7 @@
 // business logic lives here.
 
 import { createHash } from "node:crypto";
+import { AuthError } from "@pcms/auth";
 import type { Logger } from "@pcms/core";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { ApplicationServices, OperationContext } from "../context.js";
@@ -18,12 +19,21 @@ import { createIdempotencyService } from "./idempotency.js";
 import type { ApiRoute, RouteResult } from "./registry.js";
 import { isMutating, requiresCsrf } from "./registry.js";
 import { makeCoreRoutes, makeOpenApiRoute } from "./routes/core.js";
+import { RateLimitError, rateLimitHeaders } from "./routes/search.js";
+import type { SourceKeyResolver } from "./source-key.js";
 
 export interface ApiPluginOptions {
   readonly application: ApplicationServices;
   readonly logger: Logger;
   /** Secure cookies (__Host- name). false only for plain-HTTP development. */
   readonly cookieSecure: boolean;
+  /**
+   * Derives the opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01)
+   * from the transport-resolved peer of authenticated requests. Omitted when
+   * the installation has no `http.sourceKeySecretRef` — contexts then carry
+   * no sourceKey at all.
+   */
+  readonly sourceKey?: SourceKeyResolver;
 }
 
 export const API_BODY_LIMIT_JSON = 1_048_576; // 1 MiB JSON
@@ -80,7 +90,7 @@ export function createApiFastify(
  */
 export function createApiV1(domainRoutes: readonly ApiRoute[]) {
   return async function apiV1(fastify: FastifyInstance, options: ApiPluginOptions): Promise<void> {
-    const { application, logger, cookieSecure } = options;
+    const { application, logger, cookieSecure, sourceKey } = options;
     let warnedUntrustedForwarded = false;
     const coreRoutes = makeCoreRoutes({ cookieSecure });
     const routes: ApiRoute[] = [
@@ -159,7 +169,22 @@ export function createApiV1(domainRoutes: readonly ApiRoute[]) {
     }
 
     fastify.setErrorHandler((error, request, reply) => {
-      const status = httpStatusForError(error);
+      const frameworkError = error as { code?: string; statusCode?: number };
+      const status =
+        currentSpec(request)?.spec.rawBody &&
+        frameworkError.code?.startsWith("FST_ERR_") &&
+        typeof frameworkError.statusCode === "number" &&
+        frameworkError.statusCode >= 400 &&
+        frameworkError.statusCode < 500
+          ? frameworkError.statusCode
+          : httpStatusForError(error);
+      if (error instanceof RateLimitError) {
+        for (const [name, value] of Object.entries(rateLimitHeaders(error.rateLimit))) {
+          void reply.header(name, value);
+        }
+      } else if (error instanceof AuthError && error.retryAfterSeconds !== undefined) {
+        void reply.header("retry-after", String(error.retryAfterSeconds));
+      }
       if (status >= 500) {
         logger.error("api.request_failed", {
           operation: "api.request_failed",
@@ -214,7 +239,13 @@ export function createApiV1(domainRoutes: readonly ApiRoute[]) {
         assertSameOriginRequest(request);
         if (requiresCsrf(spec.spec)) assertSessionCsrf(auth, request);
       }
-      return { actor: auth.actor, transport: "rest", requestId: request.id };
+      const requestSourceKey = sourceKey?.(request.ip);
+      return {
+        actor: auth.actor,
+        transport: "rest",
+        requestId: request.id,
+        ...(requestSourceKey === undefined ? {} : { sourceKey: requestSourceKey }),
+      };
     }
 
     function currentSpec(request: FastifyRequest): ApiRoute | undefined {
@@ -287,46 +318,67 @@ export function createApiV1(domainRoutes: readonly ApiRoute[]) {
 
     for (const route of routes) {
       const url = `/api/v1${route.spec.url}`;
-      fastify.route({
-        method: route.spec.method,
-        url,
-        bodyLimit: route.spec.bodyLimit ?? API_BODY_LIMIT_JSON,
-        // Real runtime validation from the same schemas the contract
-        // documents — documented and served behavior cannot drift (spec §4).
-        schema: {
-          ...(route.spec.bodySchema === undefined ? {} : { body: route.spec.bodySchema }),
-          ...(route.spec.querySchema === undefined ? {} : { querystring: route.spec.querySchema }),
-          ...(route.spec.paramsSchema === undefined ? {} : { params: route.spec.paramsSchema }),
-        },
-        preValidation: async (request, reply) => {
-          // POST/PUT/PATCH with no body on a route that DECLARES a body schema:
-          // an absent body validates as {} so `{}`-shaped contracts (optional
-          // fields only) do not force clients to guess about empty payloads
-          // (2026-09-29 site-developer report). Schemas with required fields
-          // still reject, as they should.
-          if (
-            request.method !== "GET" &&
-            request.method !== "HEAD" &&
-            request.body === undefined &&
-            route.spec.bodySchema !== undefined &&
-            (route.spec.bodySchema as { required?: unknown }).required === undefined
-          ) {
-            request.body = {};
-          }
-          const ctx = await resolveContext(request, reply);
-          if (ctx === null) return reply;
-          (request as RequestWithCtx).pcmsContext = ctx;
-          return undefined;
-        },
-        async handler(request, reply) {
-          const result = await execute(route, request);
-          void reply
-            .status(result.status)
-            .headers({ ...(result.headers ?? {}) })
-            .send(result.body);
-          return reply;
-        },
-      });
+      const registerRoute = (target: FastifyInstance) =>
+        target.route({
+          method: route.spec.method,
+          url,
+          bodyLimit: route.spec.bodyLimit ?? API_BODY_LIMIT_JSON,
+          // Real runtime validation from the same schemas the contract
+          // documents — documented and served behavior cannot drift (spec §4).
+          schema: {
+            ...(route.spec.bodySchema === undefined ? {} : { body: route.spec.bodySchema }),
+            ...(route.spec.querySchema === undefined
+              ? {}
+              : { querystring: route.spec.querySchema }),
+            ...(route.spec.paramsSchema === undefined ? {} : { params: route.spec.paramsSchema }),
+          },
+          preValidation: async (request, reply) => {
+            // POST/PUT/PATCH with no body on a route that DECLARES a body schema:
+            // an absent body validates as {} so `{}`-shaped contracts (optional
+            // fields only) do not force clients to guess about empty payloads
+            // (2026-09-29 site-developer report). Schemas with required fields
+            // still reject, as they should.
+            if (
+              request.method !== "GET" &&
+              request.method !== "HEAD" &&
+              request.body === undefined &&
+              route.spec.bodySchema !== undefined &&
+              (route.spec.bodySchema as { required?: unknown }).required === undefined
+            ) {
+              request.body = {};
+            }
+            const ctx = await resolveContext(request, reply);
+            if (ctx === null) return reply;
+            (request as RequestWithCtx).pcmsContext = ctx;
+            return undefined;
+          },
+          async handler(request, reply) {
+            const result = await execute(route, request);
+            void reply
+              .status(result.status)
+              .headers({ ...(result.headers ?? {}) })
+              .send(result.body);
+            return reply;
+          },
+        });
+      if (route.spec.rawBody) {
+        await fastify.register(async (scope) => {
+          scope.removeAllContentTypeParsers();
+          scope.addContentTypeParser(
+            [
+              "application/json",
+              "text/plain",
+              "application/octet-stream",
+              "application/x-www-form-urlencoded",
+            ],
+            { parseAs: "buffer" },
+            (_request, body, done) => done(null, body),
+          );
+          registerRoute(scope);
+        });
+      } else {
+        registerRoute(fastify);
+      }
     }
   };
 }

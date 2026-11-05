@@ -14,6 +14,12 @@ Discover installed extension ids/versions and registered capabilities. Verify th
 
 The manifest is declarative; its named handlers resolve from trusted composition. Public Core does not promise a Shop domain simply because extensions can add views/fields/providers. Read [Payments](payments.md) for the separate adapter boundary.
 
+## Extension-defined Block Document blocks
+
+An extension can register a block through `registrations.blocks[]` using `block_type` and an optional object `props_schema`. Its block descriptor appears in `/discovery/blocks` when its artifact is deployed. Extension block ids are lowercase dotted namespaced ids (for example, `shop.listing`); a theme maps the discovered id and version to a renderer key such as `shop.listing@1`. Extension block props use schema version 1 and children are not allowed. See [Typed Blocks](blocks.md) for authoring and seal behavior.
+
+The owning extension must be enabled when a new WORKING revision containing its block is sealed. A disabled extension produces `BLOCK_EXTENSION_UNAVAILABLE` in the revision validation result. A SEALED revision is not re-judged when extension state changes; continued rendering still requires the block's deployed artifact and a compatible theme renderer.
+
 ## Scheduled jobs and lifecycle obligations
 
 Extension Contract 2.0 adds optional `interval_seconds` to `registrations.jobs[]`; it is an integer from `1` to `3600000`. The `ExtensionJobRegistration` and `ExtensionObligationRegistration` types are exported from the root `@pcms/extensions` SDK. A declared interval makes the existing Worker schedule that named job through the shared M07 queue. Only enabled extensions are scheduled. The scheduler skips a task while any run of that logical job is active, regardless of interval window, and a completed window is not enqueued twice. This is not an exactly-once guarantee: job handlers must be idempotent. Omit `interval_seconds` for on-demand-only jobs.
@@ -38,6 +44,10 @@ Extension Contract 2.0 adds optional `interval_seconds` to `registrations.jobs[]
 Any business transaction that creates an outstanding obligation must use `ExtensionTransactionContext.query` to take the same transaction-scoped advisory lock and re-read the current lifecycle state inside that transaction. Proceed only while the extension is still `ENABLED`; a `platform.db.query` or check made before the transaction is not sufficient. This serializes obligation creation against disable/uninstall and prevents a race from creating new work after the lifecycle transition.
 
 ## Handler context and transactions
+
+`ExtensionCallContext` has an optional `sourceKey` for operation and HTTP handlers. When `http.sourceKeySecretRef` is configured, Core derives an opaque identifier by truncating HMAC-SHA-256 to 128 bits over the transport-resolved address: IPv4 uses the full address and IPv6 uses its `/64` prefix. Forwarded addresses count only when the connected proxy is listed in `http.trustedProxies`; trust only real proxies that safely append or replace `X-Forwarded-For`. Without a configured secret, or when Core cannot parse a source address, the field is omitted. Missing `sourceKey` means there is no source signal; never group missing values into one shared bucket. The raw address and secret stay server-side.
+
+Use `sourceKey` only as an additional network anti-abuse signal, never as user identity or authorization. For MCP calls, the service account remains the principal. All Web nodes in one installation must use the same secret; rotating it changes every key and resets anti-abuse windows. This adds no request field, public API parameter or required manifest entry. Installations without the setting retain their existing CMS behavior. See [configuration](configuration-reference.md#optional-extension-source-key) for setup.
 
 HTTP handlers can import `ExtensionHttpCallContext` from the root `@pcms/extensions` package. It extends `ExtensionCallContext` with HTTP request facts, `guestId`, `idempotencyKey`, and nullable `canonicalPath`/`canonicalUrl`. Core derives the path from the active mount and resolved locale; it derives the absolute URL only from the site's configured canonical domain binding, never from the request `Host`. With no active mount both canonical fields are `null`; with a mount but no canonical domain only `canonicalUrl` is `null`. The handler and rendered view receive the same canonical result. Use `canonicalUrl` for Product/Category JSON-LD instead of constructing an origin.
 

@@ -9,6 +9,10 @@
 3. Для entry: `/entries/<id>/seo`, `/entries/<id>/route`, `/publications/entry/<id>` и `/revisions/<id>` по scopes. Для effective SEO: `/discovery/seo/metadata/<id>`, `/discovery/seo/preview?entry_id=<id>`, `/discovery/seo/structured-data?entry_id=<id>`, `/discovery/seo/validate?entry_id=<id>`.
 4. `cms seo validate <id>` / `cms seo validate --all` пригодны как часть аудита; проверяй `complete`, `partial`, issue severity и failures. Это не crawler, не проверка H1/всего HTML/внешней индексации. `cms site validate` проверяет локальный corpus и может skip с exit 0 — не принимай его за production SEO gate.
 
+## Markdown discovery
+
+На target с этой возможностью проверь несколько публичных URL через `Accept: text/markdown` и явный суффикс `.md`, затем проверь `GET /llms.txt`. Убедись, что negotiated Markdown сохраняет эффективный robots/canonical HTML, а явный `.md` имеет `X-Robots-Tag: noindex` и canonical Link на HTML. Выдача `/llms.txt` ограничена; отсутствие страницы там не доказывает отказ прямого Markdown URL. Подробности: [Markdown](markdown.md).
+
 ## Правка SEO
 
 SEO document отдельный от content payload. Поддерживаемые ключи: `seo_title`, `meta_description`, `canonical_override`, `robots_policy`, `social_title`, `social_description`, `social_image`, `structured_data_type_hint`. `social_image` — `{asset_id, version?}`, не произвольный URL. Сохраняй существующие значения и корректную семантику null/fallback; не обнуляй весь document только для title.

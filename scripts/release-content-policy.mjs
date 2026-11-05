@@ -42,7 +42,9 @@ export const OFFICIAL_DOCS_SKILL_FILES = Object.freeze([
   "skills/progressive-cms-site-builder/assets/theme-starter/components/footer.liquid",
   "skills/progressive-cms-site-builder/assets/theme-starter/components/header.liquid",
   "skills/progressive-cms-site-builder/assets/theme-starter/fixtures/example.json",
+  "skills/progressive-cms-site-builder/assets/theme-starter/templates/article-markdown.liquid",
   "skills/progressive-cms-site-builder/assets/theme-starter/templates/article.liquid",
+  "skills/progressive-cms-site-builder/assets/theme-starter/templates/page-markdown.liquid",
   "skills/progressive-cms-site-builder/assets/theme-starter/templates/page.liquid",
   "skills/progressive-cms-site-builder/assets/theme-starter/theme.json",
   "skills/progressive-cms-site-builder/assets/theme-starter/tokens/base.json",
@@ -69,6 +71,7 @@ export const OFFICIAL_DOCS_SKILL_FILES = Object.freeze([
   "skills/progressive-cms-seo/manifest.json",
   "skills/progressive-cms-seo/references/api-operations.json",
   "skills/progressive-cms-seo/references/audit.md",
+  "skills/progressive-cms-seo/references/markdown.md",
   "skills/progressive-cms-seo/references/pcms-workflow.md",
   "skills/progressive-cms-seo/references/sources.md",
 ]);

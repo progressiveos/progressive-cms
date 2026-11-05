@@ -1,4 +1,4 @@
-# Content Agent — Bulk publication workflow (PCMS-SKILL-T005)
+# Content Agent — Bulk publication workflow
 
 Canonical transport for a pool of content items (e.g. "35 articles, batches
 of 3, every 12 hours"). The pool's research/writing happens outside the CMS;

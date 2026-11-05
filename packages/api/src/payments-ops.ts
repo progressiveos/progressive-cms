@@ -491,6 +491,7 @@ export async function refundPayment(
     type: "payments.refund.execute",
     payload: { intent_id: intentId },
     idempotencyKey: `refund-intent-${intentId}`,
+    preserveTerminalIdempotency: true,
     maxAttempts: 5,
     origin: "payments.admin",
   });

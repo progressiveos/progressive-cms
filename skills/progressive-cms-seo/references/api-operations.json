@@ -355,7 +355,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Open or create the entry's working draft (Admin spec §24)",
+        "summary": "Open or create the entry's working draft",
         "tags": ["content"],
         "x-permission": "content.edit"
       }
@@ -1982,7 +1982,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
+        "summary": "Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
         "tags": ["themes"],
         "x-permission": "theme.write"
       }
@@ -3400,7 +3400,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Content Tree rows with kind (content|folder), title/working/publication indicators (PCMS-ADMIN-T002)",
+        "summary": "Content Tree rows with kind (content|folder), title/working/publication indicators",
         "tags": ["discovery"],
         "x-permission": "content.read"
       }
@@ -3743,7 +3743,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Stored SEO document for an entry (or null; PCMS-ADMIN-T010)",
+        "summary": "Stored SEO document for an entry (or null)",
         "tags": ["discovery"],
         "x-permission": "seo.read"
       },
@@ -4000,7 +4000,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Canonical route view: current path, history, proposal (PCMS-ADMIN-T011)",
+        "summary": "Canonical route view: current path, history, proposal",
         "tags": ["discovery"],
         "x-permission": "navigation.read"
       }

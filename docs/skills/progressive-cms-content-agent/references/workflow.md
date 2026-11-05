@@ -5,6 +5,7 @@
 3. Validate all declared fields/blocks and nested documents. Inspect the exact preview and resolved SEO.
 4. Seal only a valid revision. Read the publication generation, then publish/plan only within task authorization.
 5. Verify public body/metadata/media/Search. Preserve the published revision during cleanup and check the human editing lifecycle.
+6. If the target supports Markdown, verify the page with `Accept: text/markdown` and its explicit `.md` URL, then inspect `/llms.txt`. A page can render directly while remaining absent from the bounded inventory; see [Markdown representations](../../../markdown.md).
 
 Read these files from the installed `docs/` folder; no private Core workspace is needed.
 

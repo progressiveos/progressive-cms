@@ -37,6 +37,31 @@
           "minimum": 0,
           "maximum": 100000
         },
+        "sourceKeySecretRef": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_.]{0,63}$"
+        },
+        "securityTxt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contact", "expires"],
+          "properties": {
+            "contact": {
+              "type": "string",
+              "maxLength": 2048,
+              "pattern": "^(https://|mailto:)[^\\s\\u0000-\\u001f\\u007f]+$"
+            },
+            "expires": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+            },
+            "preferredLanguages": {
+              "type": "string",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*(, *[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*)*$"
+            }
+          }
+        },
         "cookieSecure": {
           "type": "boolean"
         }

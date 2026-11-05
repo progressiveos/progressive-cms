@@ -22,6 +22,7 @@ Stop on missing required permissions, incompatible contracts, unconfigured previ
 - Model/manifest/declared templates agree; optional media stays optional.
 - All nested prose is AST v2; typed block envelopes keep version 1.
 - Draft/CAS, validate, preview, seal, publish, public render and Search verified through public interfaces.
+- When the target exposes Markdown, verify negotiated and explicit `.md` output separately from `/llms.txt` inclusion; see [Markdown representations](../../markdown.md).
 - Breadcrumbs and four SEO image cases verified from actual HTML.
 - A normal editor can modify and republish content via Admin without private scripts.
 - Responsive pages, form submission with synthetic data, and failure handling checked; unresolved gates reported honestly.

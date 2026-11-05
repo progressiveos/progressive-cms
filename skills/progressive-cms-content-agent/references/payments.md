@@ -1,7 +1,6 @@
 # Платежи на сайте: что можно писать контент-агенту
 
-Источник истины: Payments spec (`docs/specs/Progressive_CMS_Integrations_
-Actions_Payments_v1_Spec.md`) и адаптеры ядра
+Источник истины: [публичный контракт Payments](../../../docs/payments.md) и адаптеры ядра
 (`packages/payments/src/providers/*.ts`, Core 0.1.151+).
 
 ## Главный факт (не искажать в текстах)

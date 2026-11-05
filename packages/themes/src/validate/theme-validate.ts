@@ -101,6 +101,7 @@ export function validateThemeDir(
   // 3. declared file references exist
   const declaredFiles = [
     ...manifest.templates.map((t) => t.file),
+    ...manifest.templates.flatMap((t) => (t.markdown_file === undefined ? [] : [t.markdown_file])),
     ...manifest.components.map((c) => c.file),
     ...manifest.block_renderers.map((r) => r.file),
   ];

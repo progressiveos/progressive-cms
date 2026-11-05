@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import Ajv from "ajv";
+import { parseExtensionPaymentGrants } from "./extension-payment-grants.js";
 import {
   type AppConfig,
   CONFIG_SCHEMA,
@@ -80,6 +81,17 @@ function applyEnvOverrides(
     // must not fail offline commands that also load the deployment config.
     if (value === undefined || !key.startsWith("PCMS_")) continue;
     if (key === "PCMS_CONFIG_FILE" || key.startsWith("PCMS_SECRET_")) continue;
+    if (key === "PCMS_EXTENSION_PAYMENT_GRANTS") {
+      try {
+        parseExtensionPaymentGrants(value);
+      } catch (error) {
+        issues.push({
+          path: `(env) ${key}`,
+          message: error instanceof Error ? error.message : "invalid grants",
+        });
+      }
+      continue;
+    }
     if (
       key === "PCMS_API_URL" ||
       key === "PCMS_API_TOKEN" ||
@@ -190,6 +202,36 @@ function applyDefaults(doc: Record<string, unknown>): void {
 
 function semanticIssues(doc: Record<string, unknown>): ConfigIssue[] {
   const issues: ConfigIssue[] = [];
+  const security = (doc.http as { securityTxt?: Record<string, unknown> } | undefined)?.securityTxt;
+  if (security !== undefined && security !== null && typeof security === "object") {
+    if (typeof security.contact === "string") {
+      try {
+        const contact = new URL(security.contact);
+        if (
+          (contact.protocol !== "https:" && contact.protocol !== "mailto:") ||
+          contact.username ||
+          contact.password ||
+          (contact.protocol === "https:" && !contact.hostname) ||
+          (contact.protocol === "mailto:" && !contact.pathname.includes("@"))
+        )
+          throw new Error("invalid contact");
+      } catch {
+        issues.push({
+          path: "http.securityTxt.contact",
+          message: "must be an HTTPS or mailto contact without credentials",
+        });
+      }
+    }
+    if (typeof security.expires === "string") {
+      const time = Date.parse(security.expires);
+      if (
+        !Number.isFinite(time) ||
+        new Date(time).toISOString() !== security.expires.replace(/Z$/, ".000Z")
+      ) {
+        issues.push({ path: "http.securityTxt.expires", message: "must be a valid UTC timestamp" });
+      }
+    }
+  }
   const secrets = doc.secrets as Record<string, unknown> | undefined;
   const checkRef = (path: string, ref: unknown): void => {
     if (secrets !== undefined && typeof ref === "string" && !(ref in secrets)) {
@@ -201,6 +243,10 @@ function semanticIssues(doc: Record<string, unknown>): ConfigIssue[] {
   };
   const db = doc.db as Record<string, unknown> | undefined;
   if (db !== undefined) checkRef("db.passwordSecretRef", db.passwordSecretRef);
+  // Source-key HMAC secret (CORE-SHOP-SECURITY-SOURCE-01): every secret
+  // reference must resolve or the process would crash-loop at boot.
+  const httpDoc = doc.http as Record<string, unknown> | undefined;
+  if (httpDoc !== undefined) checkRef("http.sourceKeySecretRef", httpDoc.sourceKeySecretRef);
   // Publication preview key + mail credentials (PCMS-OPS-T110/T114): every
   // secret reference must resolve or the process would crash-loop at boot.
   const publication = doc.publication as Record<string, unknown> | undefined;
@@ -240,9 +286,15 @@ function toTypedConfig(doc: Record<string, unknown>): AppConfig {
       shutdownTimeoutMilliseconds: http.shutdownTimeoutMilliseconds as number,
       trustedProxies: (http.trustedProxies as string[]) ?? [],
       apiRateLimitPerMinute: http.apiRateLimitPerMinute as number,
+      ...(http.sourceKeySecretRef === undefined
+        ? {}
+        : { sourceKeySecretRef: http.sourceKeySecretRef as string }),
       // Audit 2026-09-27 lesson: normalized fields are carried EXPLICITLY —
       // an omitted key silently falls back to the nodeEnv default downstream.
       ...(http.cookieSecure === undefined ? {} : { cookieSecure: http.cookieSecure as boolean }),
+      ...(http.securityTxt === undefined
+        ? {}
+        : { securityTxt: http.securityTxt as NonNullable<AppConfig["http"]["securityTxt"]> }),
     },
     db: {
       host: db.host as string,

@@ -3,7 +3,7 @@
 Поддержанные источники: **MODX 3.0/3.2** (агент), **WordPress** (нативный
 REST + Application Passwords, агент не нужен), **Tilda** (sitemap-краулинг
 без аккаунта или export-zip), **1C-Bitrix** (агент, experimental).
-Общее ядро у всех одно: URL-план (301/410, §61 сохранение адресов) +
+Общее ядро у всех одно: URL-план (301/410, сохранение адресов) +
 `.pcpub`-воркспейс (контент HTML→markdown, картинки в bundle assets).
 
 Цель формата: развёрнутый Progressive CMS + адрес старого сайта — этого
@@ -40,7 +40,7 @@ PCMS_MIGRATE_TOKEN=… cms migrate bitrix --endpoint https://old.example/pcms-ag
 |---|---|---|
 | MODX-агент | `extensions/progressive-site-migration/agent/modx3/pcms-agent.php` (+README) | один PHP-файл в web-корень старого сайта; бутстрап modX API (креды БД наружу не уходят); read-only выгрузка: ресурсы+TV (MIGX-JSON насквозь), медиа, content types, extras-детект (MIGX/Gallery/SEO Suite), история редиректов SEO Suite |
 | Приёмник | `cms migrate modx3` | одна команда строит весь перенос: URL-план + `.pcpub`-воркспейс + сводка |
-| Импорт URL-плана | `cms redirects validate|apply` | 301/410 с защитами (§33/§60), атомарно |
+| Импорт URL-плана | `cms redirects validate|apply` | 301/410 с защитами, атомарно |
 | Публикация контента | `cms bundle validate|pack|submit` | стандартный `.pcpub` конвейер |
 
 Permissions агента: `routing.redirects.import` (план), `media.import`
@@ -71,7 +71,7 @@ cms migrate modx3 --endpoint https://old-site.example/pcms-agent.php \
 
 - `redirects.csv` — план URL: удалённые ресурсы → 410, переименованные
   (`--map modx_id,new_path`) и история SEO Suite → 301;
-- `canonical.csv` — план «старый URL = канонический путь» (spec §61):
+- `canonical.csv` — план «старый URL = канонический путь»:
   живые страницы сохраняют свои адреса, редирект им не нужен;
 - `bundle/` — `.pcpub`-воркспейс: `content/*.pcmd` (`route.path` = старый
   URI, контент HTML→markdown через turndown, картинки выцеплены в
@@ -152,5 +152,5 @@ cms bundle submit   ./migration-out/migrate.pcpub --environment <env> --yes
   `class_key` пропускаются с предупреждением.
 - Редиректы `index.php?id=N` путями не выражаются — уровень edge-RP.
 
-Подробности модели URI и формата экспорта:
-`docs/migration/modx3-site-migration.md`.
+Публичная модель маршрутов и порядок публикации:
+[Navigation](../../../docs/navigation.md) и [Publishing](../../../docs/publishing.md).

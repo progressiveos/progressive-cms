@@ -7,11 +7,11 @@
 // worker composition, so an extension consumer can never steal an event.
 //
 // Idempotency: the consumption ledger row (event, extension, subscription)
-// is claimed with INSERT … ON CONFLICT DO NOTHING before the handler runs;
-// a redelivered event never repeats a side effect. A failing handler
-// releases its claim so the outbox retry can re-process the subscription.
+// is claimed in the same transaction as an opted-in handler's writes.
+// Legacy handlers retain the original claim/callback/release behavior.
 import type { DbPool } from "@pcms/core";
 import { ExtensionError } from "./errors.js";
+import { createExtensionPlatformServices, type ExtensionTransactionContext } from "./platform.js";
 
 export const EVENT_CONSUMPTIONS_TABLE = "pcms_extension_event_consumptions";
 
@@ -25,14 +25,23 @@ export interface ExtensionEventView {
 }
 
 /** Bounded, typed handler an extension registers for one event type. */
+export type TransactionalExtensionEventHandler = (
+  event: ExtensionEventView,
+  tx: ExtensionTransactionContext,
+) => Promise<void>;
 export type ExtensionEventHandler = (event: ExtensionEventView) => Promise<void>;
 
-export interface ExtensionEventSubscriptionSpec {
+interface ExtensionEventSubscriptionBase {
   readonly extensionId: string;
   readonly subscriptionId: string;
   readonly eventType: string;
-  readonly handler: ExtensionEventHandler;
 }
+
+export type ExtensionEventSubscriptionSpec = ExtensionEventSubscriptionBase &
+  (
+    | { readonly transactional: true; readonly handler: TransactionalExtensionEventHandler }
+    | { readonly transactional?: false; readonly handler: ExtensionEventHandler }
+  );
 
 export interface ExtensionEventConsumer {
   /** Fans one event out to all matching subscriptions, idempotently. */
@@ -45,6 +54,11 @@ export interface ExtensionEventConsumer {
 export function createExtensionEventConsumer(options: {
   readonly pool: DbPool;
   readonly clock: { now(): Date };
+  /** Core-owned writers, executed on the same client as the ledger claim. */
+  readonly writers?: Pick<
+    Parameters<typeof createExtensionPlatformServices>[0],
+    "auditWriter" | "outboxAppender"
+  >;
   /** Only subscriptions of ENABLED extensions are passed in here —
    * composition derives them from the lifecycle state. */
   readonly subscriptions: readonly ExtensionEventSubscriptionSpec[];
@@ -73,22 +87,58 @@ export function createExtensionEventConsumer(options: {
     async handle(event) {
       const matching = byType.get(event.eventType) ?? [];
       for (const subscription of matching) {
-        const claim = await pool.query(
-          `INSERT INTO ${EVENT_CONSUMPTIONS_TABLE} (event_id, extension_id, subscription_id)
+        try {
+          if (!subscription.transactional) {
+            const claim = await pool.query(
+              `INSERT INTO ${EVENT_CONSUMPTIONS_TABLE} (event_id, extension_id, subscription_id)
+               VALUES ($1, $2, $3) ON CONFLICT (event_id, extension_id, subscription_id) DO NOTHING`,
+              [event.id, subscription.extensionId, subscription.subscriptionId],
+            );
+            if (claim.rowCount === 0) continue;
+            try {
+              await subscription.handler(event);
+            } catch (error) {
+              await pool.query(
+                `DELETE FROM ${EVENT_CONSUMPTIONS_TABLE} WHERE event_id = $1 AND extension_id = $2 AND subscription_id = $3`,
+                [event.id, subscription.extensionId, subscription.subscriptionId],
+              );
+              throw error;
+            }
+            continue;
+          }
+          await pool.withTransaction(async (client) => {
+            const claim = await client.query(
+              `INSERT INTO ${EVENT_CONSUMPTIONS_TABLE} (event_id, extension_id, subscription_id)
            VALUES ($1, $2, $3)
            ON CONFLICT (event_id, extension_id, subscription_id) DO NOTHING`,
-          [event.id, subscription.extensionId, subscription.subscriptionId],
-        );
-        if (claim.rowCount === 0) continue; // already consumed — idempotent skip
-        try {
-          await subscription.handler(event);
+              [event.id, subscription.extensionId, subscription.subscriptionId],
+            );
+            if (claim.rowCount === 0) return;
+            const platform = createExtensionPlatformServices({
+              pool: {
+                query: (sql, params) => client.query(sql, params),
+                withTransaction: (run) => run(client),
+              },
+              authorize: async () => {
+                throw new Error("event handlers cannot authorize");
+              },
+              actor: { kind: "actor", id: "system", type: "system" },
+              requestId: `outbox:${event.id}`,
+              extensionId: subscription.extensionId,
+              auditWriter:
+                options.writers?.auditWriter ??
+                (async () => {
+                  throw new Error("event audit writer unavailable");
+                }),
+              outboxAppender:
+                options.writers?.outboxAppender ??
+                (async () => {
+                  throw new Error("event outbox writer unavailable");
+                }),
+            });
+            await platform.transaction((tx) => subscription.handler(event, tx));
+          });
         } catch (error) {
-          // Release this subscription's claim so the outbox retry re-runs it.
-          await pool.query(
-            `DELETE FROM ${EVENT_CONSUMPTIONS_TABLE}
-             WHERE event_id = $1 AND extension_id = $2 AND subscription_id = $3`,
-            [event.id, subscription.extensionId, subscription.subscriptionId],
-          );
           throw new ExtensionError(
             "EXTENSION_EVENT_CONSUMPTION_INVALID",
             `extension "${subscription.extensionId}" subscription "${subscription.subscriptionId}" failed to consume event "${event.id}": ${error instanceof Error ? error.message : String(error)}`,

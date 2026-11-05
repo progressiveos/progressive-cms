@@ -18,6 +18,7 @@ import { writeOutboxEvent } from "@pcms/publication";
 import type { ApplicationServices, OperationContext } from "./context.js";
 import { requirePermission } from "./context.js";
 import { ApiError } from "./errors.js";
+import { extensionPaymentsPort } from "./extension-payments.js";
 
 export interface ExtensionRuntimeFacts {
   readonly extensionId: string;
@@ -37,6 +38,13 @@ export async function buildExtensionCallContext(
     readonly guestId?: string | null;
     /** Enabled non-default locale selected from the public route prefix. */
     readonly locale?: string;
+    /**
+     * Transport-resolved opaque network-source identifier
+     * (CORE-SHOP-SECURITY-SOURCE-01) for requests with no authenticated
+     * operation context (public HTTP routes). Falls back to the operation
+     * context's own sourceKey when the transport attached one.
+     */
+    readonly sourceKey?: string;
   } = {},
 ): Promise<ExtensionCallContext> {
   const principal: ExtensionPrincipal =
@@ -84,6 +92,13 @@ export async function buildExtensionCallContext(
     actor: principal,
     requestId: ctx?.requestId ?? "req_extension_anonymous",
     extensionId: runtime.extensionId,
+    payments: extensionPaymentsPort(
+      app,
+      runtime.extensionId,
+      principal,
+      site,
+      ctx?.requestId ?? "req_extension_anonymous",
+    ),
     auditWriter: (executor, event) =>
       recordSecurityEvent(executor, null, {
         type: event.type as SecurityEventType,
@@ -138,9 +153,11 @@ export async function buildExtensionCallContext(
       },
     },
   });
+  const sourceKey = options.sourceKey ?? ctx?.sourceKey;
   return {
     actor: principal,
     requestId: ctx?.requestId ?? "req_extension_anonymous",
+    ...(sourceKey === undefined ? {} : { sourceKey }),
     extension: { id: runtime.extensionId, config: runtime.config },
     site,
     locale,

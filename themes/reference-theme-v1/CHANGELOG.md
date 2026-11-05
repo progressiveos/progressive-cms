@@ -9,13 +9,13 @@
 
 * The `head.icons` loop is removed from `page-default`, where the
   core-protected `head_html` already renders the resolved favicon icons
-  (§38) — the loop emitted every icon twice. On `search` and `error-404`
+  — the loop emitted every icon twice. On `search` and `error-404`
   (entry-less surfaces that assemble their head without `head_html`) the
   loop remains the native icon channel.
 
 ## 1.2.1 — 2026-10-03
 
-* Favicon is Site Identity media rendered by the core (§38): the hardcoded
+* Favicon is Site Identity media rendered by the core: the hardcoded
   `<link rel="icon">` (logo.svg) in `page-default`, `search` and `error-404`
   is replaced by the `head.icons` loop. Surfaces without an entry (search
   results, 404) now carry the native favicon-v1 derivative.

@@ -4,7 +4,7 @@ Contract owner: Core Theme Contract 1.0, theme manifest v2 and public rendering 
 
 ## Complete minimal authoring example
 
-The delivered [company starter](reference/theme-starter/README.md) includes [theme.json](reference/theme-starter/theme.json), two templates, header/footer/breadcrumb components, heading/text/form renderers, CSS, a contact-form script, tokens and synthetic theme-validation data. It matches the Content Types in [First Site](first-site.md). It is an authoring baseline, not a finished bespoke design or a runtime-accepted website.
+The delivered [company starter](reference/theme-starter/README.md) includes [theme.json](reference/theme-starter/theme.json), two HTML templates with paired Markdown templates, header/footer/breadcrumb components, heading/text/form renderers, CSS, a contact-form script, tokens and synthetic theme-validation data. It matches the Content Types in [First Site](first-site.md). It is an authoring baseline, not a finished bespoke design or a runtime-accepted website.
 
 ```sh
 cms theme validate ./theme-starter --cms-version "$PCMS_CORE_VERSION" --json
@@ -23,6 +23,10 @@ Set `PCMS_CORE_VERSION` to `server.cms_version` from `cms agent bootstrap --json
 - `head_html`/Core head composition protects authoritative SEO. Do not replace canonical, robots or OG metadata in a template. A default component layout for Extension views is separate from an entry template.
 
 A banner is ordinary markup/CSS over available H1, background media and breadcrumb data. It has no special Page Hero subsystem or required content entity. RichText tables render through Core and require no theme-specific table renderer.
+
+## Markdown templates for agent consumers
+
+Published pages also support an optional Markdown representation. Core supplies a fallback when a template has no paired Markdown file; new themes should pair `markdown_file` with each HTML entry template they intend to expose. A paired file uses the same published page model and can customize the Markdown layout. See [Markdown representations](markdown.md) for the request headers, projections, analyzer contract, switches and `/llms.txt` behavior.
 
 ## Installation and activation boundaries
 

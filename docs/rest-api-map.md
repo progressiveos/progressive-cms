@@ -72,7 +72,7 @@ Status meanings: 400 malformed input; 401 missing/invalid authentication; 403 in
 | `update_active_theme` | Raw `application/octet-stream` package for a newer version of the same active theme id. Both `theme.write` and `theme.activate` are enforced. |
 | `install_skill` | Raw `application/octet-stream` `.pcskill` package, or JSON `{ "url": "https://registry.example/skill.pcskill" }`. Community installer policy still applies. |
 | `registry_release_upload` | Raw `application/octet-stream` engine release ZIP; validated and handed to the standard update orchestrator. |
-| `receive_inbound`, `receive_payment_callback` | Provider-specific verified callback, not a generic authoring operation. Use the method actually registered below, including the payment callback's GET method. |
+| `receive_inbound`, `receive_payment_callback`, `post_payment_callback` | Provider-specific verified callback, not a generic authoring operation. Use the method actually registered below; payment callbacks have GET and POST operations. |
 
 JSON routes default to 1 MiB. A per-route body limit in the catalogue overrides that limit. The transport also has bounded raw-body parsers; the effective accepted size is constrained by the applicable parser, route and domain validator. Never infer that every endpoint accepts a binary upload from the existence of the raw-body parser.
 
@@ -83,21 +83,21 @@ The complete fixed registry follows below. Enabled extensions can additionally c
 HTTP routes outside `/api/v1` are listed after the registry. They include health, signed preview, public files/site rendering, Admin assets and extension dispatch. They are not all REST JSON endpoints. Fastify also supplies HEAD handling for GET routes; this is not a separate application operation.
 
 <!-- interface-map:start -->
-## Fixed REST registry: 320 operations
+## Fixed REST registry: 325 operations
 
 | Area | Operations | Purpose |
 |---|---:|---|
 | [actor](#rest-actor) | 1 | Inspect the resolved actor and effective permissions before work. |
 | [auth](#rest-auth) | 7 | Browser login, MFA and session lifecycle. Service tokens use bearer authentication instead. |
 | [bundle](#rest-bundle) | 4 | Validate/ingest coordinated content; async acceptance is not completed publication. |
-| [content](#rest-content) | 53 | Manage editable identities, drafts, schema definitions and localization. Read generations before CAS writes. |
-| [discovery](#rest-discovery) | 77 | Read effective contracts, rendering defaults and typed capabilities. |
+| [content](#rest-content) | 55 | Manage editable identities, drafts, schema definitions and localization. Read generations before CAS writes. |
+| [discovery](#rest-discovery) | 79 | Read effective contracts, rendering defaults and typed capabilities. |
 | [extensions](#rest-extensions) | 22 | Discover and manage deployed extension composition, typed operations and updates. |
 | [forms](#rest-forms) | 19 | Version definitions and run anonymous server-validated interactions; history can contain personal data. |
 | [integrations](#rest-integrations) | 25 | Configure connectors, notifications and delivery reliability; secret slots are write-only. |
 | [interactions](#rest-interactions) | 13 | Read/moderate/export submissions, quiz runs and leads with separate scopes. |
 | [media](#rest-media) | 33 | Manage assets, folders, providers and acquisition. Import/accept before referencing managed media ids. |
-| [payments](#rest-payments) | 16 | Provider discovery, payment lifecycle, refunds and verified callbacks; mutations can move real money. |
+| [payments](#rest-payments) | 17 | Provider discovery, payment lifecycle, refunds and verified callbacks; mutations can move real money. |
 | [publication](#rest-publication) | 23 | Coordinate sealed revisions, routes, changesets, plans and public visibility. |
 | [search](#rest-search) | 7 | Query public/admin search, inspect index health and explicitly run reindexing. |
 | [server](#rest-server) | 3 | Identify the target and diagnose the running instance. |
@@ -111,13 +111,13 @@ Inspect the resolved actor and effective permissions before work.
 
 | Method/path | Operation | Purpose |
 |---|---|---|
-| `GET /api/v1/actor` | [get_current_actor](#get_current_actor) | Non-secret projection of the resolved ActorContext (spec §53) |
+| `GET /api/v1/actor` | [get_current_actor](#get_current_actor) | Non-secret projection of the resolved ActorContext |
 
 <a id="get_current_actor"></a>
 
 ### GET /api/v1/actor
 
-**get_current_actor** — Non-secret projection of the resolved ActorContext (spec §53)
+**get_current_actor** — Non-secret projection of the resolved ActorContext
 
 | Contract | Value |
 |---|---|
@@ -522,7 +522,7 @@ Validate/ingest coordinated content; async acceptance is not completed publicati
 | Method/path | Operation | Purpose |
 |---|---|---|
 | `POST /api/v1/bundles` | [submit_publication_bundle](#submit_publication_bundle) | Validate or atomically apply a coordinated content bundle (strict all-or-nothing) |
-| `POST /api/v1/bundles/pcpub` | [ingest_publication_bundle](#ingest_publication_bundle) | Ingest a .pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL) |
+| `POST /api/v1/bundles/pcpub` | [ingest_publication_bundle](#ingest_publication_bundle) | Ingest a.pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL) |
 | `GET /api/v1/bundles/pcpub/ingests` | [list_publication_bundle_ingests](#list_publication_bundle_ingests) | Recent ingests, newest first (own ingests unless the caller holds publication.plan). Recovers an ingest id lost with a submit stdout. |
 | `GET /api/v1/bundles/pcpub/ingests/{ingestId}` | [get_publication_bundle_ingest](#get_publication_bundle_ingest) | Ingest status: stage, outcome, diagnostics and result links |
 
@@ -624,7 +624,7 @@ return { status: 200, body: result };
 
 ### POST /api/v1/bundles/pcpub
 
-**ingest_publication_bundle** — Ingest a .pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL)
+**ingest_publication_bundle** — Ingest a.pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL)
 
 | Contract | Value |
 |---|---|
@@ -754,20 +754,22 @@ Manage editable identities, drafts, schema definitions and localization. Read ge
 | Method/path | Operation | Purpose |
 |---|---|---|
 | `POST /api/v1/access-tokens/{tokenId}/revoke` | [revoke_access_token](#revoke_access_token) | Revoke an access token (tokens.manage) |
-| `POST /api/v1/blocks/validate` | [validate_block_props](#validate_block_props) | Semantic block props validation + calculator preview (PCMS-ADMIN-T006/T007) |
+| `POST /api/v1/blocks/validate` | [validate_block_props](#validate_block_props) | Semantic block props validation + calculator preview |
 | `GET /api/v1/collections/{key}/items` | [list_collection_items](#list_collection_items) | Public feed of a theme-declared collection (published cards; page/page_size/tag; rate-limited) |
-| `POST /api/v1/content/richtext/convert` | [convert_rich_text](#convert_rich_text) | Canonical Markdown<->AST conversion for the Admin rich text editor (PCMS-ADMIN-T005) |
+| `POST /api/v1/content/richtext/convert` | [convert_rich_text](#convert_rich_text) | Canonical Markdown<->AST conversion for the Admin rich text editor |
 | `POST /api/v1/content/schema/apply` | [apply_content_schema](#apply_content_schema) | Apply additive-only content type changes (new types, new optional fields). Audited; response reports affected entries and restart_required. |
 | `GET /api/v1/content/schema/overrides` | [list_content_schema_overrides](#list_content_schema_overrides) | Schema overrides persisted over the deployment typesFile (what a previous apply changed). |
 | `POST /api/v1/content/schema/validate` | [validate_content_schema](#validate_content_schema) | Validate content type definitions against the effective set: registration probe + additive-change report, no effects. |
 | `POST /api/v1/entries` | [create_draft](#create_draft) | Create entry + first working revision atomically |
 | `POST /api/v1/entries/{entryId}/archive` | [archive_entry](#archive_entry) | Archive an entry (idempotent, never a hard delete) |
-| `POST /api/v1/entries/{entryId}/draft` | [create_working_draft](#create_working_draft) | Open or create the entry's working draft (Admin spec §24) |
-| `POST /api/v1/entries/{entryId}/duplicate` | [duplicate_entry](#duplicate_entry) | Duplicate the latest revision payload into a new sibling draft (spec §5) |
+| `POST /api/v1/entries/{entryId}/draft` | [create_working_draft](#create_working_draft) | Open or create the entry's working draft |
+| `POST /api/v1/entries/{entryId}/duplicate` | [duplicate_entry](#duplicate_entry) | Duplicate the latest revision payload into a new sibling draft |
 | `POST /api/v1/entries/{entryId}/home` | [set_home_entry](#set_home_entry) | Homepage binding for the site (navigation.edit; Routing home_entry_id) |
 | `POST /api/v1/entries/{entryId}/identity-locale` | [reidentify_entry_locale](#reidentify_entry_locale) | Identity repair (owner 2026-10-06): move an entry and ALL its revisions to a policy-allowed identity locale in one transaction. Entry id, routes, publication pointers, payloads and edit generations are untouched. Refuses locales outside the site localization policy and translation-group members. Permission: content.edit |
+| `GET /api/v1/entries/{entryId}/markdown` | [get_entry_markdown_settings](#get_entry_markdown_settings) | Read one entry's Markdown availability switch (content.read) |
+| `PUT /api/v1/entries/{entryId}/markdown` | [update_entry_markdown_settings](#update_entry_markdown_settings) | Set one entry's Markdown availability switch (content.edit) |
 | `POST /api/v1/entries/{entryId}/move` | [move_entry](#move_entry) | Reparent an entry in the Content Tree (never rewrites routes/navigation) |
-| `POST /api/v1/entries/{entryId}/restore` | [restore_entry](#restore_entry) | Clear the archive flag (Admin spec §5) |
+| `POST /api/v1/entries/{entryId}/restore` | [restore_entry](#restore_entry) | Clear the archive flag |
 | `POST /api/v1/entries/{entryId}/revisions/cleanup` | [cleanup_entry_revisions](#cleanup_entry_revisions) | Delete all SEALED revisions of an entry except the currently published one. The working revision is always kept; refuses entries without a published revision. Permission: content.edit |
 | `POST /api/v1/entries/{entryId}/route/change` | [change_entry_route](#change_entry_route) | Explicit canonical route change with a recorded redirect (navigation.edit) |
 | `PUT /api/v1/entries/{entryId}/seo` | [update_entry_seo](#update_entry_seo) | Save the entry SEO document (seo.edit; canonical override also needs seo.canonical_override) |
@@ -863,7 +865,7 @@ return {
 
 ### POST /api/v1/blocks/validate
 
-**validate_block_props** — Semantic block props validation + calculator preview (PCMS-ADMIN-T006/T007)
+**validate_block_props** — Semantic block props validation + calculator preview
 
 | Contract | Value |
 |---|---|
@@ -972,6 +974,7 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 
 Response construction:
 ```javascript
+const rate = rateLimit(request.ip);
 const params = request.params;
 const binding = app.themeDiscovery?.getManifest().collections?.[params.key];
 const query = request.query;
@@ -1016,7 +1019,7 @@ const items = feed.items.map((row2) => {
     tags: tags2,
     // Media REFERENCE only: the route stays derivative-free and
     // read-only; themes resolve the actual image model through the
-    // media scope / buildImageModel (Theme Contract §43).
+    // media scope / buildImageModel.
     image_asset_id: firstImageAssetId(fields2, row2.blocks)
   };
 });
@@ -1026,6 +1029,7 @@ const tags = Array.isArray(fields[binding.tag_field ?? "tags"]) ? fields[binding
 ) : [];
 return {
   status: 200,
+  headers: rateLimitHeaders(rate),
   body: {
     collection: params.key,
     total: feed.total,
@@ -1045,7 +1049,7 @@ return {
 
 ### POST /api/v1/content/richtext/convert
 
-**convert_rich_text** — Canonical Markdown<->AST conversion for the Admin rich text editor (PCMS-ADMIN-T005)
+**convert_rich_text** — Canonical Markdown<->AST conversion for the Admin rich text editor
 
 | Contract | Value |
 |---|---|
@@ -1355,7 +1359,7 @@ return { status: 200, body: await archiveEntry(app, ctx, { entry_id: params.entr
 
 ### POST /api/v1/entries/{entryId}/draft
 
-**create_working_draft** — Open or create the entry's working draft (Admin spec §24)
+**create_working_draft** — Open or create the entry's working draft
 
 | Contract | Value |
 |---|---|
@@ -1405,7 +1409,7 @@ return {
 
 ### POST /api/v1/entries/{entryId}/duplicate
 
-**duplicate_entry** — Duplicate the latest revision payload into a new sibling draft (spec §5)
+**duplicate_entry** — Duplicate the latest revision payload into a new sibling draft
 
 | Contract | Value |
 |---|---|
@@ -1542,6 +1546,125 @@ return {
 };
 ```
 
+<a id="get_entry_markdown_settings"></a>
+
+### GET /api/v1/entries/{entryId}/markdown
+
+**get_entry_markdown_settings** — Read one entry's Markdown availability switch (content.read)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `content.read` |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/agent-markdown.ts` |
+
+Path parameters: `entryId`.
+
+Explicit path schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entryId"
+  ],
+  "properties": {
+    "entryId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  }
+}
+```
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const { entryId } = request.params;
+return { status: 200, body: await getEntryMarkdownSettingsOp(app, ctx, entryId) };
+```
+
+<a id="update_entry_markdown_settings"></a>
+
+### PUT /api/v1/entries/{entryId}/markdown
+
+**update_entry_markdown_settings** — Set one entry's Markdown availability switch (content.edit)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `content.edit` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/agent-markdown.ts` |
+
+Path parameters: `entryId`.
+
+Explicit path schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entryId"
+  ],
+  "properties": {
+    "entryId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  }
+}
+```
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "expected_generation"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
+```
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const { entryId } = request.params;
+return {
+  status: 200,
+  body: await saveEntryMarkdownSettingsOp(
+    app,
+    ctx,
+    entryId,
+    request.body
+  )
+};
+```
+
 <a id="move_entry"></a>
 
 ### POST /api/v1/entries/{entryId}/move
@@ -1599,7 +1722,7 @@ return {
 
 ### POST /api/v1/entries/{entryId}/restore
 
-**restore_entry** — Clear the archive flag (Admin spec §5)
+**restore_entry** — Clear the archive flag
 
 | Contract | Value |
 |---|---|
@@ -3565,11 +3688,11 @@ Read effective contracts, rendering defaults and typed capabilities.
 | `GET /api/v1/capabilities` | [get_capabilities](#get_capabilities) | Actor-visible subsystem capabilities + contract versions (permission-filtered) |
 | `GET /api/v1/discovery/blocks` | [list_block_types](#list_block_types) | Registered block types |
 | `GET /api/v1/discovery/blocks/{typeId}` | [get_block_schema](#get_block_schema) | Full block schema (props, children policy, references) |
-| `GET /api/v1/discovery/content/collection-capabilities` | [get_collection_capabilities](#get_collection_capabilities) | Collection DSL capabilities (typed allowlist, spec §14) |
+| `GET /api/v1/discovery/content/collection-capabilities` | [get_collection_capabilities](#get_collection_capabilities) | Collection DSL capabilities (typed allowlist) |
 | `GET /api/v1/discovery/content/field-types` | [list_field_types](#list_field_types) | Registered field types |
 | `GET /api/v1/discovery/content/icons` | [list_icon_catalog](#list_icon_catalog) | Curated icon catalog for `icon` fields (advisory; values are format-validated, membership is not enforced). |
 | `GET /api/v1/discovery/content/templates` | [list_compatible_templates](#list_compatible_templates) | Active-theme templates compatible with a content type (query: content_type) |
-| `GET /api/v1/discovery/content/tree` | [list_content_tree](#list_content_tree) | Content Tree rows with kind (content&#124;folder), title/working/publication indicators (PCMS-ADMIN-T002) |
+| `GET /api/v1/discovery/content/tree` | [list_content_tree](#list_content_tree) | Content Tree rows with kind (content&#124;folder), title/working/publication indicators |
 | `GET /api/v1/discovery/content/types` | [list_content_types](#list_content_types) | Registered content types (deterministic order) |
 | `GET /api/v1/discovery/content/types/{key}` | [get_content_type_schema](#get_content_type_schema) | Full content type schema (round-trippable) |
 | `GET /api/v1/discovery/navigation/placements` | [list_placement_bindings](#list_placement_bindings) | Theme-declared placements + current bindings |
@@ -3585,16 +3708,18 @@ Read effective contracts, rendering defaults and typed capabilities.
 | `GET /api/v1/discovery/seo/validate` | [validate_seo](#validate_seo) | Publish-level SEO validation report for an entry |
 | `GET /api/v1/discovery/theme` | [get_theme_contract](#get_theme_contract) | Active theme contract snapshot (manifest, templates, placements) |
 | `GET /api/v1/discovery/theme/templates` | [list_templates](#list_templates) | Theme templates with accepted content types |
-| `GET /api/v1/entries/{entryId}/route` | [get_entry_route](#get_entry_route) | Canonical route view: current path, history, proposal (PCMS-ADMIN-T011) |
-| `GET /api/v1/entries/{entryId}/seo` | [get_entry_seo](#get_entry_seo) | Stored SEO document for an entry (or null; PCMS-ADMIN-T010) |
+| `GET /api/v1/entries/{entryId}/route` | [get_entry_route](#get_entry_route) | Canonical route view: current path, history, proposal |
+| `GET /api/v1/entries/{entryId}/seo` | [get_entry_seo](#get_entry_seo) | Stored SEO document for an entry (or null) |
 | `GET /api/v1/external-identities/{namespace}/{externalId}` | [resolve_external_identity](#resolve_external_identity) | Resolve an external source item to its bound entry, with the human-edit reconciliation verdict (content.read). |
 | `PUT /api/v1/external-identities/{namespace}/{externalId}` | [bind_external_identity](#bind_external_identity) | Bind an external source item to an entry and/or refresh the agent sync baseline (content.edit). |
 | `GET /api/v1/localization` | [get_site_localization](#get_site_localization) | Site localization state: enabled locales, default, routing strategy. |
 | `PUT /api/v1/localization` | [update_site_localization](#update_site_localization) | Enable/disable multilingual and edit the locale list (audited; theme capability validated on enable). |
 | `GET /api/v1/maintenance` | [get_maintenance_state](#get_maintenance_state) | Maintenance Mode state and public page settings (site.maintenance). |
 | `PUT /api/v1/maintenance` | [update_maintenance_state](#update_maintenance_state) | Toggle maintenance mode or edit its public page settings (audited). |
-| `GET /api/v1/navigation/sets/{setId}/overrides` | [list_navigation_overrides](#list_navigation_overrides) | Derived-set overrides + stale ones (PCMS-ADMIN-T013) |
-| `GET /api/v1/navigation/validate` | [validate_navigation](#validate_navigation) | Placement binding validation (depth/type/required) — PCMS-ADMIN-T013 |
+| `GET /api/v1/markdown/settings` | [get_agent_markdown_settings](#get_agent_markdown_settings) | Read the site-wide Markdown availability switch (seo.read) |
+| `PUT /api/v1/markdown/settings` | [update_agent_markdown_settings](#update_agent_markdown_settings) | Set site-wide Markdown availability (seo.site_settings) |
+| `GET /api/v1/navigation/sets/{setId}/overrides` | [list_navigation_overrides](#list_navigation_overrides) | Derived-set overrides + stale ones |
+| `GET /api/v1/navigation/validate` | [validate_navigation](#validate_navigation) | Placement binding validation (depth/type/required) |
 | `DELETE /api/v1/registry/account-token` | [registry_account_token_clear](#registry_account_token_clear) | Remove the stored registry account token (extensions.manage; audited without the value). |
 | `POST /api/v1/registry/account-token` | [registry_account_token_set](#registry_account_token_set) | Store the registry account token (write-only runtime secret; catalog access without rebind; extensions.manage). Never readable back, never logged. |
 | `POST /api/v1/registry/apply-update` | [registry_apply_update](#registry_apply_update) | Download an engine release from the repository into incoming/ and apply it through the standard update orchestrator (extensions.manage) |
@@ -3627,11 +3752,11 @@ Read effective contracts, rendering defaults and typed capabilities.
 | `DELETE /api/v1/skills/{id}` | [uninstall_skill](#uninstall_skill) | Uninstall a community skill (skills.manage) |
 | `POST /api/v1/skills/{id}/disable` | [disable_skill](#disable_skill) | Hide a community skill from agents without uninstalling (skills.manage) |
 | `POST /api/v1/skills/{id}/enable` | [enable_skill](#enable_skill) | Re-enable a disabled community skill (skills.manage) |
-| `POST /api/v1/skills/install` | [install_skill](#install_skill) | Install a .pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path) |
-| `GET /api/v1/skills/sample.zip` | [download_skill_sample](#download_skill_sample) | Skeleton .pcskill package to fork into a community skill |
+| `POST /api/v1/skills/install` | [install_skill](#install_skill) | Install a.pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path) |
+| `GET /api/v1/skills/sample.zip` | [download_skill_sample](#download_skill_sample) | Skeleton.pcskill package to fork into a community skill |
 | `GET /api/v1/system/metrics` | [get_system_metrics](#get_system_metrics) | Recent runtime metric samples (CPU / memory / queue window) |
 | `GET /api/v1/system/status` | [get_system_status](#get_system_status) | Doctor-style snapshot: site, migration head, queue, storage, theme (site.validate; no secrets) |
-| `GET /api/v1/theme/state` | [get_theme_state](#get_theme_state) | Active theme + working settings + manifest settings (PCMS-ADMIN-T019) |
+| `GET /api/v1/theme/state` | [get_theme_state](#get_theme_state) | Active theme + working settings + manifest settings |
 | `GET /api/v1/users` | [list_users](#list_users) | Admin users with roles and MFA status (users.read) |
 
 <a id="get_agent_bootstrap"></a>
@@ -3935,7 +4060,7 @@ return {
       validate: has("theme.validate"),
       preview: has("theme.preview"),
       activate: has("theme.activate"),
-      // M10 shipped the active-theme store (migration 1000);
+      // M10 shipped the active-theme store (migration 1000)
       // activation is available whenever a theme source is configured.
       activation_available: app.themeDiscovery !== null
     },
@@ -3988,9 +4113,9 @@ return {
     },
     integrations: { installed: true, read: has("integrations.read") },
     payments: { installed: true, read: has("payments.read") },
-    // .pcpub ingest (ADR-0014, API spec §81.2): the physical format
+    // .pcpub ingest (ADR-0014): the physical format
     // versions, the contracts bundles may require, block versions the
-    // target accepts and the ingest limits — packers preflight here,
+    // target accepts and the ingest limits — packers preflight here
     // the server re-checks authoritatively at ingest.
     pcpub: {
       installed: true,
@@ -4080,7 +4205,7 @@ return { status: 200, body: schema };
 
 ### GET /api/v1/discovery/content/collection-capabilities
 
-**get_collection_capabilities** — Collection DSL capabilities (typed allowlist, spec §14)
+**get_collection_capabilities** — Collection DSL capabilities (typed allowlist)
 
 | Contract | Value |
 |---|---|
@@ -4215,7 +4340,7 @@ return {
 
 ### GET /api/v1/discovery/content/tree
 
-**list_content_tree** — Content Tree rows with kind (content|folder), title/working/publication indicators (PCMS-ADMIN-T002)
+**list_content_tree** — Content Tree rows with kind (content|folder), title/working/publication indicators
 
 | Contract | Value |
 |---|---|
@@ -4753,7 +4878,7 @@ return { status: 200, body: { items: requireTheme(app).listTemplates() } };
 
 ### GET /api/v1/entries/{entryId}/route
 
-**get_entry_route** — Canonical route view: current path, history, proposal (PCMS-ADMIN-T011)
+**get_entry_route** — Canonical route view: current path, history, proposal
 
 | Contract | Value |
 |---|---|
@@ -4785,7 +4910,7 @@ return {
 
 ### GET /api/v1/entries/{entryId}/seo
 
-**get_entry_seo** — Stored SEO document for an entry (or null; PCMS-ADMIN-T010)
+**get_entry_seo** — Stored SEO document for an entry (or null)
 
 | Contract | Value |
 |---|---|
@@ -5104,11 +5229,93 @@ return handle(
 );
 ```
 
+<a id="get_agent_markdown_settings"></a>
+
+### GET /api/v1/markdown/settings
+
+**get_agent_markdown_settings** — Read the site-wide Markdown availability switch (seo.read)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `seo.read` |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/agent-markdown.ts` |
+
+Path parameters: none.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+return { status: 200, body: await getAgentMarkdownSettingsOp(app, ctx) };
+```
+
+<a id="update_agent_markdown_settings"></a>
+
+### PUT /api/v1/markdown/settings
+
+**update_agent_markdown_settings** — Set site-wide Markdown availability (seo.site_settings)
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `seo.site_settings` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/agent-markdown.ts` |
+
+Path parameters: none.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "expected_generation"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
+```
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+return {
+  status: 200,
+  body: await saveAgentMarkdownSettingsOp(
+    app,
+    ctx,
+    request.body
+  )
+};
+```
+
 <a id="list_navigation_overrides"></a>
 
 ### GET /api/v1/navigation/sets/{setId}/overrides
 
-**list_navigation_overrides** — Derived-set overrides + stale ones (PCMS-ADMIN-T013)
+**list_navigation_overrides** — Derived-set overrides + stale ones
 
 | Contract | Value |
 |---|---|
@@ -5140,7 +5347,7 @@ return {
 
 ### GET /api/v1/navigation/validate
 
-**validate_navigation** — Placement binding validation (depth/type/required) — PCMS-ADMIN-T013
+**validate_navigation** — Placement binding validation (depth/type/required)
 
 | Contract | Value |
 |---|---|
@@ -6526,7 +6733,7 @@ return { status: 200, body: { id: params.id, disabled: false } };
 
 ### POST /api/v1/skills/install
 
-**install_skill** — Install a .pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path)
+**install_skill** — Install a.pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path)
 
 | Contract | Value |
 |---|---|
@@ -6562,7 +6769,7 @@ return { status: 201, body: bodyResult };
 
 ### GET /api/v1/skills/sample.zip
 
-**download_skill_sample** — Skeleton .pcskill package to fork into a community skill
+**download_skill_sample** — Skeleton.pcskill package to fork into a community skill
 
 | Contract | Value |
 |---|---|
@@ -6672,7 +6879,7 @@ return { status: 200, body: await getSystemStatusOp(app, ctx) };
 
 ### GET /api/v1/theme/state
 
-**get_theme_state** — Active theme + working settings + manifest settings (PCMS-ADMIN-T019)
+**get_theme_state** — Active theme + working settings + manifest settings
 
 | Contract | Value |
 |---|---|
@@ -7855,12 +8062,12 @@ Version definitions and run anonymous server-validated interactions; history can
 | `GET /api/v1/forms/{formId}/stats` | [get_form_stats](#get_form_stats) | Submission and lead counts for a form definition |
 | `GET /api/v1/forms/{formId}/usage` | [get_form_usage](#get_form_usage) | Entries whose content references the form definition |
 | `GET /api/v1/forms/field-types` | [list_form_field_types](#list_form_field_types) | Builder-facing field type corpus with supported properties |
-| `POST /api/v1/public/forms/{formId}/submit` | [submit_public_form](#submit_public_form) | Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23) |
-| `GET /api/v1/public/quizzes/{quizId}/schema` | [get_quiz_public_schema](#get_quiz_public_schema) | Sanitized public quiz schema for rendering clients (§36) |
-| `POST /api/v1/public/quizzes/{quizId}/start` | [start_public_quiz](#start_public_quiz) | Start an anonymous server-driven quiz run (§11/§16) |
-| `POST /api/v1/public/quizzes/runs/{runId}/abandon` | [abandon_public_quiz](#abandon_public_quiz) | Explicit client exit: run becomes ABANDONED (§17) |
-| `POST /api/v1/public/quizzes/runs/{runId}/answer` | [answer_public_quiz](#answer_public_quiz) | Record one server-validated answer; branching decides the next step (§12/§13) |
-| `POST /api/v1/public/quizzes/runs/{runId}/complete` | [complete_public_quiz](#complete_public_quiz) | Complete a run: server computes score/outcome, may create a lead (§14/§15) |
+| `POST /api/v1/public/forms/{formId}/submit` | [submit_public_form](#submit_public_form) | Anonymous form submission: validate → persist → outbox, retry-safe |
+| `GET /api/v1/public/quizzes/{quizId}/schema` | [get_quiz_public_schema](#get_quiz_public_schema) | Sanitized public quiz schema for rendering clients |
+| `POST /api/v1/public/quizzes/{quizId}/start` | [start_public_quiz](#start_public_quiz) | Start an anonymous server-driven quiz run |
+| `POST /api/v1/public/quizzes/runs/{runId}/abandon` | [abandon_public_quiz](#abandon_public_quiz) | Explicit client exit: run becomes ABANDONED |
+| `POST /api/v1/public/quizzes/runs/{runId}/answer` | [answer_public_quiz](#answer_public_quiz) | Record one server-validated answer; branching decides the next step |
+| `POST /api/v1/public/quizzes/runs/{runId}/complete` | [complete_public_quiz](#complete_public_quiz) | Complete a run: server computes score/outcome, may create a lead |
 | `GET /api/v1/quizzes` | [list_quizzes](#list_quizzes) | List quiz definitions (current version each) |
 | `POST /api/v1/quizzes` | [create_quiz_definition](#create_quiz_definition) | Create a quiz definition (version 1; quizzes.manage_definition) |
 | `GET /api/v1/quizzes/{quizId}` | [get_quiz_definition](#get_quiz_definition) | One quiz definition (steps/branching/scoring/outcomes of the current version) |
@@ -8256,7 +8463,7 @@ return { status: 200, body: { items: FORM_FIELD_TYPE_INFO_V1 } };
 
 ### POST /api/v1/public/forms/{formId}/submit
 
-**submit_public_form** — Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23)
+**submit_public_form** — Anonymous form submission: validate → persist → outbox, retry-safe
 
 | Contract | Value |
 |---|---|
@@ -8345,7 +8552,7 @@ return { status: 200, body: result };
 
 ### GET /api/v1/public/quizzes/{quizId}/schema
 
-**get_quiz_public_schema** — Sanitized public quiz schema for rendering clients (§36)
+**get_quiz_public_schema** — Sanitized public quiz schema for rendering clients
 
 | Contract | Value |
 |---|---|
@@ -8394,7 +8601,7 @@ return {
 
 ### POST /api/v1/public/quizzes/{quizId}/start
 
-**start_public_quiz** — Start an anonymous server-driven quiz run (§11/§16)
+**start_public_quiz** — Start an anonymous server-driven quiz run
 
 | Contract | Value |
 |---|---|
@@ -8466,7 +8673,7 @@ return { status: 200, body: result };
 
 ### POST /api/v1/public/quizzes/runs/{runId}/abandon
 
-**abandon_public_quiz** — Explicit client exit: run becomes ABANDONED (§17)
+**abandon_public_quiz** — Explicit client exit: run becomes ABANDONED
 
 | Contract | Value |
 |---|---|
@@ -8533,7 +8740,7 @@ return { status: 200, body: result };
 
 ### POST /api/v1/public/quizzes/runs/{runId}/answer
 
-**answer_public_quiz** — Record one server-validated answer; branching decides the next step (§12/§13)
+**answer_public_quiz** — Record one server-validated answer; branching decides the next step
 
 | Contract | Value |
 |---|---|
@@ -8608,7 +8815,7 @@ return { status: 200, body: result };
 
 ### POST /api/v1/public/quizzes/runs/{runId}/complete
 
-**complete_public_quiz** — Complete a run: server computes score/outcome, may create a lead (§14/§15)
+**complete_public_quiz** — Complete a run: server computes score/outcome, may create a lead
 
 | Contract | Value |
 |---|---|
@@ -9044,7 +9251,7 @@ Configure connectors, notifications and delivery reliability; secret slots are w
 | `GET /api/v1/integrations/bindings` | [list_bindings](#list_bindings) | Event→action bindings |
 | `POST /api/v1/integrations/bindings` | [create_binding](#create_binding) | Bind an event type to configured actions (bounded conditions) |
 | `PATCH /api/v1/integrations/bindings/{bindingId}` | [update_binding](#update_binding) | Update a binding (event type, conditions, actions, policy) |
-| `GET /api/v1/integrations/connectors` | [list_connectors](#list_connectors) | Registered connector catalog with typed contracts (spec §6) |
+| `GET /api/v1/integrations/connectors` | [list_connectors](#list_connectors) | Registered connector catalog with typed contracts |
 | `GET /api/v1/integrations/connectors/{connectorType}` | [get_connector_schema](#get_connector_schema) | Connector config schema, secret requirements and actions |
 | `GET /api/v1/integrations/deliveries` | [list_deliveries](#list_deliveries) | Outbound delivery history with reliability states |
 | `GET /api/v1/integrations/deliveries/{deliveryId}` | [get_delivery](#get_delivery) | One delivery with its complete attempt history |
@@ -9329,7 +9536,7 @@ return handle(
 
 ### GET /api/v1/integrations/connectors
 
-**list_connectors** — Registered connector catalog with typed contracts (spec §6)
+**list_connectors** — Registered connector catalog with typed contracts
 
 | Contract | Value |
 |---|---|
@@ -10513,7 +10720,7 @@ Read/moderate/export submissions, quiz runs and leads with separate scopes.
 
 | Method/path | Operation | Purpose |
 |---|---|---|
-| `POST /api/v1/interactions/export` | [export_interactions](#export_interactions) | Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads (§29) |
+| `POST /api/v1/interactions/export` | [export_interactions](#export_interactions) | Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads |
 | `GET /api/v1/interactions/leads` | [list_leads](#list_leads) | Bounded lead list (PII; leads.read) |
 | `GET /api/v1/interactions/leads/{leadId}` | [get_lead](#get_lead) | One lead with source provenance (PII; leads.read) |
 | `PATCH /api/v1/interactions/leads/{leadId}` | [update_lead_status](#update_lead_status) | Lead lifecycle transition; emits LeadStatusChanged atomically (leads.manage) |
@@ -10531,7 +10738,7 @@ Read/moderate/export submissions, quiz runs and leads with separate scopes.
 
 ### POST /api/v1/interactions/export
 
-**export_interactions** — Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads (§29)
+**export_interactions** — Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads
 
 | Contract | Value |
 |---|---|
@@ -11552,7 +11759,7 @@ Manage assets, folders, providers and acquisition. Import/accept before referenc
 | `GET /api/v1/media/{mediaId}/usage` | [get_media_usage](#get_media_usage) | Inbound references for the asset |
 | `POST /api/v1/media/{mediaId}/variants/regenerate` | [regenerate_media_variants](#regenerate_media_variants) | Generate missing raster image variants for the active theme |
 | `PUT /api/v1/media/{mediaId}/version` | [replace_media_version](#replace_media_version) | Replace the current document version (new immutable version) |
-| `GET /api/v1/media/by-hash/{sha256}` | [search_media_by_hash](#search_media_by_hash) | Exact-bytes lookup (§45 dedupe): every asset whose current content hash matches — explains library duplicates |
+| `GET /api/v1/media/by-hash/{sha256}` | [search_media_by_hash](#search_media_by_hash) | Exact-bytes lookup (dedupe): every asset whose current content hash matches — explains library duplicates |
 | `GET /api/v1/media/folders` | [list_media_folders](#list_media_folders) | Logical media folders (editorial organization only) |
 | `POST /api/v1/media/folders` | [create_media_folder](#create_media_folder) | Create a logical media folder |
 | `DELETE /api/v1/media/folders/{folderId}` | [delete_media_folder](#delete_media_folder) | Delete an empty folder (MEDIA_FOLDER_NOT_EMPTY otherwise) |
@@ -12206,7 +12413,7 @@ return {
 
 ### GET /api/v1/media/by-hash/{sha256}
 
-**search_media_by_hash** — Exact-bytes lookup (§45 dedupe): every asset whose current content hash matches — explains library duplicates
+**search_media_by_hash** — Exact-bytes lookup (dedupe): every asset whose current content hash matches — explains library duplicates
 
 | Contract | Value |
 |---|---|
@@ -13762,6 +13969,7 @@ Provider discovery, payment lifecycle, refunds and verified callbacks; mutations
 | `POST /api/v1/payments/{paymentId}/refund` | [refund_payment](#refund_payment) | Privileged refund (partial or full; audited) |
 | `GET /api/v1/payments/{paymentId}/refunds` | [list_payment_refund_intents](#list_payment_refund_intents) | Refund intents of one payment (durable state machine, S7). |
 | `GET /api/v1/payments/callback/{providerInstanceId}` | [receive_payment_callback](#receive_payment_callback) | Provider callback receiver (anonymous allowlist; provider verifier + InboundEvent dedup + state machine) |
+| `POST /api/v1/payments/callback/{providerInstanceId}` | [post_payment_callback](#post_payment_callback) | Provider callback receiver (anonymous allowlist; provider verifier + InboundEvent dedup + state machine) |
 | `GET /api/v1/payments/inbound-events` | [list_payment_inbound_events](#list_payment_inbound_events) | Inbound provider callbacks with processing state (S6 diagnostics; raw payloads never returned). |
 | `GET /api/v1/payments/providers` | [list_payment_providers](#list_payment_providers) | Registered payment provider types with secret requirements |
 | `GET /api/v1/payments/providers/{providerType}/capabilities` | [get_payment_provider_capabilities](#get_payment_provider_capabilities) | Provider capability report (cancel/refund/idempotency/sync) |
@@ -14213,7 +14421,7 @@ return handle(
 | Registry idempotency | Not annotated; do not assume durable header replay. |
 | Body limit | 262144 bytes |
 | Source | `packages/api/src/http/routes/payments.ts` |
-| Handler-local error codes (not the whole domain error set) | `PAYMENT_PROVIDER_INSTANCE_NOT_FOUND` |
+| Handler-local error codes (not the whole domain error set) | `PAYMENT_INBOUND_INVALID`, `PAYMENT_PROVIDER_INSTANCE_NOT_FOUND`, `PAYMENT_PROVIDER_UNAVAILABLE` |
 
 Path parameters: `providerInstanceId`.
 
@@ -14227,7 +14435,6 @@ Response construction:
 ```javascript
 const params = request.params;
 const instance = await app.payments.instances.get(params.providerInstanceId);
-const rawBody = typeof request.body === "string" ? request.body : Buffer.isBuffer(request.body) ? request.body.toString("utf8") : JSON.stringify(request.body ?? null);
 const record = await app.integrations.inbound.receiveOrphan({
   sourceType: "payment_provider",
   sourceId: instance.id,
@@ -14240,6 +14447,77 @@ const applied = await app.payments.service.processCallback({
   parsed,
   inboundEventId: outcome.record.id
 });
+return {
+  status: 200,
+  body: { received: true, retained: true, applied: false, event_id: record.id }
+};
+return {
+  status: 200,
+  body: { received: true, retained: true, applied: false, event_id: record.id }
+};
+return {
+  status: 200,
+  body: { received: true, duplicate: true, event_id: outcome.record.id }
+};
+return {
+  status: 200,
+  body: { received: true, duplicate: false, applied: false, event_id: outcome.record.id }
+};
+return {
+  status: 200,
+  body: {
+    received: true,
+    duplicate: false,
+    applied: applied.applied,
+    event_id: outcome.record.id
+  }
+};
+```
+
+<a id="post_payment_callback"></a>
+
+### POST /api/v1/payments/callback/{providerInstanceId}
+
+**post_payment_callback** — Provider callback receiver (anonymous allowlist; provider verifier + InboundEvent dedup + state machine)
+
+| Contract | Value |
+|---|---|
+| Authentication | public |
+| Declared permission | No fixed route scope; actor/domain-specific checks can still apply. |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 262144 bytes |
+| Source | `packages/api/src/http/routes/payments.ts` |
+| Handler-local error codes (not the whole domain error set) | `PAYMENT_INBOUND_INVALID`, `PAYMENT_PROVIDER_INSTANCE_NOT_FOUND`, `PAYMENT_PROVIDER_UNAVAILABLE` |
+
+Path parameters: `providerInstanceId`.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const params = request.params;
+const instance = await app.payments.instances.get(params.providerInstanceId);
+const record = await app.integrations.inbound.receiveOrphan({
+  sourceType: "payment_provider",
+  sourceId: instance.id,
+  rawBody,
+  reason: `provider type "${instance.providerType}" is not composed (extension disabled or absent)`
+});
+const parsed = outcome.normalized;
+const applied = await app.payments.service.processCallback({
+  providerInstanceId: instance.id,
+  parsed,
+  inboundEventId: outcome.record.id
+});
+return {
+  status: 200,
+  body: { received: true, retained: true, applied: false, event_id: record.id }
+};
 return {
   status: 200,
   body: { received: true, retained: true, applied: false, event_id: record.id }
@@ -16007,19 +16285,19 @@ Query public/admin search, inspect index health and explicitly run reindexing.
 
 | Method/path | Operation | Purpose |
 |---|---|---|
-| `GET /api/v1/search` | [search_query](#search_query) | Bounded public site search (PostgreSQL full-text, spec §23) |
-| `GET /api/v1/search/admin` | [search_admin](#search_admin) | Authorized admin search across published, drafts, media, navigation (§24) |
+| `GET /api/v1/search` | [search_query](#search_query) | Bounded public site search (PostgreSQL full-text) |
+| `GET /api/v1/search/admin` | [search_admin](#search_admin) | Authorized admin search across published, drafts, media, navigation |
 | `GET /api/v1/search/capabilities` | [get_search_capabilities](#get_search_capabilities) | Machine-readable search capabilities (entity types, filters, sorts, limits) |
-| `GET /api/v1/search/reindex` | [list_search_reindex_runs](#list_search_reindex_runs) | Reindex run history and progress (§26) |
-| `POST /api/v1/search/reindex` | [reindex_search](#reindex_search) | Start or resume a full shadow-epoch reindex (§19/§20) |
-| `GET /api/v1/search/status` | [get_search_status](#get_search_status) | Search index health, version and reindex progress (§26/§31) |
-| `POST /api/v1/search/validate-document` | [validate_search_document](#validate_search_document) | Re-derive and validate one entity's search document (§31) |
+| `GET /api/v1/search/reindex` | [list_search_reindex_runs](#list_search_reindex_runs) | Reindex run history and progress |
+| `POST /api/v1/search/reindex` | [reindex_search](#reindex_search) | Start or resume a full shadow-epoch reindex |
+| `GET /api/v1/search/status` | [get_search_status](#get_search_status) | Search index health, version and reindex progress |
+| `POST /api/v1/search/validate-document` | [validate_search_document](#validate_search_document) | Re-derive and validate one entity's search document |
 
 <a id="search_query"></a>
 
 ### GET /api/v1/search
 
-**search_query** — Bounded public site search (PostgreSQL full-text, spec §23)
+**search_query** — Bounded public site search (PostgreSQL full-text)
 
 | Contract | Value |
 |---|---|
@@ -16088,8 +16366,10 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 Response construction:
 ```javascript
 const query = request.query;
+const rate = rateLimit(request.ip);
 return {
   status: 200,
+  headers: rateLimitHeaders(rate),
   body: await app.searchQuery({
     q: String(query.q ?? ""),
     locale: String(query.locale ?? "default"),
@@ -16108,7 +16388,7 @@ return {
 
 ### GET /api/v1/search/admin
 
-**search_admin** — Authorized admin search across published, drafts, media, navigation (§24)
+**search_admin** — Authorized admin search across published, drafts, media, navigation
 
 | Contract | Value |
 |---|---|
@@ -16199,7 +16479,7 @@ return { status: 200, body: searchCapabilities() };
 
 ### GET /api/v1/search/reindex
 
-**list_search_reindex_runs** — Reindex run history and progress (§26)
+**list_search_reindex_runs** — Reindex run history and progress
 
 | Contract | Value |
 |---|---|
@@ -16227,7 +16507,7 @@ return { status: 200, body: { runs: await app.searchReindex.listRuns() } };
 
 ### POST /api/v1/search/reindex
 
-**reindex_search** — Start or resume a full shadow-epoch reindex (§19/§20)
+**reindex_search** — Start or resume a full shadow-epoch reindex
 
 | Contract | Value |
 |---|---|
@@ -16277,7 +16557,7 @@ return {
 
 ### GET /api/v1/search/status
 
-**get_search_status** — Search index health, version and reindex progress (§26/§31)
+**get_search_status** — Search index health, version and reindex progress
 
 | Contract | Value |
 |---|---|
@@ -16305,7 +16585,7 @@ return { status: 200, body: await searchStatus(app) };
 
 ### POST /api/v1/search/validate-document
 
-**validate_search_document** — Re-derive and validate one entity's search document (§31)
+**validate_search_document** — Re-derive and validate one entity's search document
 
 | Contract | Value |
 |---|---|
@@ -16376,7 +16656,7 @@ Identify the target and diagnose the running instance.
 |---|---|---|
 | `GET /api/v1/diagnostics` | [get_diagnostics](#get_diagnostics) | Remote diagnostics: release version, DB, worker queue/heartbeat + recent job errors, media providers, registry binding, maintenance (site.validate). |
 | `GET /api/v1/openapi.json` | [get_openapi_document](#get_openapi_document) | OpenAPI 3.1 contract of this API (deterministic release artifact) |
-| `GET /api/v1/server` | [get_server_info](#get_server_info) | Server identity + subsystem contract versions (spec §20) |
+| `GET /api/v1/server` | [get_server_info](#get_server_info) | Server identity + subsystem contract versions |
 
 <a id="get_diagnostics"></a>
 
@@ -16443,7 +16723,7 @@ return {
 
 ### GET /api/v1/server
 
-**get_server_info** — Server identity + subsystem contract versions (spec §20)
+**get_server_info** — Server identity + subsystem contract versions
 
 | Contract | Value |
 |---|---|
@@ -16494,16 +16774,16 @@ Inspect, validate, install and activate presentation packages/settings.
 | `POST /api/v1/theme/settings/seal` | [seal_theme_settings](#seal_theme_settings) | Seal the working settings as a theme_settings revision (theme.write) |
 | `GET /api/v1/themes/active` | [get_served_theme](#get_served_theme) | Actual in-memory theme id/version used by the public renderer (theme.read) |
 | `POST /api/v1/themes/active/update` | [update_active_theme](#update_active_theme) | Replace the active theme with a newer package of the same id and refresh rendering without restart (theme.write + theme.activate). Body: raw ZIP (optional ?expected_generation=N) or JSON {package_ref, expected_generation}. |
-| `POST /api/v1/themes/install` | [install_theme](#install_theme) | Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten. |
+| `POST /api/v1/themes/install` | [install_theme](#install_theme) | Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten. |
 | `GET /api/v1/themes/installed` | [list_themes_installed](#list_themes_installed) | Installed themes in the themes root (theme.read). active = admin_theme_state row; isRenderTarget = the theme themes.renderDir actually serves. |
 | `DELETE /api/v1/themes/installed/{name}` | [uninstall_theme](#uninstall_theme) | Uninstall an installed theme (theme.write). The renderDir theme is refused — switch themes.renderDir first. |
-| `POST /api/v1/themes/packages` | [upload_theme_package](#upload_theme_package) | Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability. |
+| `POST /api/v1/themes/packages` | [upload_theme_package](#upload_theme_package) | Stage a.pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability. |
 | `POST /api/v1/themes/packages/{ref}/validate` | [validate_theme_package](#validate_theme_package) | Validate a staged package without changing the site: identity, version, digest and typed diagnostics; the candidate render stack is built and discarded (theme.validate) |
 | `GET /api/v1/themes/revisions` | [list_theme_revisions](#list_theme_revisions) | Retained confirmed theme revisions for this site (active plus newest, at most 100) |
 | `POST /api/v1/themes/revisions/cleanup` | [cleanup_theme_revisions](#cleanup_theme_revisions) | Preview old snapshots (theme.read) or remove explicit candidates (theme.write); preserves active, last-good, newest five and recovery revisions |
 | `POST /api/v1/themes/rollback` | [rollback_theme_revision](#rollback_theme_revision) | Live activation of a retained revision, with lifecycle CAS (theme.write + theme.activate) |
 | `GET /api/v1/themes/source` | [get_theme_source](#get_theme_source) | Descriptor of the package of the theme the renderer ACTUALLY serves: identity, served/installed versions, revision, generation and archive digest (theme.read) |
-| `GET /api/v1/themes/source/package` | [download_theme_source_package](#download_theme_source_package) | Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis |
+| `GET /api/v1/themes/source/package` | [download_theme_source_package](#download_theme_source_package) | Download the served theme as a.pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis |
 | `POST /api/v1/themes/validate` | [validate_theme](#validate_theme) | Validate the configured theme source against the theme contract |
 
 <a id="create_preview"></a>
@@ -16900,7 +17180,7 @@ return { status: 200, body: { ...info, served: app.themeRuntime.served?.() } };
 
 ### POST /api/v1/themes/install
 
-**install_theme** — Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.
+**install_theme** — Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.
 
 Verified behavior: Installs a new catalog package; ordinary install protects the currently rendered theme. Persistent activation can override the configured boot/render path. Use active-update for a newer package of the same served id.
 
@@ -17024,7 +17304,7 @@ return { status: 200, body: { uninstalled: name } };
 
 ### POST /api/v1/themes/packages
 
-**upload_theme_package** — Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.
+**upload_theme_package** — Stage a.pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.
 
 | Contract | Value |
 |---|---|
@@ -17475,7 +17755,7 @@ return { status: 200, body: await getThemeSourceOp(app, ctx) };
 
 ### GET /api/v1/themes/source/package
 
-**download_theme_source_package** — Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis
+**download_theme_source_package** — Download the served theme as a.pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis
 
 | Contract | Value |
 |---|---|
@@ -17966,16 +18246,18 @@ Output schema:
 | GET | `/health/live` | Anonymous liveness: 200 {status:"live"}; does not test DB. | `apps/web/src/health.ts` |
 | GET | `/health/ready` | Anonymous readiness: 200 {status:"ready"} or 503 {status:"not_ready"}; dependency details stay in logs. | `apps/web/src/health.ts` |
 | POST | `/mcp` | Bearer-only JSON-RPC transport; see the MCP map. POST only, 1 MiB. | `apps/web/src/main.ts` |
+| GET | `/llms.txt` | Bounded public inventory of Core-confirmed Markdown pages with.md URLs and the XML sitemap; disabled or unavailable discovery returns 404. | `apps/web/src/markdown-files.ts` |
 | GET | `/media/a/*` | Public versioned/current managed-media files, variants and document-download paths. Validates path and public access policy; not an upload route. | `apps/web/src/media-files.ts` |
 | GET | `/preview` | Signed token query, resolved preview state JSON; expired/invalid references fail, private/no-store/noindex. | `apps/web/src/preview.ts` |
 | GET | `/core-assets/richtext-v2.css` | Core RichText fallback CSS; text/css, public cache 3600 seconds. | `apps/web/src/richtext-assets.ts` |
 | GET | `/search` | Public rendered search page; query q/locale and bounded filters are passed to search. HTML output, separate from /api/v1/search JSON. | `apps/web/src/search-page.ts` |
 | GET | `/search/` | Same public HTML search handler as /search; both paths are registered. Search results carry noindex, follow. | `apps/web/src/search-page.ts` |
+| GET | `/.well-known/security.txt` | Optional site-owned vulnerability contact. Registered only with http.securityTxt; served over HTTPS before expiry, otherwise 404. Reverse-proxy HTTPS trust and contact renewal are operator responsibilities. | `apps/web/src/seo-files.ts` |
+| GET | `/security.txt` | Alias of /.well-known/security.txt: optional site-owned vulnerability contact, registered only with http.securityTxt and served over HTTPS before expiry. | `apps/web/src/seo-files.ts` |
 | GET | `/robots.txt` | Text robots policy from SEO; public cache 3600 seconds. | `apps/web/src/seo-files.ts` |
 | GET | `/sitemap.xml` | XML sitemap from SEO or 404 when unavailable; public cache 3600 seconds. | `apps/web/src/seo-files.ts` |
 | GET | `/preview/page` | Signed preview token; renders the selected page/revision/theme in HTML with private/no-store/noindex headers. | `apps/web/src/site.ts` |
-| GET | `/*` | GET resolves locale/extension mounts, SEO key files, public search/routes and published pages. Non-GET POST/PUT/DELETE/PATCH dispatches extension HTTP routes only. Unknown paths fail; this is not a generic authoring API. | `apps/web/src/site.ts` |
-| POST, PUT, DELETE, PATCH | `/*` | GET resolves locale/extension mounts, SEO key files, public search/routes and published pages. Non-GET POST/PUT/DELETE/PATCH dispatches extension HTTP routes only. Unknown paths fail; this is not a generic authoring API. | `apps/web/src/site.ts` |
+| GET | `/*` | GET resolves locale/extension mounts, SEO key files, public search/routes and published pages. Published pages negotiate text/markdown with Accept or a.md suffix; negotiated output varies on Accept, while explicit.md is noindex and points to the HTML canonical. Disabled explicit.md is 404; Markdown-only negotiation while disabled is 406, and ordinary HTML remains available. Non-GET POST/PUT/DELETE/PATCH dispatches extension HTTP routes only. Unknown paths fail; this is not a generic authoring API. | `apps/web/src/site.ts` |
 | GET | `/themes/*` | Public active asset aliases and immutable <theme-id>/revisions/<uuid>/assets/<path> for confirmed revisions; rejects traversal/private template/manifest reads. HTML assets are revision-pinned; opaque JS/absolute CSS can still reference the active alias. | `apps/web/src/theme-files.ts` |
 
 Extension HTTP routes under `/x/<extension-id>/` and assigned site mounts are installation-dependent; GET and non-GET dispatch use the same deployed extension descriptors. Consult the extension contract, enabled state and mount discovery; these wildcard dispatchers do not promise a fixed list of third-party routes.

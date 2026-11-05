@@ -8,18 +8,33 @@
     {
       "id": "company-page",
       "file": "templates/page.liquid",
+      "markdown_file": "templates/page-markdown.liquid",
+      "markdown_contract": {
+        "version": 1,
+        "dependencies": ["entry.title", "entry.fields.intro_markdown", "blocks_markdown"]
+      },
       "accepts_content_types": ["company_page@1"],
       "required_fields": ["title"]
     },
     {
       "id": "company-news",
       "file": "templates/article.liquid",
+      "markdown_file": "templates/article-markdown.liquid",
+      "markdown_contract": {
+        "version": 1,
+        "dependencies": ["entry.title", "entry.fields.intro_markdown", "body_markdown"]
+      },
       "accepts_content_types": ["company_news@1"],
       "required_fields": ["title"]
     },
     {
       "id": "company-project",
       "file": "templates/article.liquid",
+      "markdown_file": "templates/article-markdown.liquid",
+      "markdown_contract": {
+        "version": 1,
+        "dependencies": ["entry.title", "entry.fields.intro_markdown", "body_markdown"]
+      },
       "accepts_content_types": ["company_project@1"],
       "required_fields": ["title"]
     }

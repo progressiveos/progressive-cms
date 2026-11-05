@@ -51,7 +51,9 @@ import {
   createApiFastify,
   createApiV1,
   createApplicationServices,
+  createSourceKeyResolver,
   DEFAULT_PCPUB_LIMITS,
+  makeAgentMarkdownRoutes,
   makeAgentRoutes,
   makeAnalyticsRoutes,
   makeCollectionsRoutes,
@@ -142,6 +144,15 @@ export async function buildWebRuntime(options: {
 }): Promise<WebRuntime> {
   const config = loadConfig(options);
   const secrets = loadSecrets(config.secrets, options.env ?? process.env);
+  // Opaque network-source identifier for extension anti-abuse
+  // (CORE-SHOP-SECURITY-SOURCE-01): derived here once from the resolved
+  // installation secret so the API, MCP and site transports carry identical
+  // keys for the same peer. Unconfigured → always undefined (feature off).
+  const sourceKeyOf = createSourceKeyResolver(
+    config.http.sourceKeySecretRef === undefined
+      ? undefined
+      : secrets.require(config.http.sourceKeySecretRef),
+  );
   const connectionInfo = buildDbConnectionInfo(config.db, secrets);
   const pool = createDbPool({
     connectionInfo,
@@ -323,15 +334,7 @@ export async function buildWebRuntime(options: {
   // ADR-0017 R2: the update orchestrator reconciles installed extensions
   // with the shipped artifacts through the same trusted catalog (a second
   // lifecycle INSTANCE is fine — the DB revision/ledger is the authority).
-  // PCMS_ADMIN_UI_TEST=1 composes the ui-test entries (Admin UI contract
-  // gate fixture) — the e2e harness only; production web always standard.
-  // The ui-test variant is loaded DYNAMICALLY so the production import graph
-  // never references it (release ships without that module).
-  let extensionCatalog = createFirstPartyExtensionCatalog({ pool });
-  if (process.env.PCMS_ADMIN_UI_TEST === "1") {
-    const uiTest = await import("../../../extensions/catalog.ui-test.generated.js");
-    extensionCatalog = uiTest.createFirstPartyExtensionCatalog({ pool });
-  }
+  const extensionCatalog = createFirstPartyExtensionCatalog({ pool });
   const updateOrchestrationPorts =
     updateManifestDocument === undefined
       ? undefined
@@ -464,12 +467,14 @@ export async function buildWebRuntime(options: {
       ...makeLocalizationRoutes(),
       ...makeMaintenanceRoutes(),
       ...makeAgentRoutes(),
+      ...makeAgentMarkdownRoutes(),
       ...makeMailRoutes(),
       ...makeNotificationRoutes(),
     ]),
     {
       application,
       logger,
+      sourceKey: sourceKeyOf,
       // __Host- cookies demand TLS; plain-HTTP development uses a non-prefixed
       // name (auth package cookie contract). Proxy/TLS hardening is M15.
       cookieSecure: config.http?.cookieSecure ?? config.nodeEnv === "production",
@@ -483,14 +488,17 @@ export async function buildWebRuntime(options: {
   // Public site (composition capability): Routing → published revision →
   // theme render; registered after the maintenance gate so anonymous
   // requests keep receiving the branded 503 while it is enabled.
-  await registerSiteRoute(fastify, { application });
+  await registerSiteRoute(fastify, { application, sourceKey: sourceKeyOf });
   registerMediaFilesRoute(fastify, { application });
   // Theme public assets (M17-T007; ADR-0011): the external-RP profile has no
   // in-container nginx, so the application serves /themes/<name>/assets/*.
   registerThemeFilesRoute(fastify, { renderDir: config.themes?.renderDir, application });
   // Public SEO documents (M17 §44/§45): robots.txt + sitemap.xml from the
   // SEO subsystem; origin comes from the primary domain binding.
-  registerSeoFilesRoute(fastify, { application });
+  registerSeoFilesRoute(fastify, {
+    application,
+    ...(config.http.securityTxt === undefined ? {} : { securityTxt: config.http.securityTxt }),
+  });
   // Standard browser alias for the current site's favicon (CORE-FAVICON-01):
   // same Site Identity source as the core head, no theme or Nginx involvement.
   registerFaviconRoute(fastify, { application });
@@ -519,10 +527,14 @@ export async function buildWebRuntime(options: {
       void reply.status(401).send({ error: { code: "AUTH_UNAUTHENTICATED" } });
       return reply;
     }
+    const sourceKey = sourceKeyOf(request.ip);
     const response = await mcp.handleRequest(request.body, () => ({
       actor: auth.actor,
       transport: "mcp",
       requestId: request.id,
+      // Additional signal only — the bearer service account stays the MCP
+      // identity (CORE-SHOP-SECURITY-SOURCE-01).
+      ...(sourceKey === undefined ? {} : { sourceKey }),
     }));
     if (response === null) {
       void reply.status(204).send();

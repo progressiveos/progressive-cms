@@ -21,7 +21,12 @@ import {
   sweepGenerationRunsOp,
   sweepNotificationsOp,
 } from "@pcms/api";
-import { createSecretBox, decodeEncryptionKey } from "@pcms/auth";
+import {
+  createSecretBox,
+  decodeEncryptionKey,
+  recordSecurityEvent,
+  type SecurityEventType,
+} from "@pcms/auth";
 import { effectiveContentTypeDefinitions } from "@pcms/content";
 import {
   type AppConfig,
@@ -59,6 +64,7 @@ import {
   createOutboxService,
   createPublicationJobHandlers,
   type OutboxConsumer,
+  writeOutboxEvent,
 } from "@pcms/publication";
 import { sweepSealedRevisions } from "@pcms/revisions";
 import {
@@ -71,6 +77,8 @@ import {
 import { readThemeManifestPresets } from "@pcms/themes";
 import { createFirstPartyExtensionCatalog } from "../../../extensions/catalog.js";
 import { loadContentTypeDefinitions } from "./content-types.js";
+import { createPaymentRefundJobHandlers } from "./payment-refund-jobs.js";
+import { createRevisionedValue } from "./revisioned-value.js";
 
 /** DB probe cadence for availability logging. */
 const PROBE_INTERVAL_MILLISECONDS = 10_000;
@@ -136,14 +144,7 @@ async function startWorker(options: {
   // M14 trusted extension catalog (composition-time only — the DB is not a
   // package manager), built through the shared first-party helper so web and
   // worker always deploy the identical artifact set (ADR-0013 §52.1).
-  // PCMS_ADMIN_UI_TEST=1 composes the ui-test entries (ADR-0018 acceptance
-  // harness) — worker mirrors the web composition so source pipelines see
-  // the same set in both processes.
-  let extensionCatalog = createFirstPartyExtensionCatalog({ pool });
-  if (process.env.PCMS_ADMIN_UI_TEST === "1") {
-    const uiTest = await import("../../../extensions/catalog.ui-test.generated.js");
-    extensionCatalog = uiTest.createFirstPartyExtensionCatalog({ pool });
-  }
+  const extensionCatalog = createFirstPartyExtensionCatalog({ pool });
   const extensionSystemCapabilities = createCapabilityRegistry();
   // Runtime secret store key (PCMS-OPS-T131): the worker executes connector
   // deliveries, so it must be able to decrypt Admin-managed secret values.
@@ -275,50 +276,79 @@ async function startWorker(options: {
     catalog: extensionCatalog,
     systemCapabilities: extensionSystemCapabilities,
   });
-  let extensionEventConsumer = createExtensionEventConsumer({
-    pool,
-    clock: systemClock,
-    subscriptions: [],
-  });
-  /** Lifecycle revision the current subscription set was built from (R3). */
-  let extensionRevision: string | null = null;
-  const refreshExtensionSubscriptions = async (): Promise<void> => {
+  const eventWriters: NonNullable<Parameters<typeof createExtensionEventConsumer>[0]["writers"]> = {
+    auditWriter: (executor, event) =>
+      recordSecurityEvent(executor, null, {
+        type: event.type as SecurityEventType,
+        actorType: "SYSTEM",
+        actorId: null,
+        subjectType: event.subjectType ?? "extension",
+        subjectId: event.subjectId,
+        siteKey: application.defaultSiteKey,
+        transport: "operator",
+        ...(event.metadata === undefined
+          ? {}
+          : { metadata: event.metadata as Record<string, unknown> }),
+      }),
+    outboxAppender: (executor, event) =>
+      writeOutboxEvent(executor, {
+        aggregate: "extension",
+        aggregateId: event.aggregateId,
+        eventType: event.eventType,
+        payload: event.payload,
+      }),
+  };
+  const refreshExtensionSubscriptions = createRevisionedValue({
     // Authoritative revision read (ADR-0017 R3): a disable in ANY process
     // (web A, web B, this worker) bumps it and the next dispatched event
     // recomposes BEFORE the consumer runs — fail-closed, no TTL trust.
-    let revision: string;
-    try {
-      revision = await extensionLifecycle.revision();
-    } catch {
-      return; // pre-M14 database (no extension state tables yet)
-    }
-    if (revision === extensionRevision) return;
-    extensionRevision = revision;
-    const enabledExtensionIds = await extensionLifecycle.enabledIds();
-    const subscriptions: ExtensionEventSubscriptionSpec[] = [];
-    for (const registration of composeExtensionRegistrations(extensionCatalog, enabledExtensionIds)
-      .registrations) {
-      if (registration.kind !== "event_subscription") continue;
-      // Handler resolves from the OWNING artifact (spec §7) — never from one
-      // hardcoded module: a second first-party extension must just work, and
-      // same-named handlers must not cross-resolve (owner-module defect, 2026-10-10).
-      const handler = extensionCatalog.get(registration.extensionId)?.module?.[
-        registration.handler
-      ];
-      if (typeof handler !== "function") continue;
-      subscriptions.push({
-        extensionId: registration.extensionId,
-        subscriptionId: registration.subscriptionId,
-        eventType: registration.eventType,
-        handler: handler as unknown as ExtensionEventSubscriptionSpec["handler"],
+    revision: () => extensionLifecycle.revision(),
+    build: async () => {
+      const enabledExtensionIds = await extensionLifecycle.enabledIds();
+      const subscriptions: ExtensionEventSubscriptionSpec[] = [];
+      for (const registration of composeExtensionRegistrations(
+        extensionCatalog,
+        enabledExtensionIds,
+      ).registrations) {
+        if (registration.kind !== "event_subscription") continue;
+        // Handler resolves from the OWNING artifact (spec §7) — never from one
+        // hardcoded module: a second first-party extension must just work, and
+        // same-named handlers must not cross-resolve (owner-module defect, 2026-10-10).
+        const handler = extensionCatalog.get(registration.extensionId)?.module?.[
+          registration.handler
+        ];
+        if (typeof handler !== "function") continue;
+        const base = {
+          extensionId: registration.extensionId,
+          subscriptionId: registration.subscriptionId,
+          eventType: registration.eventType,
+        };
+        subscriptions.push(
+          registration.transactional
+            ? {
+                ...base,
+                transactional: true,
+                handler: handler as Extract<
+                  ExtensionEventSubscriptionSpec,
+                  { transactional: true }
+                >["handler"],
+              }
+            : {
+                ...base,
+                handler: handler as (
+                  event: import("@pcms/extensions/internal").ExtensionEventView,
+                ) => Promise<void>,
+              },
+        );
+      }
+      return createExtensionEventConsumer({
+        pool,
+        clock: systemClock,
+        writers: eventWriters,
+        subscriptions,
       });
-    }
-    extensionEventConsumer = createExtensionEventConsumer({
-      pool,
-      clock: systemClock,
-      subscriptions,
-    });
-  };
+    },
+  });
   // Every event type ANY deployed artifact could ever subscribe to gets a
   // delegating family entry (manifest data, no DB read): enabling an
   // extension later cannot introduce an unknown type. Types with no core
@@ -333,8 +363,8 @@ async function startWorker(options: {
     if (registration.kind !== "event_subscription") continue;
     if (registration.eventType in extensionEventFamily) continue;
     extensionEventFamily[registration.eventType] = async (event: unknown) => {
-      await refreshExtensionSubscriptions();
-      await extensionEventConsumer.handle(event as never);
+      const consumer = await refreshExtensionSubscriptions();
+      await consumer.handle(event as never);
     };
   }
   const composedHandlers = mergeOutboxHandlers([
@@ -358,7 +388,7 @@ async function startWorker(options: {
   const outboxConsumer = createOutboxConsumer(outbox, composedHandlers, {
     // Events without a registered handler are acknowledged as delivered —
     // the outbox must not accumulate. Extension subscriptions on types no
-    // core consumer carries ride this fallback (refresh is TTL-bounded; the
+    // core consumer carries ride this fallback (refresh checks the revision; the
     // consumer no-ops when nothing subscribes).
     fallback: async (event: unknown) => {
       // Extension Contract 2.0 (P1-b; ADR-0018): "<extensionId>/EntityChanged"
@@ -381,8 +411,8 @@ async function startWorker(options: {
         });
         return;
       }
-      await refreshExtensionSubscriptions();
-      await extensionEventConsumer.handle(event as never);
+      const consumer = await refreshExtensionSubscriptions();
+      await consumer.handle(event as never);
     },
   });
 
@@ -462,38 +492,7 @@ async function startWorker(options: {
       await refreshActiveMediaPresets();
       await processPcpubIngest(application, ingestId);
     },
-    // S7 financial safety: durable refund intent execution. The job id is
-    // the intent id (idempotency_key) — a retried/duplicated job drives the
-    // SAME logical refund; max attempts then leave the intent SUBMITTED for
-    // manual reconciliation (never a silent loss).
-    "payments.refund.execute": async (payload: unknown) => {
-      // The payload carries the intent id; the job's idempotency_key
-      // additionally makes duplicated enqueues a no-op at the store level.
-      const intentId =
-        typeof (payload as { intent_id?: unknown })?.intent_id === "string"
-          ? (payload as { intent_id: string }).intent_id
-          : "";
-      if (intentId === "") return; // malformed enqueue — nothing to drive
-      await application.payments.service.executeRefundIntent(intentId);
-    },
-    "payments.refund.reconcile": async () => {
-      const stale = await application.payments.service.reconcileStaleRefundIntents(5);
-      if (stale > 0) {
-        logger.warn("worker.payments.refund_stale", {
-          operation: "worker.payments",
-          intents: stale,
-        });
-      }
-      const intents = await application.payments.service.claimDueRefundIntents(25);
-      for (const intentId of intents) {
-        try {
-          await application.payments.service.executeRefundIntent(intentId);
-        } catch {
-          // executor classified unknown outcomes; job-level retry not needed
-          // for REQUESTED rows — the next reconcile sweep re-claims them.
-        }
-      }
-    },
+    ...createPaymentRefundJobHandlers(application.payments, logger, jobs),
     // S7: inbound replay/recovery (RECEIVED-after-crash, transient FAILED,
     // orphan callbacks whose provider came back). Authenticity re-verified
     // before every apply; capped backoff; attempts cap = dead-letter (visible

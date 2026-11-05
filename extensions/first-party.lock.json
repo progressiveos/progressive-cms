@@ -2,17 +2,6 @@
   "schema": "pcms-first-party-lock/1",
   "packages": [
     {
-      "id": "progressive.admin-fixture",
-      "dir": "extensions/progressive-admin-fixture",
-      "version": "1.0.5",
-      "content_sha256": "f55f20304502f8be9b3a131007098eaf838a1e95ea1c15978b78cae09c46fbfa",
-      "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-admin-fixture-1.0.5.tar.gz",
-        "sha256": "0cb8b754b7b0b00930d4ab7e9e5f2be3f09534d0def5adc3ef6c2bd5a46aea35"
-      },
-      "composition": "ui-test"
-    },
-    {
       "id": "progressive-media.openrouter",
       "dir": "extensions/progressive-media-openrouter",
       "version": "1.0.4",
@@ -113,18 +102,6 @@
       }
     },
     {
-      "id": "progressive.platform-fixture",
-      "dir": "extensions/progressive-platform-fixture",
-      "version": "1.3.4",
-      "content_sha256": "3ff640ab8d26532a1b0f626516591e2caf1749f8fb9b5a74d2261243b9943ab7",
-      "permission_namespace": "platform",
-      "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive.platform-fixture-1.3.4.tar.gz",
-        "sha256": "0487ac0ab581b052bacb56d6faddcdd37f68a05fcd46364cfc79c044c8ef14ef"
-      },
-      "composition": "ui-test"
-    },
-    {
       "id": "progressive.prompt-enhancer",
       "dir": "extensions/progressive-prompt-enhancer",
       "version": "1.0.4",
@@ -137,11 +114,11 @@
     {
       "id": "progressive.site-migration",
       "dir": "extensions/progressive-site-migration",
-      "version": "1.0.4",
-      "content_sha256": "82951dc350d5d41329947e62f1997f9d936fc611b01a170b2ea12b4de4d9918b",
+      "version": "1.0.5",
+      "content_sha256": "5d3141c72f3cece1b43a5088edcfa4826d52618ab783464ac67c4433dd185c41",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-site-migration-1.0.4.tar.gz",
-        "sha256": "702342b20476f3f89abdfdd585bad306b3d265432353d4a352bf2698753997b5"
+        "tarball": "../progressive-cms-extensions/dist/progressive-site-migration-1.0.5.tar.gz",
+        "sha256": "e974ac8738ea4f28402beb43712c2d9075f82950bdbcc524df1057eb1c97ee91"
       }
     },
     {

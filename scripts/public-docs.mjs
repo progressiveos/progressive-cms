@@ -434,8 +434,14 @@ export function checkDocs(
     fail(`Documentation does not match release ${version}`);
   for (const path of currentFiles)
     if (!existsSync(join(docs, path))) fail(`Missing current-release entrypoint: ${path}`);
-  const interfaceMaps = checkInterfaceMaps(docs);
   const paths = files(docs);
+  const internalReference = /\btask brief\b|\bspec\s*§|§\s*\d+|\bT\d{3}\b/;
+  for (const absolute of paths.filter((path) => textExtensions.test(path))) {
+    if (internalReference.test(readFileSync(absolute, "utf8"))) {
+      fail(`Internal source reference in public documentation: ${relative(docs, absolute)}`);
+    }
+  }
+  const interfaceMaps = checkInterfaceMaps(docs);
   for (const absolute of paths.filter((path) => textExtensions.test(path))) {
     const path = relative(docs, absolute);
     if (path === "release-version.txt") continue;

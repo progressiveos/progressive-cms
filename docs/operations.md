@@ -10,6 +10,18 @@ Upgrade through the supported update workflow and approved artifact. Preflight, 
 
 Troubleshooting: check proxy trust for `API_ORIGIN_MISMATCH`, actor scopes for authorization failures, generation conflicts for stale edits, and Worker/index status for missing search results. Candidate install/backup/restore acceptance remains pending.
 
+## TLS, reverse proxy and public security contact
+
+Terminate trusted TLS at the public edge and redirect HTTP to HTTPS there. Forward the original scheme to Web, but set or overwrite forwarded headers at the proxy; never let a client supply trusted `X-Forwarded-*` values. Configure `http.trustedProxies` with only the actual proxy peer IP addresses or CIDRs. An incorrect trust list can affect scheme, client IP, origin checks and secure cookies.
+
+Add HSTS at the HTTPS edge after confirming HTTPS works for the site. Start with an appropriate `max-age`; add `includeSubDomains` only after every subdomain supports HTTPS. HSTS does not protect the first HTTP request. Ensure edge-generated redirects use HTTPS and preserve the intended host and path.
+
+The Web process also applies `http.apiRateLimitPerMinute` to `/api/v1/*` (default 1200/minute per client IP and process); a rejected request has `API_RATE_LIMITED` and `Retry-After`. Search and collection routes have additional smaller buckets. Configure the global value and see each route's response headers in the [rate-limit reference](configuration-reference.md#api-rate-limiting).
+
+To publish the site owner's vulnerability contact, configure optional `http.securityTxt` and keep its expiry current. Core registers `/.well-known/security.txt` and `/security.txt` only when configured and serves them only over HTTPS; a missing configuration, HTTP request or expired contact yields 404. Keep the well-known path routed to Web. See [Configuration reference](configuration-reference.md#optional-public-security-contact) for the accepted fields.
+
+Unknown public page paths use the request's `Accept` header: HTML-capable requests, including `*/*`, receive the themed 404 page; JSON requests receive a compact JSON 404; other explicitly non-HTML requests receive plain text. These responses set `Vary: Accept` so a cache does not reuse one representation for another client. This rule applies to unresolved public pages, not every API or endpoint 404.
+
 ## Backup, restore and upgrade procedure boundaries
 
 The standard install supplies backup-site.sh and restore-site.sh as operator tools. The backup contains database/media and secret-free configuration/release metadata with per-file checksums; retain actual secret material through the separately protected recovery process. Backup sets and manifests are private operator data and never belong in the public documentation folder.

@@ -14,4 +14,6 @@ hero_image — необязательное объявленное MediaAsset-п
 
 Проверьте четыре независимых случая и реальный HTML: title, description, canonical, og:image, twitter:image, robots, sitemap и JSON-LD. OG использует Core derivative og-v1 1200×630 JPEG. Preview: `GET /api/v1/discovery/seo/preview?entry_id=<entry-id>`; validation: `GET /api/v1/discovery/seo/validate?entry_id=<entry-id>`. Нужны соответствующие scopes.
 
+Опубликованные страницы также могут отдавать Markdown по `Accept: text/markdown` или URL с суффиксом `.md`. Явный `.md` получает `noindex` и canonical на HTML; согласованное представление Markdown сохраняет robots/canonical HTML. `/llms.txt` ограничен и включает только страницы с подтверждённым Markdown. Подробности: [Markdown (англ.)](../markdown.md).
+
 [Полная глава](../seo.md) · [Русский индекс](index.md)

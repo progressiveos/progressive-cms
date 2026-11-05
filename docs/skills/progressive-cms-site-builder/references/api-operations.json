@@ -2264,7 +2264,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Open or create the entry's working draft (Admin spec §24)",
+        "summary": "Open or create the entry's working draft",
         "tags": ["content"],
         "x-permission": "content.edit"
       }
@@ -2658,7 +2658,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Canonical route view: current path, history, proposal (PCMS-ADMIN-T011)",
+        "summary": "Canonical route view: current path, history, proposal",
         "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
@@ -2779,7 +2779,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Stored SEO document for an entry (or null; PCMS-ADMIN-T010)",
+        "summary": "Stored SEO document for an entry (or null)",
         "tags": ["discovery"],
         "x-permission": "seo.read"
       },
@@ -4626,7 +4626,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Placement binding validation (depth/type/required) — PCMS-ADMIN-T013",
+        "summary": "Placement binding validation (depth/type/required)",
         "tags": ["discovery"],
         "x-permission": "navigation.read"
       }
@@ -5868,7 +5868,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23)",
+        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe",
         "tags": ["forms"]
       }
     },
@@ -6215,7 +6215,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
+        "summary": "Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
         "tags": ["themes"],
         "x-permission": "theme.write"
       }
@@ -6878,7 +6878,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
+        "summary": "Download the served theme as a.pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
         "tags": ["themes"],
         "x-permission": "theme.read"
       }
@@ -6989,7 +6989,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
+        "summary": "Stage a.pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
         "tags": ["themes"],
         "x-permission": "theme.write"
       }
@@ -7564,7 +7564,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Bounded public site search (PostgreSQL full-text, spec §23)",
+        "summary": "Bounded public site search (PostgreSQL full-text)",
         "tags": ["search"]
       }
     },
@@ -7674,7 +7674,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Search index health, version and reindex progress (§26/§31)",
+        "summary": "Search index health, version and reindex progress",
         "tags": ["search"],
         "x-permission": "search.diagnostics"
       }

@@ -60,6 +60,7 @@ export {
   type ExtensionEventSubscriptionSpec,
   type ExtensionEventView,
   mergeOutboxHandlers,
+  type TransactionalExtensionEventHandler,
 } from "./events.js";
 export {
   assertEvolutionPhaseAllowed,
@@ -142,6 +143,8 @@ export {
   type ExtensionCallContext,
   type ExtensionDbReader,
   type ExtensionHttpCallContext,
+  type ExtensionPaymentSubjectResolver,
+  type ExtensionPaymentsPort,
   type ExtensionPlatformServices,
   type ExtensionPrincipal,
   type ExtensionSiteContext,

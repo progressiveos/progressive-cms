@@ -1,7 +1,7 @@
 # Versioning and compatibility
 
 <!-- cms-current:start -->
-Current Progressive CMS release: **RC35** (`1.0.0-rc.35`).
+Current Progressive CMS release: **RC36** (`1.0.0-rc.36`).
 <!-- cms-current:end -->
 
 This guide describes the current product behavior. Historical release introductions below explain provenance; they do not identify the current product or the installed server. Skill versions and minimum compatible CMS ranges are independent of the release label. The authoritative ranges live in the supplied Skill/theme manifests, not copied version numbers in instructions.
@@ -17,6 +17,8 @@ Read `server.cms_version` and `server.release_id` from `cms agent bootstrap --js
 | Block Document | envelope v1, independent of RichText |
 | Skill manifest | v1 |
 | MCP | 2024-11-05 |
+
+Markdown routes and settings are an optional runtime feature; feature-detect them on the installed target. Their documentation does not change the compatibility minimum in a theme or Skill manifest.
 
 ## Historical introductions and source provenance
 

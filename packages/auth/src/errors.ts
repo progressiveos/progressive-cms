@@ -39,10 +39,18 @@ export class AuthError extends Error {
   /** HTTP-agnostic status hint for transports (M09 maps these). */
   readonly status: number;
 
-  constructor(code: AuthErrorCode, message: string, status = 400) {
+  readonly retryAfterSeconds: number | undefined;
+
+  constructor(
+    code: AuthErrorCode,
+    message: string,
+    status = 400,
+    options?: { retryAfterSeconds?: number },
+  ) {
     super(message);
     this.name = "AuthError";
     this.code = code;
     this.status = status;
+    this.retryAfterSeconds = options?.retryAfterSeconds;
   }
 }

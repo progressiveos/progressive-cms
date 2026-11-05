@@ -1,4 +1,4 @@
-# Theme Developer — Content schema proposal & escalation (PCMS-SKILL-T009)
+# Theme Developer — Content schema proposal & escalation
 
 When a design needs semantic data that the site's Content Model genuinely
 does not carry (e.g. a "delivery date" the case-study template must render),

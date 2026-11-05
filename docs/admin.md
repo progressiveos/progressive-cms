@@ -21,6 +21,10 @@ An authoring agent uses a separate Service Account access token with task-specif
 
 Before publishing, Admin compares the draft's `parent_revision_id` with the current publication pointer. If the published version changed after the draft was created, or an older draft has no recorded base, Admin asks the editor to compare versions and explicitly confirm. Cancel to keep reviewing; after confirmation Admin rereads the pointer and stops if it changed again. Publication generation checks still apply.
 
+## Agent Markdown availability
+
+Admin exposes a site-wide Markdown switch under **Settings** and an entry-level switch in the entry's **SEO** tab. Both default to enabled. The entry switch is hidden while the site-wide switch is off, and its saved value is preserved. These controls govern the published page's Markdown representation and `/llms.txt` listing; ordinary HTML remains available. Permissions, REST paths and the 404/406 behavior are documented in [Markdown representations](markdown.md).
+
 When Admin creates a draft from the displayed published version, it uses that exact SEALED revision as the base. The REST contract also rejects a WORKING source with HTTP 409 `REVISION_NOT_SEALED`; missing and foreign revision ids receive the same 404. See [the draft-base API workflow](publishing.md#inspect-the-published-version-and-draft-base).
 
 No database edits, private helper scripts or repeat visits from the building agent may be required. If a type/template mismatch prevents editing or sealing, the site has not passed handoff even if its first public render looked correct.

@@ -1,4 +1,4 @@
-# Progressive CMS — Common Agent Operating Rules (PCMS-SKILL-T002)
+# Progressive CMS — Common Agent Operating Rules
 
 Shared invariants for every Progressive CMS Agent Skill. An individual
 SKILL.md defines the workflow; this file defines the rules of engagement that
@@ -35,7 +35,7 @@ them.
 
 - Content/theme work goes through REST/MCP/CLI only. Direct PostgreSQL,
   migration editing and CMS Core patching are operator/architecture work —
-  prohibited in agent runs (eval harnesses treat them as violations).
+  prohibited in content/theme agent runs.
 - Site-specific visual needs are solved inside the Theme; behavior via Site
   Extensions; genuinely missing semantics via the additive schema API
   (`cms content schema validate|apply` — scopes `content_schema.propose` /

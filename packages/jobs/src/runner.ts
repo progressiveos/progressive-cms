@@ -47,6 +47,7 @@ export function createJobRunner(
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let stopped = true;
   let inFlightCount = 0;
+  let tickInFlight = false;
   /** IDs of claimed jobs whose handler is still running (lease heartbeat set). */
   const inFlightIds = new Set<string>();
 
@@ -164,11 +165,15 @@ export function createJobRunner(
     // The catch guards the gap the tick-internal try cannot cover: a throw
     // from `reportWorkerError` inside tick (or any future pre-try code) must
     // still reschedule, or the worker dies as a silent zombie.
+    tickInFlight = true;
     void tick()
       .then(() => schedule())
       .catch((error) => {
         reportWorkerError(error);
         schedule();
+      })
+      .finally(() => {
+        tickInFlight = false;
       });
   }
 
@@ -215,11 +220,11 @@ export function createJobRunner(
         clearInterval(heartbeatTimer);
         heartbeatTimer = null;
       }
-      const deadline = deps.clock.now().getTime() + timeoutMilliseconds;
-      while (inFlightCount > 0 && deps.clock.now().getTime() < deadline) {
+      const deadline = Date.now() + timeoutMilliseconds;
+      while ((inFlightCount > 0 || tickInFlight) && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
-      return inFlightCount === 0;
+      return inFlightCount === 0 && !tickInFlight;
     },
     inFlight: () => inFlightCount,
   };

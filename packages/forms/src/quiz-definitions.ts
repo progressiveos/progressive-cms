@@ -712,6 +712,8 @@ export interface QuizDefinitionService {
   listDefinitions(options?: {
     readonly status?: "ACTIVE" | "ARCHIVED";
   }): Promise<readonly QuizDefinition[]>;
+  /** Active titles only; no scoring, answer, settings or other service data. */
+  getPublicTitles(ids: readonly string[]): Promise<Readonly<Record<string, string>>>;
   getDefinition(quiz_definition_id: string): Promise<QuizDefinition>;
   getVersion(
     quiz_definition_id: string,
@@ -869,6 +871,29 @@ export function createQuizDefinitionService(pool: DbPool): QuizDefinitionService
               [filter],
             );
       return result.rows.map(rowToDefinition);
+    },
+
+    async getPublicTitles(ids) {
+      const unique = [...new Set(ids)];
+      if (
+        unique.length > 500 ||
+        unique.some(
+          (id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id),
+        )
+      ) {
+        throw new FormsError(
+          "QUIZ_DEFINITION_INVALID",
+          "public title lookup requires at most 500 stable IDs",
+        );
+      }
+      if (unique.length === 0) return {};
+      const result = await pool.query<{ id: string; title: string }>(
+        `SELECT d.id::text, d.title FROM forms_quiz_definitions d
+         JOIN forms_quiz_definition_versions v ON v.quiz_definition_id=d.id AND v.schema_version=d.current_schema_version
+         WHERE d.id = ANY($1::uuid[]) AND d.status='ACTIVE' ORDER BY d.id`,
+        [unique],
+      );
+      return Object.fromEntries(result.rows.map((row) => [row.id, row.title]));
     },
 
     async getDefinition(quiz_definition_id) {

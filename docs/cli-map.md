@@ -1265,7 +1265,7 @@ HTTP client calls (source expressions, including complete request construction):
 apiCall(client, "POST", "/update/apply", {
       manifest: manifestDocument,
       // Backup acknowledgment: the orchestrator compares this against the
-      // target version when backup_required is set (Extensions §25).
+      // target version when backup_required is set.
       backup_confirmation: JSON.parse(readFileSync(manifestPath, "utf8")).version
     })
 

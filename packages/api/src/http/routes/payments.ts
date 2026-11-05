@@ -3,6 +3,7 @@
 // receiver is the documented anonymous allowlist entry point; its
 // authentication is the provider verifier and its idempotency is the
 // InboundEvent dedup + payment state machine.
+import { isStableId } from "@pcms/core";
 import type { FastifyRequest } from "fastify";
 import type { ApplicationServices, OperationContext } from "../../context.js";
 import { ApiError } from "../../errors.js";
@@ -71,7 +72,7 @@ const CREATE_SCHEMA = {
 } as const;
 
 export function makePaymentsRoutes(): ApiRoute[] {
-  return [
+  const routes: ApiRoute[] = [
     {
       spec: {
         method: "GET",
@@ -434,6 +435,12 @@ export function makePaymentsRoutes(): ApiRoute[] {
       },
       async handle(app, _ctx, request) {
         const params = request.params as { providerInstanceId: string };
+        if (!isStableId(params.providerInstanceId)) {
+          throw new ApiError("PAYMENT_PROVIDER_INSTANCE_NOT_FOUND", "callback endpoint not found", {
+            status: 404,
+          });
+        }
+        await app.payments.ensureComposed();
         const instance = await app.payments.instances.get(params.providerInstanceId);
         if (instance === null) {
           throw new ApiError("PAYMENT_PROVIDER_INSTANCE_NOT_FOUND", "callback endpoint not found", {
@@ -444,12 +451,41 @@ export function makePaymentsRoutes(): ApiRoute[] {
         for (const [name, value] of Object.entries(request.headers)) {
           if (typeof value === "string") headers[name.toLowerCase()] = value;
         }
-        const rawBody =
-          typeof request.body === "string"
-            ? request.body
-            : Buffer.isBuffer(request.body)
-              ? (request.body as Buffer).toString("utf8")
-              : JSON.stringify(request.body ?? null);
+        // Provider IP policies must use Fastify's trusted-proxy result, never
+        // caller-supplied forwarding headers.
+        const peerIp = request.ip.startsWith("::ffff:") ? request.ip.slice(7) : request.ip;
+        headers["x-forwarded-for"] = peerIp;
+        headers["x-real-ip"] = peerIp;
+        let rawBody: string;
+        try {
+          rawBody =
+            typeof request.body === "string"
+              ? request.body
+              : Buffer.isBuffer(request.body)
+                ? new TextDecoder("utf-8", { fatal: true }).decode(request.body as Buffer)
+                : JSON.stringify(request.body ?? null);
+        } catch {
+          throw new ApiError("PAYMENT_INBOUND_INVALID", "callback body must be valid UTF-8", {
+            status: 400,
+          });
+        }
+        if (app.payments.registry.get(instance.providerType) === undefined) {
+          if (request.method === "POST") {
+            throw new ApiError("PAYMENT_PROVIDER_UNAVAILABLE", "callback provider is unavailable", {
+              status: 503,
+            });
+          }
+          const record = await app.integrations.inbound.receiveOrphan({
+            sourceType: "payment_provider",
+            sourceId: instance.id,
+            rawBody,
+            reason: `provider type "${instance.providerType}" is not composed (extension disabled or absent)`,
+          });
+          return {
+            status: 200,
+            body: { received: true, retained: true, applied: false, event_id: record.id },
+          };
+        }
         // Pipeline (spec §34): verify → persist/dedupe → normalize →
         // apply (lock/transition/event/outbox in one tx).
         let outcome: Awaited<ReturnType<typeof app.integrations.inbound.receive>>;
@@ -535,4 +571,10 @@ export function makePaymentsRoutes(): ApiRoute[] {
       },
     },
   ];
+  const callback = routes.find((route) => route.spec.operationId === "receive_payment_callback")!;
+  routes.push({
+    ...callback,
+    spec: { ...callback.spec, method: "POST", operationId: "post_payment_callback", rawBody: true },
+  });
+  return routes;
 }

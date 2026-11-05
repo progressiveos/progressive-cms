@@ -31,7 +31,7 @@ Read actual `server.cms_version`, target identity, contracts/scopes and preview 
 ## Build in this order
 
 1. Read [workflow](references/workflow.md) for the executable path, then make a short page/content plan matching the brief.
-2. Before creating content, read [content and theme](references/content-and-theme.md). Reuse discovered types or declare compatible types/bodyPolicy, then adapt the bundled Liquid theme in a new workspace. For published feeds, use [collections](references/collections.md); to update an already served theme remotely, use [theme package cycle](references/theme-package-cycle.md).
+2. Before creating content, read [content and theme](references/content-and-theme.md). Reuse discovered types or declare compatible types/bodyPolicy, then adapt the bundled Liquid theme in a new workspace. New themes should pair Markdown templates for published pages. For published feeds, use [collections](references/collections.md); to update an already served theme remotely, use [theme package cycle](references/theme-package-cycle.md).
 3. Create form definitions before referencing them. Write real declared content, upload authorized media, create page parentage and menu bindings. Use returned IDs and generations.
 4. Validate and preview each target revision, resolve blockers, seal, then publish if authorized. Complete [site and editor checks](references/checks.md) and report observed results and remaining blockers.
 

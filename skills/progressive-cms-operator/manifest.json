@@ -1,6 +1,6 @@
 {
   "id": "progressive-cms-operator",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Operate a deployed Progressive CMS instance: discovery, health, config, extensions, providers, maintenance, updates and diagnostics through the CLI golden path — without reading source code and without hand-editing the database.",
   "requires": {
     "cms": ">=1.0.0-rc.1 <2.0.0",

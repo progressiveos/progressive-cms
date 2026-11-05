@@ -69,7 +69,9 @@ export function createThrottleService(
     async assertNotLocked(buckets, now) {
       const lockedMs = await this.lockedForMilliseconds(buckets, now);
       if (lockedMs > 0) {
-        throw new AuthError("AUTH_THROTTLED", "too many attempts; try again later", 429);
+        throw new AuthError("AUTH_THROTTLED", "too many attempts; try again later", 429, {
+          retryAfterSeconds: Math.max(1, Math.ceil(lockedMs / 1000)),
+        });
       }
     },
 

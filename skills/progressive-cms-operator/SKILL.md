@@ -1,6 +1,6 @@
 # Skill: progressive-cms-operator
 
-**Version:** 1.0.2
+**Version:** 1.0.3
 **Purpose:** operate a deployed Progressive CMS — discovery, health, config,
 extensions, media providers, maintenance, updates, diagnostics — through the
 documented CLI/API surface, deterministically, without reading implementation
@@ -107,11 +107,8 @@ progressive-cms-web -u progressive-cms-worker`.
   curl cookie-jar example and ownership/transaction boundary in
   `references/golden-path.md`. Core does not publish request schemas or a
   generic HTTP-route discovery endpoint; each extension must document its own
-  path and body. The fixture example in the reference is test-only and is not
-  guaranteed to exist on a deployed site. In that isolated fixture, replay the
-  same mutation with its cookie jar and idempotency key, compare `note_id`,
-  then verify `subject_type=extension_entity`, matching `subject_id` and
-  `actor_type=GUEST` through `/api/v1/audit` with `audit.read`.
+  path and body. Verify mutations only through the actual extension
+  documentation and its supported read/audit surfaces.
 - **Web Research** (`progressive.web-research`): configure
   `xmlstock.user_id` + write-only `xmlstock.api_key`, engine, fetch limits and
   the shared `network` block through the same extension settings contract.
@@ -154,6 +151,14 @@ restore the BackupGate dump.
 
 ## Diagnostics discipline
 
-Typed code first → docs/RUNBOOK second → journalctl third → source code last
+Typed code first → [public operations guide](../../docs/operations.md) second → journalctl third → source code last
 (and never as a substitute for the documented flag). Unknown failure: capture
 `request_id`, the typed envelope and the unit journal excerpt into the report.
+
+## Markdown availability (Core 1.0.0-rc.36+)
+
+Admin exposes site-wide and individual Markdown switches, both default on.
+Inspect or change them only within the authorized task and actual scopes;
+preserve generation CAS and normal session CSRF/origin checks. The routes,
+permissions and verification behavior are in
+[the Markdown golden path](references/golden-path.md).

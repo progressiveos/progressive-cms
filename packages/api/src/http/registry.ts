@@ -42,6 +42,8 @@ export interface RouteSpec {
   readonly idempotency?: "required" | "supported";
   /** Per-route body cap override (uploads); default is the JSON limit. */
   readonly bodyLimit?: number;
+  /** Preserve the exact UTF-8 request body for provider signature verification. */
+  readonly rawBody?: boolean;
   readonly bodySchema?: Record<string, unknown>;
   readonly querySchema?: Record<string, unknown>;
   readonly paramsSchema?: Record<string, unknown>;

@@ -147,8 +147,8 @@ to the apply attempt. Keep bearer credentials in the approved curl config
 ## Extension mounts and guest mutations
 
 An extension's public route must exist in its trusted deployed manifest and be
-enabled. On an isolated acceptance instance, install and enable an artifact
-already in the trusted catalog with:
+enabled. With owner authorization, install and enable an artifact already in
+the trusted catalog with:
 
 ```bash
 curl --config "$PCMS_CURL_AUTH" -sS -X POST -H 'Content-Type: application/json' \
@@ -221,20 +221,9 @@ a generic reverse operation.
 
 The HTTP-route manifest has no request-schema field and Core does not expose a
 generic extension-route discovery/OpenAPI endpoint. Use the extension's own
-operator/API documentation for its concrete body and path. For example, only
-in an isolated acceptance composition where the test-only
-`progressive.platform-fixture` is installed and mounted at `/shop`, its
-`POST /widgets/:slug/notes` route accepts `{"body":"fixture note"}` and
-returns `note_id`, `slug` and `guest`. It returns 422 when `body` is empty or
-longer than 500 characters. The fixture is not part of standard composition
-and must not be assumed to exist on a deployed site. Repeat the exact request
-with the same cookie jar and idempotency key; compare the returned `note_id`.
-An operator with `audit.read` can independently verify the committed
-transaction with `GET /api/v1/audit?event_type=PLATFORM_FIXTURE_NOTE_CREATED&limit=50`
-and match `subject_type=extension_entity`, `subject_id=<note_id>` and
-`actor_type=GUEST`. The fixture writes the audit event atomically with the
-note. It has no guest note read route, so the audit verifies a committed
-creation event but does not return the saved body.
+operator/API documentation for its concrete body and path. Verify retries with
+the same cookie jar and idempotency key using the extension’s documented
+response and read/audit surfaces; never invent a generic verification endpoint.
 
 ## Publication (agent-relevant subset)
 
@@ -267,3 +256,27 @@ cms bundle status <ingest-id> --wait --json
   refill 2/s). Keep bulk comparisons sequential and at most 2 requests/s;
   cache repeated queries. On 429 honor Retry-After when supplied, otherwise
   use bounded exponential backoff with jitter (1, 2, 4… up to 30 seconds).
+
+## Markdown availability (Core 1.0.0-rc.36+)
+
+Admin exposes global and per-entry switches. Both default on; global off hides
+the individual control while preserving its saved value. Read actual state:
+
+- `GET /api/v1/markdown/settings` requires `seo.read`.
+- `PUT /api/v1/markdown/settings` requires `seo.site_settings`.
+- `GET /api/v1/entries/{entryId}/markdown` requires `content.read`.
+- `PUT /api/v1/entries/{entryId}/markdown` requires `content.edit`.
+
+PUT uses `{"enabled":true,"expected_generation":0}` with the generation from
+the corresponding read; never assume zero on an existing setting. Only write
+when the task authorizes the change. Session mutations retain CSRF/origin rules;
+bearer tokens remain in the approved secret/curl configuration. No separate
+Markdown-specific CLI/MCP mutation commands are implied.
+
+Verify explicit `.md`, negotiated `Accept: text/markdown`, and HTML separately.
+Disabled explicit Markdown gives HTTP 404; Markdown-only negotiation gives HTTP 406 while
+HTML stays HTTP 200. Empty/unsupported substantive content gives diagnostic HTTP 406. A
+paired template takes precedence over Core fallback. Discovery is capped at
+200 confirmed public documents and excludes noindex, disabled and unpublished
+materials; absence alone does not prove the direct document is unavailable.
+Consult [SEO](../../../docs/seo.md) and [Themes](../../../docs/themes.md).

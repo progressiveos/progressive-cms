@@ -8,6 +8,8 @@ API contract 1.0.0 is described by OpenAPI 3.1. The [OpenAPI artifact](reference
 
 Use the operation’s declared method, path, security and request schema. Base `/api/v1` routes and public form endpoints have different authorization requirements. Configure API URL, service token, site and environment explicitly for CLI clients. Cursor pagination returns `items`, `has_more` and `next_cursor`; continue until exhausted rather than assuming the first page is complete.
 
+The published page route also supports negotiated Markdown and `.md` URLs. The global and per-entry availability settings are REST operations; see [Markdown representations](markdown.md) and the [REST map](rest-api-map.md).
+
 Stable errors carry code, message, request_id, details and retryable. Preserve request ids for diagnosis without logging credentials. OpenAPI cannot replace the semantics of [Publishing](publishing.md), CAS checks or scope boundaries. Verify the served schema at the final candidate.
 
 [Documentation index](index.md)

@@ -107,6 +107,7 @@ export type SecurityEventType =
   | "INDEXNOW_DISABLED"
   | "INDEXNOW_KEY_ROTATED"
   | "INDEXNOW_SETTINGS_UPDATED"
+  | "AGENT_MARKDOWN_SETTINGS_UPDATED"
   // Notifications v1 (owner brief 2026-10-07): recipient routing edits are
   // permission-gated AND audited (category counts only — never recipient
   // e-mails; those live in the users table).

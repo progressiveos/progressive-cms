@@ -18,4 +18,6 @@
 
 Рабочие примеры: [RichText с таблицей](../reference/examples/richtext-v2-table.json), [typed blocks](../reference/examples/block-document-v1.json), [Content Types](../reference/examples/content-types.json). Полный [контракт на английском](../content-contract.md).
 
+Markdown — отдельное представление опубликованной ревизии; оно не меняет модель RichText или Block Document. См. [главу о Markdown (англ.)](../markdown.md).
+
 [Русский индекс](index.md)

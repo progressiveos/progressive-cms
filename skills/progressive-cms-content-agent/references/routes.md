@@ -1,4 +1,4 @@
-# Content Agent — Route safety (PCMS-SKILL-T004)
+# Content Agent — Route safety
 
 ## Read before mutation
 

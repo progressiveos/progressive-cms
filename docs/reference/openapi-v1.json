@@ -333,7 +333,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Non-secret projection of the resolved ActorContext (spec §53)",
+        "summary": "Non-secret projection of the resolved ActorContext",
         "tags": [
           "actor"
         ]
@@ -2077,7 +2077,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Semantic block props validation + calculator preview (PCMS-ADMIN-T006/T007)",
+        "summary": "Semantic block props validation + calculator preview",
         "tags": [
           "content"
         ],
@@ -2384,7 +2384,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Ingest a .pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL)",
+        "summary": "Ingest a.pcpub bundle (raw ZIP body). ?mode=validate reports issues with zero writes; apply is async (202 + status URL)",
         "tags": [
           "bundle"
         ],
@@ -3969,7 +3969,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Canonical Markdown<->AST conversion for the Admin rich text editor (PCMS-ADMIN-T005)",
+        "summary": "Canonical Markdown<->AST conversion for the Admin rich text editor",
         "tags": [
           "content"
         ],
@@ -4844,7 +4844,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Collection DSL capabilities (typed allowlist, spec §14)",
+        "summary": "Collection DSL capabilities (typed allowlist)",
         "tags": [
           "discovery"
         ],
@@ -5338,7 +5338,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Content Tree rows with kind (content|folder), title/working/publication indicators (PCMS-ADMIN-T002)",
+        "summary": "Content Tree rows with kind (content|folder), title/working/publication indicators",
         "tags": [
           "discovery"
         ],
@@ -7597,7 +7597,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Open or create the entry's working draft (Admin spec §24)",
+        "summary": "Open or create the entry's working draft",
         "tags": [
           "content"
         ],
@@ -7738,7 +7738,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Duplicate the latest revision payload into a new sibling draft (spec §5)",
+        "summary": "Duplicate the latest revision payload into a new sibling draft",
         "tags": [
           "content"
         ],
@@ -8024,6 +8024,274 @@
         "x-permission": "content.edit"
       }
     },
+    "/entries/{entryId}/markdown": {
+      "get": {
+        "operationId": "get_entry_markdown_settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request syntax (request schema)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authenticated but forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found or not visible"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "State conflict / CAS / collision"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Semantic validation failed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Throttled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unexpected internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read one entry's Markdown availability switch (content.read)",
+        "tags": [
+          "content"
+        ],
+        "x-permission": "content.read"
+      },
+      "put": {
+        "operationId": "update_entry_markdown_settings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "expected_generation": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "expected_generation"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request syntax (request schema)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authenticated but forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found or not visible"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "State conflict / CAS / collision"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Semantic validation failed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Throttled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unexpected internal error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set one entry's Markdown availability switch (content.edit)",
+        "tags": [
+          "content"
+        ],
+        "x-permission": "content.edit"
+      }
+    },
     "/entries/{entryId}/move": {
       "post": {
         "operationId": "move_entry",
@@ -8284,7 +8552,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Clear the archive flag (Admin spec §5)",
+        "summary": "Clear the archive flag",
         "tags": [
           "content"
         ],
@@ -8653,7 +8921,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Canonical route view: current path, history, proposal (PCMS-ADMIN-T011)",
+        "summary": "Canonical route view: current path, history, proposal",
         "tags": [
           "discovery"
         ],
@@ -8924,7 +9192,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Stored SEO document for an entry (or null; PCMS-ADMIN-T010)",
+        "summary": "Stored SEO document for an entry (or null)",
         "tags": [
           "discovery"
         ],
@@ -13716,7 +13984,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Registered connector catalog with typed contracts (spec §6)",
+        "summary": "Registered connector catalog with typed contracts",
         "tags": [
           "integrations"
         ],
@@ -15730,7 +15998,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads (§29)",
+        "summary": "Permission-gated, audited CSV/JSON export of submissions/quiz-runs/leads",
         "tags": [
           "interactions"
         ],
@@ -18532,6 +18800,254 @@
         "x-permission": "site.maintenance"
       }
     },
+    "/markdown/settings": {
+      "get": {
+        "operationId": "get_agent_markdown_settings",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request syntax (request schema)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authenticated but forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found or not visible"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "State conflict / CAS / collision"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Semantic validation failed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Throttled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unexpected internal error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Read the site-wide Markdown availability switch (seo.read)",
+        "tags": [
+          "discovery"
+        ],
+        "x-permission": "seo.read"
+      },
+      "put": {
+        "operationId": "update_agent_markdown_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "expected_generation": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "expected_generation"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request syntax (request schema)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authenticated but forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found or not visible"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "State conflict / CAS / collision"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Semantic validation failed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Throttled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unexpected internal error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set site-wide Markdown availability (seo.site_settings)",
+        "tags": [
+          "discovery"
+        ],
+        "x-permission": "seo.site_settings"
+      }
+    },
     "/media": {
       "get": {
         "operationId": "search_media",
@@ -19013,7 +19529,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Exact-bytes lookup (§45 dedupe): every asset whose current content hash matches — explains library duplicates",
+        "summary": "Exact-bytes lookup (dedupe): every asset whose current content hash matches — explains library duplicates",
         "tags": [
           "media"
         ],
@@ -24538,7 +25054,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Derived-set overrides + stale ones (PCMS-ADMIN-T013)",
+        "summary": "Derived-set overrides + stale ones",
         "tags": [
           "discovery"
         ],
@@ -25054,7 +25570,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Placement binding validation (depth/type/required) — PCMS-ADMIN-T013",
+        "summary": "Placement binding validation (depth/type/required)",
         "tags": [
           "discovery"
         ],
@@ -26037,6 +26553,118 @@
     "/payments/callback/{providerInstanceId}": {
       "get": {
         "operationId": "receive_payment_callback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "providerInstanceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request syntax (request schema)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authenticated but forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found or not visible"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "State conflict / CAS / collision"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Payload too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Semantic validation failed"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Throttled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unexpected internal error"
+          }
+        },
+        "summary": "Provider callback receiver (anonymous allowlist; provider verifier + InboundEvent dedup + state machine)",
+        "tags": [
+          "payments"
+        ]
+      },
+      "post": {
+        "operationId": "post_payment_callback",
         "parameters": [
           {
             "in": "path",
@@ -29183,7 +29811,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe (§3/§23)",
+        "summary": "Anonymous form submission: validate → persist → outbox, retry-safe",
         "tags": [
           "forms"
         ]
@@ -29318,7 +29946,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Explicit client exit: run becomes ABANDONED (§17)",
+        "summary": "Explicit client exit: run becomes ABANDONED",
         "tags": [
           "forms"
         ]
@@ -29459,7 +30087,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Record one server-validated answer; branching decides the next step (§12/§13)",
+        "summary": "Record one server-validated answer; branching decides the next step",
         "tags": [
           "forms"
         ]
@@ -29594,7 +30222,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Complete a run: server computes score/outcome, may create a lead (§14/§15)",
+        "summary": "Complete a run: server computes score/outcome, may create a lead",
         "tags": [
           "forms"
         ]
@@ -29708,7 +30336,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Sanitized public quiz schema for rendering clients (§36)",
+        "summary": "Sanitized public quiz schema for rendering clients",
         "tags": [
           "forms"
         ]
@@ -29842,7 +30470,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Start an anonymous server-driven quiz run (§11/§16)",
+        "summary": "Start an anonymous server-driven quiz run",
         "tags": [
           "forms"
         ]
@@ -34672,7 +35300,7 @@
             "description": "Unexpected internal error"
           }
         },
-        "summary": "Bounded public site search (PostgreSQL full-text, spec §23)",
+        "summary": "Bounded public site search (PostgreSQL full-text)",
         "tags": [
           "search"
         ]
@@ -34822,7 +35450,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Authorized admin search across published, drafts, media, navigation (§24)",
+        "summary": "Authorized admin search across published, drafts, media, navigation",
         "tags": [
           "search"
         ],
@@ -35047,7 +35675,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Reindex run history and progress (§26)",
+        "summary": "Reindex run history and progress",
         "tags": [
           "search"
         ],
@@ -35175,7 +35803,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Start or resume a full shadow-epoch reindex (§19/§20)",
+        "summary": "Start or resume a full shadow-epoch reindex",
         "tags": [
           "search"
         ],
@@ -35288,7 +35916,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Search index health, version and reindex progress (§26/§31)",
+        "summary": "Search index health, version and reindex progress",
         "tags": [
           "search"
         ],
@@ -35426,7 +36054,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Re-derive and validate one entity's search document (§31)",
+        "summary": "Re-derive and validate one entity's search document",
         "tags": [
           "search"
         ],
@@ -36147,7 +36775,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Server identity + subsystem contract versions (spec §20)",
+        "summary": "Server identity + subsystem contract versions",
         "tags": [
           "server"
         ]
@@ -38115,7 +38743,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Install a .pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path)",
+        "summary": "Install a.pcskill package (skills.manage; community skills must be enabled). Body: JSON {url} to fetch, or the raw package as application/octet-stream (the agent authoring path)",
         "tags": [
           "discovery"
         ],
@@ -38228,7 +38856,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Skeleton .pcskill package to fork into a community skill",
+        "summary": "Skeleton.pcskill package to fork into a community skill",
         "tags": [
           "discovery"
         ]
@@ -39338,7 +39966,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Active theme + working settings + manifest settings (PCMS-ADMIN-T019)",
+        "summary": "Active theme + working settings + manifest settings",
         "tags": [
           "discovery"
         ],
@@ -39716,7 +40344,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Install a .pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
+        "summary": "Install a.pcTheme package (theme.write). Body: JSON {download_url} (repository artifact), JSON {package_ref} (package uploaded by this actor) or the raw package as application/octet-stream. Installs a candidate; never activates. The renderDir theme can never be overwritten.",
         "tags": [
           "themes"
         ],
@@ -40065,7 +40693,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Stage a .pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
+        "summary": "Stage a.pcTheme package uploaded from the agent's machine (theme.write). Body: raw ZIP as application/octet-stream. Returns an opaque package_ref with a fixed TTL; the ref is not a capability.",
         "tags": [
           "themes"
         ],
@@ -41031,7 +41659,7 @@
             "cookieAuth": []
           }
         ],
-        "summary": "Download the served theme as a .pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
+        "summary": "Download the served theme as a.pcTheme archive (theme.read); expected_generation is required so a changed theme fails with THEME_REVISION_STALE instead of returning another basis",
         "tags": [
           "themes"
         ],

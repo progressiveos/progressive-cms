@@ -82,5 +82,5 @@ revision fail validate/seal with `RICH_TEXT_BLOCKS_NOT_RENDERED`; resolve that
 content explicitly and save without hidden blocks before applying. Never clear
 the block payload merely to make migration pass.
 
-Full contract: `docs/specs/RICHTEXT-V2-MIGRATION.md`.
+Public contract: [RichText AST v2](../../../docs/richtext.md).
 

@@ -1,6 +1,6 @@
 {
   "$id": "https://progressive-cms.dev/schemas/safety-scope-map-v1.json",
-  "title": "Progressive CMS agent skill safety-level/scope map (PCMS-SKILL-T012)",
+  "title": "Progressive CMS agent skill safety-level/scope map",
   "description": "Maps each skill operation to its safety level and the ACTUAL permission registry keys (packages/auth/src/permissions.ts). The registry — not this file — is the enforcement; the test suite fails if a listed permission is not registered.",
   "version": "1.0.0",
   "operations": [

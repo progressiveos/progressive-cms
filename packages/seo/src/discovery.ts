@@ -94,7 +94,9 @@ export interface SeoDiscoveryDeps {
    * public renderer. */
   readonly materializeSocialDerivative?: (ref: { readonly asset_id: string }) => Promise<void>;
   /** Sitemap candidates provider (routing + eligibility composition). */
-  readonly getSitemapCandidates: () => Promise<readonly SitemapCandidate[]>;
+  readonly getSitemapCandidates: (options?: {
+    readonly includeMarkdown?: boolean;
+  }) => Promise<readonly SitemapCandidate[]>;
   readonly getRobotsPolicy: () => Promise<RobotsTxtPolicy>;
 }
 
@@ -168,6 +170,8 @@ export interface SeoDiscovery {
    * public route serves nothing rather than a wrong document).
    */
   getSitemapDocument(): Promise<string | null>;
+  /** Published, indexable routes eligible for sitemap-based public discovery. */
+  getPublicSitemapCandidates(): Promise<readonly SitemapCandidate[] | null>;
   getRobotsPolicy(): Promise<RobotsTxtPolicy>;
 }
 
@@ -493,6 +497,17 @@ export function createSeoDiscovery(deps: SeoDiscoveryDeps): SeoDiscovery {
       const candidates = await deps.getSitemapCandidates();
       const built = buildSitemapEntries({ origin, candidates });
       return renderSitemapXml(built.urls);
+    },
+
+    async getPublicSitemapCandidates() {
+      const origin = await deps.getOrigin();
+      if (origin === null || !environmentAllowsIndexing(deps.environment)) return null;
+      const candidates = await deps.getSitemapCandidates({ includeMarkdown: true });
+      return candidates
+        .filter(
+          (candidate) => buildSitemapEntries({ origin, candidates: [candidate] }).urls.length > 0,
+        )
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     },
 
     async getRobotsPolicy() {

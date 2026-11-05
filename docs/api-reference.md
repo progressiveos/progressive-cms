@@ -2,7 +2,7 @@
 
 Contract owner: Core route registry. Paths are relative to `/api/v1`. Each operation retains its authoritative request/security schema in [OpenAPI JSON](reference/openapi-v1.json). Generic objects in OpenAPI are not complete domain examples; use the authored chapters and runtime discovery.
 
-The [complete REST map](rest-api-map.md) explains all operations, reproduces complete declared input schemas and response construction, and covers optional extension operations and HTTP routes outside this registry.
+The [complete REST map](rest-api-map.md) explains all operations, reproduces complete declared input schemas and response construction, and covers optional extension operations and HTTP routes outside this registry. The public page representation and its availability settings are described in [Markdown representations](markdown.md).
 
 | Method | Path | Operation | Permission |
 |---|---|---|---|
@@ -69,6 +69,8 @@ The [complete REST map](rest-api-map.md) explains all operations, reproduces com
 | POST | `/entries/{entryId}/duplicate` | `duplicate_entry` | `content.create` |
 | POST | `/entries/{entryId}/home` | `set_home_entry` | `navigation.edit` |
 | POST | `/entries/{entryId}/identity-locale` | `reidentify_entry_locale` | `content.edit` |
+| GET | `/entries/{entryId}/markdown` | `get_entry_markdown_settings` | `content.read` |
+| PUT | `/entries/{entryId}/markdown` | `update_entry_markdown_settings` | `content.edit` |
 | POST | `/entries/{entryId}/move` | `move_entry` | `content.edit` |
 | POST | `/entries/{entryId}/restore` | `restore_entry` | `content.archive` |
 | GET | `/entries/{entryId}/revisions` | `list_revisions` | `publication.read` |
@@ -146,6 +148,8 @@ The [complete REST map](rest-api-map.md) explains all operations, reproduces com
 | POST | `/mail/test` | `test_mail_transport` | `integrations.test` |
 | GET | `/maintenance` | `get_maintenance_state` | `site.maintenance` |
 | PUT | `/maintenance` | `update_maintenance_state` | `site.maintenance` |
+| GET | `/markdown/settings` | `get_agent_markdown_settings` | `seo.read` |
+| PUT | `/markdown/settings` | `update_agent_markdown_settings` | `seo.site_settings` |
 | GET | `/media` | `search_media` | `media.read` |
 | POST | `/media` | `upload_media` | `media.write` |
 | GET | `/media/by-hash/{sha256}` | `search_media_by_hash` | `media.read` |
@@ -198,6 +202,7 @@ The [complete REST map](rest-api-map.md) explains all operations, reproduces com
 | GET | `/payments` | `list_payments` | `payments.read` |
 | POST | `/payments` | `create_payment` | `payments.create` |
 | GET | `/payments/callback/{providerInstanceId}` | `receive_payment_callback` | `see security schema` |
+| POST | `/payments/callback/{providerInstanceId}` | `post_payment_callback` | `see security schema` |
 | GET | `/payments/inbound-events` | `list_payment_inbound_events` | `payments.events.read` |
 | GET | `/payments/providers` | `list_payment_providers` | `payments.read` |
 | GET | `/payments/providers/instances` | `list_payment_provider_instances` | `payments.read` |

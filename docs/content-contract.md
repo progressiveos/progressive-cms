@@ -13,6 +13,8 @@ A valid empty Block Document is:
 {"blocks":[],"schema_version":1}
 ```
 
+Markdown is a separate public representation over the selected published revision. It does not change RichText or Block Document storage and does not create a second content copy. See [Markdown representations](markdown.md) for fallback and paired-theme output.
+
 It is **not RichText v1**. Do not change its version to 2. A RichText document instead starts with:
 
 ```json

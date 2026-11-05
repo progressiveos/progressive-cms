@@ -5,7 +5,7 @@
   "type": "module",
   "description": "pcms-web process — HTTP composition root (health endpoints in M01; public site/admin/api mount later)",
   "dependencies": {
-    "@fastify/static": "10.1.4",
+    "@fastify/static": "10.1.10",
     "@pcms/mcp": "0.0.0",
     "fastify": "5.12.6"
   },

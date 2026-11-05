@@ -57,6 +57,18 @@ export const settings = defineFragment(
       "После нажатия «Сохранить» мета-тег появится в исходном HTML главной страницы, а файл — по адресу /<имя файла>. Перезапуск и изменение темы не нужны. Не удаляйте доказательство после подтверждения: провайдер проверяет его повторно.",
     "settings.verification_file_read_failed": "Не удалось прочитать файл",
     // SettingsScreen — SiteTab
+    "markdown.global_title": "Markdown для агентов",
+    "markdown.global_hint":
+      "Публичное Markdown-представление опубликованных материалов. Доступны URL с суффиксом .md и согласование через Accept: text/markdown.",
+    "markdown.global_enabled": "Разрешить Markdown на сайте",
+    "markdown.global_saved": "Настройка Markdown сохранена",
+    "markdown.global_save_failed": "Не удалось изменить настройку Markdown",
+    "markdown.entry_title": "Markdown-представление",
+    "markdown.entry_enabled": "Публиковать Markdown для этого материала",
+    "markdown.entry_hint":
+      "При отсутствии Markdown-шаблона темы Core формирует представление из основного содержания.",
+    "markdown.entry_saved": "Настройка Markdown для материала сохранена",
+    "markdown.entry_save_failed": "Не удалось изменить настройку Markdown для материала",
     "settings.site_load_failed": "Не удалось загрузить данные сайта",
     "settings.site_title": "Сайт",
     "settings.domains_title": "Домены",
@@ -232,6 +244,18 @@ export const settings = defineFragment(
       "After clicking Save, the meta tag appears in the homepage HTML source and the file at /<filename>. No restart or theme changes are needed. Keep the proof after verification: the provider checks it again.",
     "settings.verification_file_read_failed": "Failed to read the file",
     // SettingsScreen — SiteTab
+    "markdown.global_title": "Agent Markdown",
+    "markdown.global_hint":
+      "Public Markdown representation of published entries. Pages support .md URLs and Accept: text/markdown negotiation.",
+    "markdown.global_enabled": "Enable Markdown for this site",
+    "markdown.global_saved": "Markdown setting saved",
+    "markdown.global_save_failed": "Could not change the Markdown setting",
+    "markdown.entry_title": "Markdown representation",
+    "markdown.entry_enabled": "Publish Markdown for this entry",
+    "markdown.entry_hint":
+      "If the theme has no paired Markdown template, Core builds a representation from the main content.",
+    "markdown.entry_saved": "Markdown setting for this entry saved",
+    "markdown.entry_save_failed": "Could not change the Markdown setting for this entry",
     "settings.site_load_failed": "Failed to load site info",
     "settings.site_title": "Site",
     "settings.domains_title": "Domains",

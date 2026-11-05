@@ -21,6 +21,21 @@ export interface SitemapCandidate {
   readonly entryId: string;
   /** Canonical site-relative path (Routing normalization). */
   readonly path: string;
+  /** Public route locale when supplied by the Core publication provider. */
+  readonly locale?: string;
+  /** Public projection from the same sealed revision used by the route. */
+  readonly markdown?: {
+    readonly enabled: boolean;
+    readonly title: unknown;
+    readonly intro: unknown;
+    readonly seo: unknown;
+    readonly payload: unknown;
+    readonly sidecar: unknown;
+    readonly mediaVersions?: Readonly<Record<string, number>> | null;
+    readonly contentTypeId: string;
+    readonly templateKey: string | null;
+    readonly isHome: boolean;
+  };
   /** Reciprocal language alternates (multilingual); empty otherwise. */
   readonly alternates?: readonly { readonly hreflang: string; readonly href: string }[];
   /** Public content modification time, ISO 8601 (Publication subsystem, §17). */

@@ -1,6 +1,6 @@
 # Skill: progressive-cms-content-agent
 
-**Version:** 1.5.0 (migration toolkit + routing/INDEX + image and OG-chain rules)
+**Version:** 1.5.1 (published Markdown and discovery guidance)
 **Purpose:** safely create, update, validate, preview and publish/schedule
 Progressive CMS content through public machine contracts — never through the
 database, source code or Core patches.
@@ -94,3 +94,12 @@ all block schemas or the whole media library for a small task.
 | SEO/соц-мета | [`references/seo.md`](references/seo.md) |
 | Маршруты и конфликты путей | [`references/routes.md`](references/routes.md) |
 | Платежи на сайте: что можно писать (адаптеры ≠ готовый приём платежей) | [`references/payments.md`](references/payments.md) |
+
+## Public Markdown verification (Core 1.0.0-rc.36+)
+
+PCMD authoring/import is distinct from the public Markdown representation of a
+published CMS entry. When the task asks to verify that representation, inspect
+explicit `.md` and canonical HTML with `Accept: text/markdown` separately,
+compare substantive content, and follow [SEO rules](references/seo.md). Preserve
+existing availability settings unless asked to change them. `/llms.txt` is a
+bounded discovery index, not evidence that every published entry is listed.

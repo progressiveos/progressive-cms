@@ -8,6 +8,7 @@
 // fail-closed: unknown fields are rejected, shapes are bounded, versions are
 // real SemVer (the `semver` package, not an ad-hoc parser), and every
 // problem carries a stable issue code.
+import { EXTENSION_BLOCK_TYPE_ID_SOURCE } from "@pcms/core";
 import Ajv from "ajv";
 import { valid as semverValid, validRange } from "semver";
 
@@ -34,7 +35,7 @@ const HANDLER_PATTERN = /^[a-z][a-zA-Z0-9_]{0,99}$/;
 /** Registration-local identifier (subscription_id, validator_id, …). */
 const LOCAL_ID_PATTERN = /^[a-z][a-z0-9-]{0,62}(\.[a-z0-9][a-z0-9-]{0,62}){0,9}$/;
 /** Block type / field type keys reuse the existing M02 key shape. */
-const BLOCK_TYPE_PATTERN = /^[a-z][a-z0-9-]{0,62}(\.[a-z0-9][a-z0-9-]{0,62}){0,9}$/;
+const BLOCK_TYPE_PATTERN = new RegExp(`^${EXTENSION_BLOCK_TYPE_ID_SOURCE}$`);
 /**
  * Migration directory: a relative path inside the extension artifact. No
  * absolute paths, no ".." segments — the trusted catalog, not the manifest,
@@ -48,6 +49,7 @@ export const EXTENSION_PROVIDER_REGISTRIES = [
   "media_storage",
   "form_destination",
   "payment_provider",
+  "payment_subject",
   "integration_connector",
   // Media acquisition (ADR-0013, Media spec §71): consumed by the media
   // provider registries at composition — not by media storage.
@@ -74,6 +76,8 @@ export interface ExtensionCapabilityProvision {
 
 export interface ExtensionBlockRegistration {
   readonly block_type: string;
+  /** Optional object schema; legacy declarations accept object props. */
+  readonly props_schema?: Record<string, unknown>;
 }
 
 export interface ExtensionFieldTypeRegistration {
@@ -245,6 +249,8 @@ export interface ExtensionEventSubscription {
   readonly event_type: string;
   /** Named export of the extension module handling the event. */
   readonly handler: string;
+  /** Opt in to a shared ledger + handler transaction and handler(event, tx). */
+  readonly transactional?: boolean;
 }
 
 export interface ExtensionValidatorRegistration {
@@ -450,6 +456,7 @@ export const EXTENSION_MANIFEST_SCHEMA = {
             required: ["block_type"],
             properties: {
               block_type: { type: "string", pattern: BLOCK_TYPE_PATTERN.source, maxLength: 200 },
+              props_schema: { type: "object", additionalProperties: true },
             },
           },
         },
@@ -493,6 +500,7 @@ export const EXTENSION_MANIFEST_SCHEMA = {
               },
               event_type: { type: "string", pattern: EVENT_TYPE_PATTERN.source, maxLength: 100 },
               handler: { type: "string", pattern: HANDLER_PATTERN.source, maxLength: 100 },
+              transactional: { type: "boolean" },
             },
           },
         },
@@ -910,6 +918,35 @@ export function validateExtensionManifest(input: unknown): ExtensionManifestVali
   };
   const regs = registrations as Partial<ExtensionRegistrations> | undefined;
   uniqueBy(regs?.blocks ?? [], (b) => b.block_type, "blocks");
+  (regs?.blocks ?? []).forEach((block, index) => {
+    if (block.props_schema === undefined) return;
+    const path = `registrations.blocks[${index}].props_schema`;
+    const schemaIssues: ExtensionManifestIssue[] = [];
+    configSchemaIssues(block.props_schema, path, schemaIssues);
+    issues.push(
+      ...schemaIssues.map((issue) => ({
+        ...issue,
+        code: "MANIFEST_REGISTRATIONS_INVALID" as const,
+      })),
+    );
+    if (block.props_schema.type !== "object") {
+      issues.push({
+        code: "MANIFEST_REGISTRATIONS_INVALID",
+        path,
+        message: "block props schema must have type object",
+      });
+    } else if (schemaIssues.length === 0) {
+      try {
+        new Ajv({ allErrors: true, allowUnionTypes: true }).compile(block.props_schema);
+      } catch {
+        issues.push({
+          code: "MANIFEST_REGISTRATIONS_INVALID",
+          path,
+          message: "block props schema does not compile",
+        });
+      }
+    }
+  });
   uniqueBy(regs?.field_types ?? [], (f) => f.type, "field_types");
   uniqueBy(regs?.routes ?? [], (r) => r.route_id, "routes");
   uniqueBy(regs?.event_subscriptions ?? [], (s) => s.subscription_id, "event_subscriptions");

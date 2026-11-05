@@ -20,6 +20,7 @@ import {
   authenticateRequest,
   COLLECTION_DEFAULT_PAGE_SIZE,
   extensionCanonicalPath,
+  getPublicAgentMarkdownSettings,
   mapEntryRichText,
   type OperationContext,
   queryCollectionFeed,
@@ -28,6 +29,7 @@ import {
   readRelatedFeedOptions,
   readThemeLifecycleState,
   recoverThemeLifecycle,
+  type SourceKeyResolver,
 } from "@pcms/api";
 import { validateBlockDocument } from "@pcms/blocks";
 import { collectRichTextMediaIds, type FieldSchema, resolveNavigationEntries } from "@pcms/content";
@@ -43,12 +45,13 @@ import type { NavigationItemNode } from "@pcms/navigation";
 import { createNavigationDiscovery, deriveBreadcrumbs } from "@pcms/navigation";
 import { PREVIEW_RESPONSE_HEADERS, publishedEntryIds } from "@pcms/publication";
 import { localizedRoutePath, resolveNavigationPaths } from "@pcms/routing";
-import { serializeJsonLd } from "@pcms/seo";
+import { type SitemapCandidate, serializeJsonLd } from "@pcms/seo";
 import {
   applyTokenOverrides,
   assembleHeadHtml,
   type BreadcrumbsViewModel,
   buildImageModel,
+  compileMarkdownDiscoveryPlan,
   createBlockRendererRegistry,
   createComponentRegistry,
   createMediaPresetRegistry,
@@ -58,6 +61,7 @@ import {
   createThemeDiscovery,
   createThemeEngine,
   type ImageModel,
+  type MarkdownDiscoveryCompilation,
   type MediaAssetViewModel,
   type NavigationItemViewModel,
   parseTokensSource,
@@ -67,6 +71,7 @@ import {
   resolveSettingsValues,
   type SafeHtml,
   safeHtml,
+  safeMarkdown,
   type ThemeManifest,
   type ThemeManifestCollection,
   themeRevisionDirectory,
@@ -75,6 +80,7 @@ import {
   validateThemeManifest,
 } from "@pcms/themes";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { registerExtensionFormParser } from "./extension-form.js";
 import {
   blockNodesOf,
   buildFeedCards,
@@ -83,6 +89,18 @@ import {
   plainText,
   STABLE_ID_RE,
 } from "./feed-cards.js";
+import { MarkdownDependencyError, MarkdownDiscoveryBatch } from "./markdown-discovery-batch.js";
+import {
+  acceptsHtml,
+  htmlPathFromMarkdown,
+  type MarkdownDiscoveryEnvironment,
+  markdownPathForHtml,
+  type PublicRepresentation,
+  preferredRepresentation,
+  registerMarkdownFiles,
+} from "./markdown-files.js";
+import { preparePublishedMarkdown } from "./markdown-projections.js";
+import { MarkdownRenderError } from "./markdown-render.js";
 import { publicSecurityHeaders } from "./public-headers.js";
 import { registerRichTextAssets, withRichTextStyles } from "./richtext-assets.js";
 import { createSearchPageHandler, registerSearchPageRoute, wrapSearchPage } from "./search-page.js";
@@ -96,6 +114,12 @@ import { loadThemePlacements } from "./theme-placements.js";
 
 export interface SiteRouteOptions {
   readonly application: ApplicationServices;
+  /**
+   * Derives the opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01)
+   * for extension call contexts from the transport-resolved peer. Omitted
+   * when the installation has no `http.sourceKeySecretRef`.
+   */
+  readonly sourceKey?: SourceKeyResolver;
 }
 
 export function paginationPageLabel(locale: string, page: number): string {
@@ -134,6 +158,17 @@ interface CollectionFeedItem {
 }
 
 export { collectFieldMediaIds, selectCardImage } from "./feed-cards.js";
+
+function appendVaryAccept(reply: FastifyReply): void {
+  const current = reply.getHeader("vary");
+  const values = (Array.isArray(current) ? current : [current])
+    .flatMap((value) => (typeof value === "string" ? value.split(",") : []))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (values.includes("*")) return;
+  if (!values.some((value) => value.toLowerCase() === "accept")) values.push("Accept");
+  void reply.header("vary", values.join(", "));
+}
 
 /** Collects declared media references from a block tree (Content spec §60). */
 export function collectBlockMediaIds(blocks: unknown, app: ApplicationServices, into: Set<string>) {
@@ -175,6 +210,28 @@ export function collectBlockMediaIds(blocks: unknown, app: ApplicationServices, 
   for (const block of blocks as Record<string, unknown>[]) visit(block);
 }
 
+function collectBlockActionMediaIds(
+  blocks: readonly Record<string, unknown>[],
+  into: Set<string>,
+): void {
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (typeof value !== "object" || value === null) return;
+    const record = value as Record<string, unknown>;
+    if (
+      record.type === "media_download" &&
+      typeof record.media_asset_id === "string" &&
+      STABLE_ID_RE.test(record.media_asset_id)
+    )
+      into.add(record.media_asset_id);
+    for (const child of Object.values(record)) visit(child);
+  };
+  visit(blocks);
+}
+
 /**
  * Core-owned head section as one trusted fragment (R14, 2026-10-02 site
  * developer report): the engine escapes plain strings unconditionally, so a
@@ -194,7 +251,9 @@ function headHtmlScope(head: Parameters<typeof assembleHeadHtml>[0]): SafeHtml {
  * no activation side effects. */
 interface ThemeStack {
   readonly manifest: ThemeManifest;
+  readonly snapshot: Readonly<Record<string, string>>;
   readonly renderService: ReturnType<typeof createRenderService>;
+  readonly markdownRenderService: ReturnType<typeof createRenderService>;
   readonly templates: ReturnType<typeof createTemplateRegistry>;
   readonly components: ReturnType<typeof createComponentRegistry>;
   readonly blocks: ReturnType<typeof createBlockRendererRegistry>;
@@ -232,6 +291,12 @@ function buildThemeStack(
     if (dir === "templates" || existsSync(join(themeDir, dir))) collect(dir, `${dir}/`);
 
   const renderService = createRenderService({ manifest, snapshot, devMode: false });
+  const markdownRenderService = createRenderService({
+    manifest,
+    snapshot,
+    devMode: false,
+    outputFormat: "markdown",
+  });
   const templates = createTemplateRegistry(manifest);
   const components = createComponentRegistry(manifest, renderService);
   const blocks = createBlockRendererRegistry(manifest, renderService, {
@@ -293,7 +358,9 @@ function buildThemeStack(
 
   return {
     manifest,
+    snapshot,
     renderService,
+    markdownRenderService,
     templates,
     components,
     blocks,
@@ -361,9 +428,16 @@ export async function registerSiteRoute(
   fastify: FastifyInstance,
   options: SiteRouteOptions,
 ): Promise<void> {
-  const { application } = options;
+  const { application, sourceKey } = options;
   registerRichTextAssets(fastify);
   const themeDir = application.themeDir;
+  registerMarkdownFiles(fastify, {
+    application,
+    prepareAvailability: async (candidates, environment) =>
+      themeDir === undefined
+        ? async () => "theme_unavailable"
+        : prepareDiscoveryMarkdown(candidates, environment),
+  });
   if (themeDir === undefined) {
     registerSearchPageRoute(fastify, { application });
     return; // API-only deployment: search has built-in markup
@@ -673,6 +747,9 @@ export async function registerSiteRoute(
   async function buildMediaScope(
     stack: ThemeStack,
     ids: ReadonlySet<string>,
+    assetOverride?: Readonly<
+      Record<string, import("@pcms/media").MediaAssetPublicViewModel | null>
+    >,
   ): Promise<
     Record<
       string,
@@ -691,7 +768,7 @@ export async function registerSiteRoute(
         presets: Record<string, ImageModel | null>;
       }
     > = {};
-    const assets = await requestMedia([...ids], true);
+    const assets = assetOverride ?? (await requestMedia([...ids], true));
     for (const id of ids) {
       const asset = assets[id];
       if (asset == null) continue;
@@ -1026,13 +1103,21 @@ export async function registerSiteRoute(
    * starts a run against start_url and answers against the run-scoped
    * endpoints; {quiz_run_id} in answer/complete URLs is substituted by the
    * theme client with the started run's id. */
-  async function quizzesScope(blocksInDocument: unknown): Promise<Record<string, unknown>> {
+  async function quizzesScope(
+    blocksInDocument: unknown,
+    batch?: MarkdownDiscoveryBatch,
+  ): Promise<Record<string, unknown>> {
     const scope: Record<string, unknown> = {};
     if (!Array.isArray(blocksInDocument)) return scope;
     for (const block of blocksInDocument as Record<string, unknown>[]) {
       if (block.type !== "quiz") continue;
       const id = (block.props as Record<string, unknown> | undefined)?.quiz_definition_id;
       if (typeof id !== "string" || !STABLE_ID_RE.test(id)) continue;
+      if (batch) {
+        const title = batch.quizTitle(id);
+        if (title !== undefined) scope[id] = { title };
+        continue;
+      }
       try {
         const definition = await application.formsSource.domain.quizzes.getDefinition(id);
         if (definition.status !== "ACTIVE") continue;
@@ -1056,11 +1141,11 @@ export async function registerSiteRoute(
   /** Feed-card dependencies shared by related blocks and collections: the
    * block registry, content-type lookup, the batched media port and the
    * rendering theme's presets. */
-  function cardDeps(stack: ThemeStack) {
+  function cardDeps(stack: ThemeStack, batch?: MarkdownDiscoveryBatch) {
     return {
       blocks: application.blocks,
       contentType: (key: string) => application.contentTypes.getLatestContentType(key),
-      assets: (ids: readonly string[]) => requestMedia(ids, false),
+      assets: (ids: readonly string[]) => (batch ? batch.assets(ids) : requestMedia(ids, false)),
       presets: stack.manifest.media_presets,
     };
   }
@@ -1074,13 +1159,14 @@ export async function registerSiteRoute(
       readonly tagField: string;
     },
     stack: ThemeStack,
+    batch?: MarkdownDiscoveryBatch,
   ): Promise<readonly FeedCard[]> {
     if (!stack.manifest.media_presets.some((preset) => preset.id === options.imagePreset)) {
       // Known-at-seal preset that the CURRENT theme no longer declares: cards
       // degrade to no image; GET never seals, migrates or transforms.
       fastify.log.warn({ preset: options.imagePreset }, "render.feed_image_preset_unknown");
     }
-    return buildFeedCards(rows, options, cardDeps(stack));
+    return buildFeedCards(rows, options, cardDeps(stack, batch));
   }
 
   async function relatedCards(
@@ -1088,10 +1174,11 @@ export async function registerSiteRoute(
     contextLocale: string,
     selfEntryId: string,
     stack: ThemeStack,
+    batch?: MarkdownDiscoveryBatch,
   ): Promise<Record<string, RelatedCard[]>> {
     const cardsByBlock: Record<string, RelatedCard[]> = {};
     if (!Array.isArray(blocksInDocument)) return cardsByBlock;
-    const site = await application.routes.ensureSite(application.defaultSiteKey);
+    const site = batch?.site ?? (await application.routes.ensureSite(application.defaultSiteKey));
     const deps = {
       pool: application.pool,
       isKnownContentType: (key: string) =>
@@ -1146,7 +1233,7 @@ export async function registerSiteRoute(
           );
         } else {
           try {
-            const feed = await queryCollectionFeed(deps, {
+            const feedInput = {
               context: contextLocale,
               contentTypes,
               sectionEntryId: options.scope === "site" ? null : selfEntryId,
@@ -1158,9 +1245,13 @@ export async function registerSiteRoute(
               tag: null,
               page: 1,
               pageSize: limit ?? binding.page_size ?? COLLECTION_DEFAULT_PAGE_SIZE,
-            });
+            } as const;
+            const feed = batch
+              ? await batch.feed(feedInput)
+              : await queryCollectionFeed(deps, feedInput);
             fill = feed.items;
           } catch (error) {
+            if (batch) throw error;
             fastify.log.warn(
               { err: error, collection_key: props.collection_key },
               "render.collection_unresolved",
@@ -1173,11 +1264,13 @@ export async function registerSiteRoute(
       const pinnedRows =
         pinned.length === 0
           ? []
-          : await queryPublishedCardRows(deps, {
-              context: contextLocale,
-              entryIds: pinned,
-              siteId: site.id,
-            });
+          : batch
+            ? await batch.pinned(contextLocale, pinned)
+            : await queryPublishedCardRows(deps, {
+                context: contextLocale,
+                entryIds: pinned,
+                siteId: site.id,
+              });
       // `limit` bounds the OUTPUT, pinned ids included: only resolvable,
       // published, non-excluded pins take a slot (removed pins never do).
       const cap = limit ?? 100;
@@ -1206,6 +1299,7 @@ export async function registerSiteRoute(
           tagField: "tags",
         },
         stack,
+        batch,
       );
       cardsByBlock[blockId] = cards.map((card, index) => {
         const row = rows[index];
@@ -1355,9 +1449,10 @@ export async function registerSiteRoute(
       readonly requestPath: string;
       readonly query: Record<string, unknown>;
     },
+    batch?: MarkdownDiscoveryBatch,
   ): Promise<unknown> {
     const options = readBindingFeedOptions(binding);
-    const site = await application.routes.ensureSite(application.defaultSiteKey);
+    const site = batch?.site ?? (await application.routes.ensureSite(application.defaultSiteKey));
     // Browsable URLs degrade leniently (page=abc → 1); the REST surface is
     // the strict one and answers 400 for the same input.
     const rawTag = context.query.tag;
@@ -1370,26 +1465,30 @@ export async function registerSiteRoute(
         : 1;
     const tagField = binding.tag_field ?? "tags";
     try {
-      const feed = await queryCollectionFeed(
-        {
-          pool: application.pool,
-          isKnownContentType: (key) => application.contentTypes.getLatestContentType(key) !== null,
-        },
-        {
-          context: context.contextLocale,
-          contentTypes: binding.content_types,
-          sectionEntryId: options.scope === "site" ? null : context.selfEntryId,
-          scope: options.scope,
-          order: options.order,
-          // The rendered page is not excluded implicitly: "site" is the whole
-          // site, and a page that wants itself out names itself explicitly.
-          siteId: site.id,
-          tagField,
-          tag,
-          page,
-          pageSize,
-        },
-      );
+      const feedInput = {
+        context: context.contextLocale,
+        contentTypes: binding.content_types,
+        sectionEntryId: options.scope === "site" ? null : context.selfEntryId,
+        scope: options.scope,
+        order: options.order,
+        // The rendered page is not excluded implicitly: "site" is the whole
+        // site, and a page that wants itself out names itself explicitly.
+        siteId: site.id,
+        tagField,
+        tag,
+        page,
+        pageSize,
+      } as const;
+      const feed = batch
+        ? await batch.feed(feedInput)
+        : await queryCollectionFeed(
+            {
+              pool: application.pool,
+              isKnownContentType: (key) =>
+                application.contentTypes.getLatestContentType(key) !== null,
+            },
+            feedInput,
+          );
       // One batched projection for the whole page (no per-item reads).
       const cards = await cardsOf(
         feed.items,
@@ -1400,6 +1499,7 @@ export async function registerSiteRoute(
           tagField,
         },
         stack,
+        batch,
       );
       const items: CollectionFeedItem[] = cards.map((card, index) => {
         const row = feed.items[index];
@@ -1440,6 +1540,7 @@ export async function registerSiteRoute(
         has_prev: feed.page > 1,
       };
     } catch (error) {
+      if (batch) throw error;
       // A broken binding (unknown content type, transient DB issue) must not
       // take the page down; the REST surface answers the typed error for the
       // same key, and the log names the code.
@@ -1469,16 +1570,23 @@ export async function registerSiteRoute(
     contextLocale: string,
     requestPath: string,
     query: Record<string, unknown>,
+    batch?: MarkdownDiscoveryBatch,
   ): Promise<Record<string, unknown>> {
     const scope: Record<string, unknown> = {};
     for (const [key, binding] of Object.entries(stack.manifest.collections ?? {})) {
       if (!(binding.templates ?? []).includes(templateId)) continue;
-      scope[key] = await resolveCollectionFeedScope(key, binding, stack, {
-        selfEntryId,
-        contextLocale,
-        requestPath,
-        query,
-      });
+      scope[key] = await resolveCollectionFeedScope(
+        key,
+        binding,
+        stack,
+        {
+          selfEntryId,
+          contextLocale,
+          requestPath,
+          query,
+        },
+        batch,
+      );
     }
     return scope;
   }
@@ -1593,6 +1701,405 @@ export async function registerSiteRoute(
     return accepting[0]?.id ?? null;
   }
 
+  const markdownPlans = new WeakMap<ThemeStack, Map<string, MarkdownDiscoveryCompilation>>();
+
+  function discoveryPlan(stack: ThemeStack, template: ThemeManifest["templates"][number]) {
+    let cache = markdownPlans.get(stack);
+    if (!cache) {
+      cache = new Map();
+      markdownPlans.set(stack, cache);
+    }
+    let compilation = cache.get(template.id);
+    if (!compilation) {
+      compilation = compileMarkdownDiscoveryPlan({
+        snapshot: stack.snapshot,
+        file: template.markdown_file!,
+        ...(template.markdown_contract ? { contract: template.markdown_contract } : {}),
+      });
+      cache.set(template.id, compilation);
+    }
+    return compilation;
+  }
+
+  function discoveryTemplate(candidate: SitemapCandidate, stack: ThemeStack) {
+    const data = candidate.markdown;
+    if (!data || !candidate.locale) return null;
+    const type = application.contentTypes.getLatestContentType(data.contentTypeId);
+    if (!type) return null;
+    const sidecar = data.sidecar as { template_key?: unknown } | null;
+    const templateId = resolveTemplate(
+      stack,
+      data.contentTypeId,
+      type.version,
+      data.isHome,
+      typeof sidecar?.template_key === "string" ? sidecar.template_key : data.templateKey,
+    );
+    const fields = (data.payload as { fields?: unknown } | null)?.fields;
+    const accepted =
+      templateId !== null &&
+      stack.templates.checkAcceptance({
+        templateId,
+        contentTypeKey: data.contentTypeId,
+        contentTypeVersion: type.version,
+        presentFields: typeof fields === "object" && fields !== null ? Object.keys(fields) : [],
+      }).ok;
+    const template = accepted
+      ? stack.manifest.templates.find((item) => item.id === templateId)
+      : undefined;
+    return { type, templateId, template, paired: template?.markdown_file !== undefined };
+  }
+
+  function walkDiscoveryValues(
+    value: unknown,
+    visit: (item: Record<string, unknown>) => void,
+  ): void {
+    const queue: unknown[] = [value];
+    let count = 0;
+    while (queue.length) {
+      if (++count > 12000) throw new MarkdownDependencyError("dependency_limit");
+      const item = queue.pop();
+      if (Array.isArray(item)) queue.push(...item);
+      else if (item && typeof item === "object") {
+        visit(item as Record<string, unknown>);
+        queue.push(...Object.values(item));
+      }
+    }
+  }
+
+  function hasBlockType(nodes: unknown, type: string): boolean {
+    const pending = Array.isArray(nodes) ? [...nodes] : [];
+    while (pending.length) {
+      const node = pending.pop() as { type?: unknown; children?: unknown } | null;
+      if (!node || typeof node !== "object") continue;
+      if (node.type === type) return true;
+      if (Array.isArray(node.children)) pending.push(...node.children);
+    }
+    return false;
+  }
+
+  async function prepareDiscoveryMarkdown(
+    candidates: readonly SitemapCandidate[],
+    environment: MarkdownDiscoveryEnvironment,
+  ) {
+    const stack = currentActiveStack();
+    const { site, localization, identity } = environment;
+    const batch = new MarkdownDiscoveryBatch(application, site);
+    const docs = new Map<
+      SitemapCandidate,
+      {
+        selected: NonNullable<ReturnType<typeof discoveryTemplate>>;
+        nodes: Record<string, unknown>[];
+        mediaIds: Set<string>;
+        richIds: Set<string>;
+        context: string;
+        usesCollections: boolean;
+        usesCardMedia: boolean;
+      }
+    >();
+    const reasons = new Map<SitemapCandidate, string>();
+    const mediaIds = new Set<string>();
+    for (const candidate of candidates) {
+      const data = candidate.markdown;
+      const selected = discoveryTemplate(candidate, stack);
+      if (!data || !selected) {
+        reasons.set(candidate, "publication_unavailable");
+        continue;
+      }
+      try {
+        const compilation =
+          selected.paired && selected.template ? discoveryPlan(stack, selected.template) : null;
+        if (compilation && !compilation.ok) {
+          reasons.set(candidate, `paired_${compilation.reason}`);
+          continue;
+        }
+        const usesCollections =
+          compilation?.ok === true &&
+          compilation.plan.dependencies.some(
+            (path) => path === "collections" || path.startsWith("collections."),
+          );
+        const payload = data.payload as { fields?: Record<string, unknown>; blocks?: unknown };
+        const fields = payload.fields ?? {};
+        const nodes = blockNodesOf(payload.blocks, application.blocks) as Record<string, unknown>[];
+        const ids = new Set<string>();
+        const richIds = new Set<string>();
+        collectBlockMediaIds(nodes, application, ids);
+        collectBlockActionMediaIds(nodes, ids);
+        if (selected.paired) collectFieldMediaIds(fields, selected.type.fieldSchema.fields, ids);
+        else if (data.contentTypeId === "case" && selected.type.version === 1)
+          for (const id of [
+            fields.hero_image,
+            ...(Array.isArray(fields.gallery) ? fields.gallery : []),
+          ])
+            if (isStableId(id)) ids.add(id);
+        mapEntryRichText(data.payload, selected.type, application.blocks, (document) => {
+          for (const id of collectRichTextMediaIds(document)) richIds.add(id);
+          return document;
+        });
+        if (typeof fields.intro === "object" && fields.intro !== null)
+          for (const id of collectRichTextMediaIds(fields.intro)) richIds.add(id);
+        if (selected.paired) for (const id of richIds) ids.add(id);
+        if (ids.size + richIds.size > 256 || new Set([...mediaIds, ...ids, ...richIds]).size > 1000)
+          throw new MarkdownDependencyError("media_dependency_limit");
+        const context =
+          candidate.locale === localization.defaultLocale ? "default" : candidate.locale!;
+        const actionIds = new Set<string>();
+        walkDiscoveryValues(nodes, (value) => {
+          if (
+            ["internal_entry", "anchor"].includes(String(value.type)) &&
+            isStableId(value.entry_id)
+          )
+            actionIds.add(value.entry_id);
+        });
+        batch.actionIds(context === "default" ? "x-default" : context, [...actionIds]);
+        if (hasBlockType(nodes, "related_content"))
+          await relatedCards(nodes, context, candidate.entryId, stack, batch);
+        await quizzesScope(nodes, batch);
+        if (usesCollections && selected.templateId && selected.template)
+          await collectionsScope(
+            stack,
+            selected.templateId,
+            candidate.entryId,
+            context,
+            candidate.path,
+            {},
+            batch,
+          );
+        for (const id of [...ids, ...richIds]) mediaIds.add(id);
+        docs.set(candidate, {
+          selected,
+          nodes,
+          mediaIds: ids,
+          richIds,
+          context,
+          usesCollections,
+          usesCardMedia: false,
+        });
+      } catch (error) {
+        reasons.set(
+          candidate,
+          error instanceof MarkdownDependencyError ? error.reason : "unproven_projection",
+        );
+      }
+    }
+    try {
+      await batch.load();
+    } catch {
+      return async (candidate: SitemapCandidate) =>
+        reasons.get(candidate) ?? "dependency_unavailable";
+    }
+    batch.collectingMedia = true;
+    for (const [candidate, doc] of docs) {
+      const before = new Set(batch.cardMediaIds);
+      batch.observedMediaIds.clear();
+      try {
+        if (hasBlockType(doc.nodes, "related_content"))
+          await relatedCards(doc.nodes, doc.context, candidate.entryId, stack, batch);
+        if (doc.usesCollections && doc.selected.templateId)
+          await collectionsScope(
+            stack,
+            doc.selected.templateId,
+            candidate.entryId,
+            doc.context,
+            candidate.path,
+            {},
+            batch,
+          );
+        doc.usesCardMedia = batch.observedMediaIds.size > 0;
+        if (new Set([...mediaIds, ...batch.cardMediaIds]).size > 1500)
+          throw new MarkdownDependencyError("media_dependency_limit");
+      } catch (error) {
+        for (const id of batch.cardMediaIds) if (!before.has(id)) batch.cardMediaIds.delete(id);
+        reasons.set(
+          candidate,
+          error instanceof MarkdownDependencyError ? error.reason : "dependency_unavailable",
+        );
+      }
+    }
+    batch.collectingMedia = false;
+    for (const id of batch.cardMediaIds) mediaIds.add(id);
+    let assets: Awaited<ReturnType<typeof requestMedia>> = {};
+    let feedAssets: Awaited<ReturnType<typeof requestMedia>> = {};
+    try {
+      [assets, feedAssets] = await Promise.all([
+        requestMedia([...mediaIds], true),
+        requestMedia([...mediaIds], false),
+      ]);
+    } catch {
+      for (const [candidate, doc] of docs)
+        if (doc.mediaIds.size || doc.richIds.size || doc.usesCardMedia)
+          reasons.set(candidate, "media_dependency_unavailable");
+    }
+    batch.feedAssets = feedAssets;
+    const mediaScope = await buildMediaScope(stack, mediaIds, assets);
+    const richPairs = new Map<string, { assetId: string; versionNo: number }>();
+    const richIds = [...new Set([...docs.values()].flatMap((doc) => [...doc.richIds]))];
+    let liveAssets = new Map<string, import("@pcms/media").MediaAssetRecord>();
+    try {
+      liveAssets = new Map(
+        (await getAssetsByIds(application.pool, richIds)).map((asset) => [
+          asset.id as string,
+          asset,
+        ]),
+      );
+    } catch {
+      for (const [candidate, doc] of docs)
+        if (doc.richIds.size) reasons.set(candidate, "media_dependency_unavailable");
+    }
+    for (const [candidate, doc] of docs)
+      for (const id of doc.richIds) {
+        const asset = liveAssets.get(id);
+        if (!asset || asset.archivedAt !== null || asset.kind !== "image") continue;
+        const versionNo = candidate.markdown?.mediaVersions?.[id] ?? asset.currentVersionNo;
+        richPairs.set(`${id}:${versionNo}`, { assetId: id, versionNo });
+      }
+    const sources = new Map<string, string>();
+    try {
+      if (richPairs.size)
+        for (const image of await listVariantsForAssets(application.pool, [
+          ...richPairs.values(),
+        ])) {
+          const key = `${image.assetId}:${image.versionNo}`;
+          if (image.presetId === "richtext-v1" && !sources.has(key))
+            sources.set(key, variantPublicUrl(image));
+        }
+    } catch {
+      for (const [candidate, doc] of docs)
+        if (doc.richIds.size) reasons.set(candidate, "media_dependency_unavailable");
+    }
+    return async (candidate: SitemapCandidate): Promise<string | null> => {
+      const reason = reasons.get(candidate);
+      if (reason) return reason;
+      const doc = docs.get(candidate);
+      const data = candidate.markdown;
+      if (!doc || !data) return "publication_unavailable";
+      try {
+        const media = Object.fromEntries(
+          [...doc.mediaIds].flatMap((id) => (mediaScope[id] ? [[id, mediaScope[id]]] : [])),
+        );
+        const related = hasBlockType(doc.nodes, "related_content")
+          ? await relatedCards(doc.nodes, doc.context, candidate.entryId, stack, batch)
+          : {};
+        const quizzes = await quizzesScope(doc.nodes, batch);
+        const collections =
+          doc.usesCollections && doc.selected.templateId && doc.selected.template
+            ? await collectionsScope(
+                stack,
+                doc.selected.templateId,
+                candidate.entryId,
+                doc.context,
+                candidate.path,
+                {},
+                batch,
+              )
+            : {};
+        const context = {
+          htmlUrl: candidate.path,
+          locale: candidate.locale!,
+          mediaUrl: (id: string) => {
+            const asset = liveAssets.get(id);
+            const image =
+              doc.richIds.has(id) &&
+              asset &&
+              sources.get(`${id}:${data.mediaVersions?.[id] ?? asset.currentVersionNo}`);
+            const view = media[id];
+            return (
+              image ||
+              Object.values(view?.presets ?? {}).find((preset) => preset?.src)?.src ||
+              view?.download?.href ||
+              null
+            );
+          },
+          mediaAlt: (id: string) => media[id]?.alt ?? null,
+          relatedCards: related,
+          quizTitles: Object.fromEntries(
+            Object.entries(quizzes).map(([id, quiz]) => [id, (quiz as { title: string }).title]),
+          ),
+          actionUrl: async (action: Readonly<Record<string, unknown>>) => {
+            if (action.type === "media_download")
+              return media[String(action.media_asset_id)]?.download?.href ?? null;
+            if (
+              ["internal_entry", "anchor"].includes(String(action.type)) &&
+              typeof action.entry_id === "string"
+            ) {
+              const path = batch.actionPath(
+                doc.context === "default" ? "x-default" : doc.context,
+                action.entry_id,
+              );
+              return path
+                ? `${path}${action.type === "anchor" ? `#${String(action.anchor ?? "")}` : ""}`
+                : null;
+            }
+            const resolved = await application.actionUrls.resolveAction({
+              kind: String(action.type ?? ""),
+              entry_id: null,
+              url: String(action.url ?? ""),
+              anchor: String(action.anchor ?? ""),
+              phone: String(action.phone ?? ""),
+              email: String(action.email ?? ""),
+            } as never);
+            return resolved && ["url", "tel", "mailto"].includes(resolved.kind)
+              ? (resolved as { href: string }).href
+              : null;
+          },
+        };
+        const projection = await preparePublishedMarkdown(application, {
+          contentTypeId: data.contentTypeId,
+          payload: data.payload,
+          paired: doc.selected.paired,
+          siteTitle: site.title,
+          context,
+        });
+        if (!doc.selected.paired) return projection.hasContent ? null : "empty_content";
+        const template = doc.selected.template!;
+        const compilation = discoveryPlan(stack, template);
+        if (!compilation.ok) return `paired_${compilation.reason}`;
+        return compilation.plan.assess(
+          {
+            media,
+            related_cards: related,
+            collections,
+            body_markdown: safeMarkdown(projection.bodyMarkdown),
+            blocks_markdown: safeMarkdown(projection.blocksMarkdown),
+            fallback_markdown: safeMarkdown(projection.fallbackMarkdown),
+            entry: {
+              id: candidate.entryId,
+              title: projection.title,
+              fields: projection.markdownFields,
+              blocks: doc.nodes,
+              content_type_key: data.contentTypeId,
+              content_type_version: doc.selected.type.version,
+              template_key: doc.selected.templateId,
+            },
+            site: {
+              site_name: identity?.site_name ?? site.title,
+              logo: null,
+              contact: {},
+              social: [],
+            },
+            request: { locale: candidate.locale, path: candidate.path },
+            i18n: {
+              active_locale: candidate.locale,
+              default_locale: localization.defaultLocale,
+              locales: [...localization.locales],
+              alternates: [],
+            },
+          },
+          [
+            ...projection.contentPaths,
+            "related_cards.*.*.title",
+            "related_cards.*.*.description",
+            "collections.*.items.*.title",
+            "collections.*.items.*.description",
+            "media.*.presets.*.src",
+            "media.*.download.href",
+          ],
+        );
+      } catch (error) {
+        return error instanceof MarkdownDependencyError ? error.reason : "unproven_projection";
+      }
+    };
+  }
+
   /** Head fields a page render consumes. The live route resolves them from
    * the SEO subsystem; the preview render forces noindex and no canonical. */
   interface EntryHeadInput {
@@ -1639,6 +2146,7 @@ export async function registerSiteRoute(
       readonly locales: readonly string[];
     };
     readonly head: EntryHeadInput;
+    readonly onResolvedHead?: (head: EntryHeadInput) => void;
   }
 
   /** Template resolution → block/body render → full page HTML. Shared by the
@@ -1651,6 +2159,7 @@ export async function registerSiteRoute(
   async function renderEntryHtml(
     input: EntryHtmlInput,
     stackOverride?: ThemeStack,
+    outputFormat: "html" | "markdown" = "html",
   ): Promise<string | null> {
     // No explicit override = the live ACTIVE surface: resolve the current
     // one (fingerprint-checked) instead of a boot-time snapshot.
@@ -1662,7 +2171,8 @@ export async function registerSiteRoute(
     // Shadow EVERY theme-scoped name from the CHOSEN stack — the outer
     // destructured consts belong to the ACTIVE theme and would leak its
     // tokens into candidate previews (0.1.130 regression).
-    const { templates, blocks, renderService, themeSettings, tokensCss } = stack;
+    const { templates, blocks, renderService, markdownRenderService, themeSettings, tokensCss } =
+      stack;
     // Effective template: the sealed snapshot (publication-safe — later
     // reassignments do not touch the live page), else the current assignment.
     const sidecarTemplate =
@@ -1677,7 +2187,7 @@ export async function registerSiteRoute(
       input.isHome,
       explicitTemplate,
     );
-    if (templateId === null) {
+    if (templateId === null && outputFormat === "html") {
       // Rec 1 (152fz recommendations): a site-wide 404 outage with zero
       // diagnostics is unacceptable — warn once per process with the
       // identifying tuple so `journalctl` points at the version/theme drift.
@@ -1691,15 +2201,23 @@ export async function registerSiteRoute(
       );
       return null;
     }
-    const acceptance = templates.checkAcceptance({
-      templateId,
-      contentTypeKey: entry.contentTypeId,
-      contentTypeVersion: contentType.version,
-      presentFields: Object.keys(
-        (((revision.payload ?? {}) as { fields?: unknown }).fields as object) ?? {},
-      ),
-    });
-    if (!acceptance.ok) return null;
+    const acceptance =
+      templateId === null
+        ? null
+        : templates.checkAcceptance({
+            templateId,
+            contentTypeKey: entry.contentTypeId,
+            contentTypeVersion: contentType.version,
+            presentFields: Object.keys(
+              (((revision.payload ?? {}) as { fields?: unknown }).fields as object) ?? {},
+            ),
+          });
+    if (outputFormat === "html" && !acceptance?.ok) return null;
+    const markdownFile =
+      outputFormat !== "markdown" || templateId === null || !acceptance?.ok
+        ? undefined
+        : stack.manifest.templates.find((template) => template.id === templateId)?.markdown_file;
+    const hasMarkdownTemplate = markdownFile !== undefined;
 
     const payload = (revision.payload ?? {}) as {
       fields?: Record<string, unknown>;
@@ -1707,25 +2225,66 @@ export async function registerSiteRoute(
       body?: unknown;
     };
     const fields = payload.fields ?? {};
+    const richTextBody =
+      contentType.bodyPolicy === "block_document" ? undefined : (payload.body ?? fields.body);
     const blockNodes = blockNodesOf(payload.blocks, application.blocks, (issues) =>
       fastify.log.warn({ issues }, "render.blocks_dropped"),
     );
-    const forms = await formsScope(
-      blockNodes,
-      input.effectiveLocale,
-      typeof themeSettings.lead_form_id === "string" ? [themeSettings.lead_form_id] : [],
-    );
+    const forms =
+      outputFormat === "html"
+        ? await formsScope(
+            blockNodes,
+            input.effectiveLocale,
+            typeof themeSettings.lead_form_id === "string" ? [themeSettings.lead_form_id] : [],
+          )
+        : {};
+    if (outputFormat === "markdown" && contentType.bodyPolicy === "block_document") {
+      const validated = validateBlockDocument(payload.blocks, application.blocks);
+      if (!validated.ok)
+        throw new MarkdownRenderError(
+          "published BlockDocument is invalid and cannot be serialized",
+        );
+    }
 
+    const contentTypeDefinition = application.contentTypes.getLatestContentType(
+      entry.contentTypeId,
+    );
+    const fieldSchema = contentTypeDefinition?.fieldSchema.fields;
     const mediaIds = new Set<string>();
     collectBlockMediaIds(blockNodes, application, mediaIds);
-    const fieldSchema = application.contentTypes.getLatestContentType(entry.contentTypeId)
-      ?.fieldSchema.fields;
-    if (fieldSchema !== undefined) collectFieldMediaIds(fields, fieldSchema, mediaIds);
+    if (outputFormat === "markdown")
+      collectBlockActionMediaIds(blockNodes as Record<string, unknown>[], mediaIds);
+    if (fieldSchema !== undefined && (outputFormat === "html" || hasMarkdownTemplate))
+      collectFieldMediaIds(fields, fieldSchema, mediaIds);
+    else if (
+      outputFormat === "markdown" &&
+      contentType.version === 1 &&
+      entry.contentTypeId === "case"
+    ) {
+      for (const id of [
+        fields.hero_image,
+        ...(Array.isArray(fields.gallery) ? fields.gallery : []),
+      ])
+        if (typeof id === "string" && STABLE_ID_RE.test(id)) mediaIds.add(id);
+    }
     // Media-typed THEME SETTINGS are page media too (the long-noted schema
     // gap): hero-slide/collage/logo settings hold media ids that templates
     // resolve through media[<id>], so they join the media scope. Asset-path
     // values ("assets/img/…") are bundled theme files — not resolvable here.
-    collectThemeMediaIds(stack, mediaIds);
+    if (outputFormat === "html") collectThemeMediaIds(stack, mediaIds);
+
+    const imageSources = new Map<string, string>();
+    const richTextIds = new Set<string>();
+    if (contentTypeDefinition !== null) {
+      mapEntryRichText(revision.payload, contentTypeDefinition, application.blocks, (document) => {
+        for (const id of collectRichTextMediaIds(document)) richTextIds.add(id);
+        return document;
+      });
+    }
+    if (outputFormat === "markdown" && typeof fields.intro === "object" && fields.intro !== null)
+      for (const id of collectRichTextMediaIds(fields.intro)) richTextIds.add(id);
+    if (outputFormat === "markdown" && hasMarkdownTemplate)
+      for (const id of richTextIds) mediaIds.add(id);
     const media = await buildMediaScope(stack, mediaIds);
 
     // Registry admission (validation) is cross-theme; RENDER support is
@@ -1741,17 +2300,6 @@ export async function registerSiteRoute(
         "render.blocks_unsupported_by_theme",
       );
     }
-    const imageSources = new Map<string, string>();
-    const richTextIds = new Set<string>();
-    mapEntryRichText(
-      revision.payload,
-      application.contentTypes.getLatestContentType(entry.contentTypeId)!,
-      application.blocks,
-      (document) => {
-        for (const id of collectRichTextMediaIds(document)) richTextIds.add(id);
-        return document;
-      },
-    );
     const richIds = [...richTextIds];
     for (let offset = 0; offset < richIds.length; offset += 500) {
       const assets = (
@@ -1779,21 +2327,26 @@ export async function registerSiteRoute(
       }
     }
     const richTextOptions = { imageSource: (id: string) => imageSources.get(id) ?? null };
+    const relatedCardMap =
+      outputFormat === "markdown" && hasBlockType(blockNodes, "related_content")
+        ? await relatedCards(blockNodes, input.publicationContext, entry.id, stack)
+        : null;
+    const quizzes =
+      contentType.bodyPolicy === "block_document" && hasBlockType(blockNodes, "quiz")
+        ? await quizzesScope(blockNodes)
+        : {};
     const blocksHtml =
-      contentType.bodyPolicy === "block_document"
+      outputFormat === "html" && contentType.bodyPolicy === "block_document"
         ? await blocks.renderBlockDocument(
             renderable as never,
             {
               media,
               richtext_image_sources: Object.fromEntries(imageSources),
               forms,
-              quizzes: await quizzesScope(blockNodes),
-              related_cards: await relatedCards(
-                blockNodes,
-                input.publicationContext,
-                entry.id,
-                stack,
-              ),
+              quizzes,
+              related_cards:
+                relatedCardMap ??
+                (await relatedCards(blockNodes, input.publicationContext, entry.id, stack)),
             },
             {},
           )
@@ -1808,8 +2361,6 @@ export async function registerSiteRoute(
     // needed "tolerance", but the tolerance must be shape-based, never
     // policy-blind: Block Document and RichText AST are independent formats and
     // neither may be decoded as the other.
-    const richTextBody =
-      contentType.bodyPolicy === "block_document" ? undefined : (payload.body ?? fields.body);
     // Pass the SafeHtml wrapper itself (not `.html`): the render engine keeps
     // autoescape on for plain strings, which would double-escape the fragment.
     // An absent/empty body is a valid state and renders as nothing — but a
@@ -1817,7 +2368,10 @@ export async function registerSiteRoute(
     // renderer, so a document without `schema_version: 2` fails loudly exactly
     // as before rather than silently rendering an empty page.
     const bodyHtml =
-      richTextBody === undefined || richTextBody === null || richTextBody === ""
+      outputFormat === "markdown" ||
+      richTextBody === undefined ||
+      richTextBody === null ||
+      richTextBody === ""
         ? ""
         : renderRichText(richTextBody as never, richTextOptions);
     // EVERY declared rich_text field gets a `<field>_html` SafeHtml twin
@@ -1829,7 +2383,9 @@ export async function registerSiteRoute(
     const richTextFieldHtml: Record<string, ReturnType<typeof renderRichText>> = {};
     const fieldSchemas = application.contentTypes.getLatestContentType(entry.contentTypeId)
       ?.fieldSchema.fields;
-    for (const [fieldKey, field] of Object.entries(fieldSchemas ?? {})) {
+    for (const [fieldKey, field] of Object.entries(
+      outputFormat === "html" ? (fieldSchemas ?? {}) : {},
+    )) {
       if (field.type !== "rich_text") continue;
       const value = fields[fieldKey];
       if (value === undefined || value === null || value === "") continue;
@@ -1839,15 +2395,19 @@ export async function registerSiteRoute(
       richTextFieldHtml[`${fieldKey}_html`] = renderRichText(value as never, richTextOptions);
     }
 
-    const collections = await collectionsScope(
-      stack,
-      templateId,
-      entry.id,
-      input.publicationContext,
-      input.requestPath,
-      input.query,
-    );
+    const collections =
+      templateId !== null && acceptance?.ok
+        ? await collectionsScope(
+            stack,
+            templateId,
+            entry.id,
+            input.publicationContext,
+            input.requestPath,
+            input.query,
+          )
+        : {};
     const resolvedHead = paginatedHead(input.head, collections, input.effectiveLocale);
+    input.onResolvedHead?.(resolvedHead);
     const entryHeadView = {
       title: resolvedHead.title,
       core_meta: resolvedHead.core_meta,
@@ -1859,51 +2419,149 @@ export async function registerSiteRoute(
       theme_slots: [],
     };
     const site = await application.routes.ensureSite(application.defaultSiteKey);
-    const nav = await navigationScope(stack, input.publicationContext, site.homeEntryId);
-    const breadcrumbs = await breadcrumbsScope(entry.id, input.publicationContext);
-    const siteIdentity = await application.seoDiscovery.getSiteIdentity().catch(() => null);
-    const html = await renderService.renderTemplate(
-      templateId,
-      {
-        media,
-        i18n: {
-          active_locale: input.effectiveLocale,
-          default_locale: input.localization.defaultLocale,
-          locales: [...input.localization.locales],
-          alternates: input.head.alternates,
-        },
-        site: {
-          site_name: siteIdentity?.site_name ?? site.title,
-          logo: null,
-          contact: {},
-          social: [],
-        },
-        entry: {
-          id: entry.id,
-          content_type_key: entry.contentTypeId,
-          content_type_version: contentType.version,
-          template_key: templateId,
-          title: typeof fields.title === "string" ? fields.title : entry.id,
-          fields: { ...fields, ...richTextFieldHtml },
-          blocks: [],
-        },
-        blocks_html: blocksHtml,
-        body_html: bodyHtml,
-        breadcrumbs,
-        nav,
-        forms,
-        collections,
-        head: entryHeadView,
-        head_html: headHtmlScope(entryHeadView),
-        // SafeHtml: engine-generated trusted CSS. Plain-string autoescape
-        // corrupts quoted font stacks (&#39;) and then no longer matches the
-        // tokensStyleHash the CSP header allows.
-        tokens_css: safeHtml(tokensCss()),
-        theme_settings: themeSettings,
-        request: { locale: input.effectiveLocale, path: input.requestPath },
+    const nav =
+      outputFormat === "html"
+        ? await navigationScope(stack, input.publicationContext, site.homeEntryId)
+        : {};
+    const breadcrumbs =
+      outputFormat === "html" ? await breadcrumbsScope(entry.id, input.publicationContext) : [];
+    const siteIdentity =
+      outputFormat === "html" || hasMarkdownTemplate
+        ? await application.seoDiscovery.getSiteIdentity().catch(() => null)
+        : null;
+    const mediaUrl = (id: string): string | null => {
+      const richTextImage = imageSources.get(id);
+      if (richTextImage !== undefined) return richTextImage;
+      const view = media[id] as
+        | { download?: { href?: string | null }; presets?: Record<string, { src?: string } | null> }
+        | undefined;
+      return (
+        Object.values(view?.presets ?? {}).find((preset) => typeof preset?.src === "string")?.src ??
+        view?.download?.href ??
+        null
+      );
+    };
+    const mediaAlt = (id: string): string | null => {
+      const view = media[id] as { alt?: string | null } | undefined;
+      return typeof view?.alt === "string" ? view.alt : null;
+    };
+    const markdownContext = {
+      mediaUrl,
+      mediaAlt,
+      htmlUrl: input.requestPath,
+      locale: input.effectiveLocale,
+      relatedCards: relatedCardMap ?? {},
+      actionUrl: async (action: Readonly<Record<string, unknown>>) => {
+        const kind = String(action.type ?? "");
+        if (kind === "media_download") {
+          const view = media[String(action.media_asset_id ?? "")] as
+            | { download?: { href?: string | null } }
+            | undefined;
+          return view?.download?.href ?? null;
+        }
+        const resolved = await application.actionUrls.resolveAction(
+          {
+            kind,
+            entry_id: typeof action.entry_id === "string" ? action.entry_id : null,
+            url: typeof action.url === "string" ? action.url : "",
+            anchor: typeof action.anchor === "string" ? action.anchor : "",
+            phone: typeof action.phone === "string" ? action.phone : "",
+            email: typeof action.email === "string" ? action.email : "",
+          } as never,
+          {
+            locale:
+              input.effectiveLocale === input.localization.defaultLocale
+                ? "x-default"
+                : input.effectiveLocale,
+          },
+        );
+        return resolved.kind === "url" || resolved.kind === "tel" || resolved.kind === "mailto"
+          ? resolved.href
+          : null;
       },
-      {},
+    };
+    const quizTitles = Object.fromEntries(
+      Object.entries(quizzes).flatMap(([id, value]) => {
+        const title = (value as { title?: unknown }).title;
+        return typeof title === "string" ? [[id, title]] : [];
+      }),
     );
+    const markdownContextWithQuizzes = { ...markdownContext, quizTitles };
+    const markdownProjection =
+      outputFormat === "markdown"
+        ? await preparePublishedMarkdown(application, {
+            contentTypeId: entry.contentTypeId,
+            payload: revision.payload,
+            paired: hasMarkdownTemplate,
+            siteTitle: site.title,
+            context: markdownContextWithQuizzes,
+          })
+        : null;
+    const templateScope = {
+      media,
+      i18n: {
+        active_locale: input.effectiveLocale,
+        default_locale: input.localization.defaultLocale,
+        locales: [...input.localization.locales],
+        alternates: input.head.alternates,
+      },
+      site: {
+        site_name: siteIdentity?.site_name ?? site.title,
+        logo: null,
+        contact: {},
+        social: [],
+      },
+      entry: {
+        id: entry.id,
+        content_type_key: entry.contentTypeId,
+        content_type_version: contentType.version,
+        template_key: templateId,
+        title:
+          markdownProjection?.title ??
+          (typeof fields.title === "string" ? fields.title : site.title),
+        fields: markdownProjection
+          ? markdownProjection.markdownFields
+          : { ...fields, ...richTextFieldHtml },
+        blocks: outputFormat === "markdown" ? blockNodes : [],
+      },
+      blocks_html: blocksHtml,
+      body_html: bodyHtml,
+      ...(outputFormat === "markdown"
+        ? {
+            body_markdown: safeMarkdown(markdownProjection!.bodyMarkdown),
+            blocks_markdown: safeMarkdown(markdownProjection!.blocksMarkdown),
+            fallback_markdown: safeMarkdown(markdownProjection!.fallbackMarkdown),
+            markdown_projection_error: null,
+          }
+        : {}),
+      related_cards: relatedCardMap ?? {},
+      breadcrumbs,
+      nav,
+      forms: outputFormat === "html" ? forms : {},
+      collections,
+      head: entryHeadView,
+      head_html: outputFormat === "html" ? headHtmlScope(entryHeadView) : {},
+      tokens_css: outputFormat === "html" ? safeHtml(tokensCss()) : "",
+      theme_settings: outputFormat === "html" ? themeSettings : {},
+      request: { locale: input.effectiveLocale, path: input.requestPath },
+    };
+    if (outputFormat === "markdown") {
+      if (!hasMarkdownTemplate && !markdownProjection?.hasContent)
+        throw new MarkdownRenderError("published entry has no supported public content");
+      if (hasMarkdownTemplate && templateId !== null) {
+        const rendered = await markdownRenderService.renderMarkdownTemplate(
+          templateId,
+          templateScope,
+          { entryId: entry.id },
+        );
+        if (rendered.trim() === "")
+          throw new MarkdownRenderError("paired Markdown template rendered an empty document");
+        return rendered;
+      }
+      return markdownProjection!.fallbackMarkdown;
+    }
+    if (templateId === null || !acceptance?.ok) return null;
+    const html = await renderService.renderTemplate(templateId, templateScope, {});
     return withRichTextStyles(html);
   }
 
@@ -1914,6 +2572,9 @@ export async function registerSiteRoute(
     requestPath: string,
     requestLocale: string | null = null,
     requestQuery: Record<string, unknown> = {},
+    requestedRepresentation: PublicRepresentation = "html",
+    explicitMarkdown = false,
+    acceptHeader?: string,
   ): Promise<FastifyReply> {
     // Opt-in multilingual: the request locale rides the existing publication
     // context axis (legacy "default" sentinel for the default locale). A
@@ -1952,6 +2613,25 @@ export async function registerSiteRoute(
     if (entry === null) return renderNotFound(reply, requestLocale ?? undefined);
     const contentType = application.contentTypes.getLatestContentType(entry.contentTypeId);
     if (contentType === null) return renderNotFound(reply, requestLocale ?? undefined);
+    const markdownSettings = await getPublicAgentMarkdownSettings(application, entry.id);
+    const markdownEnabled = markdownSettings.globalEnabled && markdownSettings.entryEnabled;
+    let outputFormat = requestedRepresentation;
+    if (!explicitMarkdown && outputFormat === "html" && !acceptsHtml(acceptHeader)) {
+      appendVaryAccept(reply);
+      void reply.header("content-type", "text/plain; charset=utf-8");
+      void reply.header("x-content-type-options", "nosniff");
+      return reply.status(406).send("No acceptable representation\n");
+    }
+    if (outputFormat === "markdown" && !markdownEnabled) {
+      if (explicitMarkdown) return renderNotFound(reply, requestLocale ?? undefined);
+      if (!acceptsHtml(acceptHeader)) {
+        appendVaryAccept(reply);
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        void reply.header("x-content-type-options", "nosniff");
+        return reply.status(406).send("Markdown representation is disabled\n");
+      }
+      outputFormat = "html";
+    }
 
     const liveFields = (((revision.payload ?? {}) as { fields?: unknown }).fields ?? {}) as Record<
       string,
@@ -1966,56 +2646,114 @@ export async function registerSiteRoute(
     const seoPreview = await application.seoDiscovery
       .previewSeoFor(entry.id, {
         revisionId: revision.revisionId,
-        openGraph: true,
-        twitterCard: true,
+        openGraph: outputFormat === "html",
+        twitterCard: outputFormat === "html",
         locale: effectiveLocale,
-        // Public pages materialize the RESOLVED social image (explicit →
-        // hero → site default) so og-v1 exists without a prior Admin visit.
-        materializeSocial: true,
+        // Public HTML materializes the resolved social image.
+        materializeSocial: outputFormat === "html",
       })
       .catch(() => null);
     const site = await application.routes.ensureSite(application.defaultSiteKey);
-    const alternates = await localeAlternates(entry.id, site.id, localization);
+    const alternates =
+      outputFormat === "html" ? await localeAlternates(entry.id, site.id, localization) : [];
     // Ownership verification (2026-10-18 task B): provider meta tags ride the
     // core-protected head section of the PUBLIC HOME PAGE only — independent
     // of theme, analytics and consent; themes cannot fabricate or remove them.
     const verificationMeta =
-      isHome === true
+      outputFormat === "html" && isHome === true
         ? await application.seoDiscovery.getSiteVerificationMeta().catch(() => [])
         : [];
-    const html = await renderEntryHtml({
-      entry,
-      contentType,
-      revision,
-      isHome,
-      requestPath,
-      query: requestQuery,
-      publicationContext,
-      effectiveLocale,
-      localization,
-      head: {
-        title:
-          seoPreview?.head.title ??
-          (typeof liveFields.title === "string" ? liveFields.title : null),
-        core_meta: [
-          ...(seoPreview?.head.core_meta ??
-            (intro === "" ? [] : [{ name: "description", content: intro.slice(0, 300) }])),
-          ...verificationMeta,
-        ],
-        canonical: seoPreview?.head.canonical ?? null,
-        canonicalSource: seoPreview?.canonical.source ?? null,
-        alternates: alternates.map((alternate) => ({
-          hreflang: alternate.locale,
-          href: alternate.url,
-        })),
-        icons: seoPreview?.head.icons ?? [],
-        robots:
-          seoPreview?.head.robots ??
-          (application.seoEnvironment === "production" ? null : "noindex, nofollow"),
-        json_ld: seoPreview?.head.json_ld ?? [],
-      },
-    });
+    const renderedHead: { value: EntryHeadInput | null } = { value: null };
+    let html: string | null;
+    try {
+      html = await renderEntryHtml(
+        {
+          entry,
+          contentType,
+          revision,
+          isHome,
+          requestPath,
+          query: requestQuery,
+          publicationContext,
+          effectiveLocale,
+          localization,
+          onResolvedHead: (head) => {
+            renderedHead.value = head;
+          },
+          head: {
+            title:
+              seoPreview?.head.title ??
+              (typeof liveFields.title === "string" ? liveFields.title : null),
+            core_meta: [
+              ...(seoPreview?.head.core_meta ??
+                (intro === "" ? [] : [{ name: "description", content: intro.slice(0, 300) }])),
+              ...verificationMeta,
+            ],
+            canonical: seoPreview?.head.canonical ?? null,
+            canonicalSource: seoPreview?.canonical.source ?? null,
+            alternates: alternates.map((alternate) => ({
+              hreflang: alternate.locale,
+              href: alternate.url,
+            })),
+            icons: seoPreview?.head.icons ?? [],
+            robots:
+              seoPreview?.head.robots ??
+              (application.seoEnvironment === "production" ? null : "noindex, nofollow"),
+            json_ld: seoPreview?.head.json_ld ?? [],
+          },
+        },
+        undefined,
+        outputFormat,
+      );
+    } catch (error) {
+      if (outputFormat !== "markdown") throw error;
+      if (!explicitMarkdown) appendVaryAccept(reply);
+      const unsupported = error instanceof MarkdownRenderError;
+      fastify.log.warn(
+        {
+          entry_id: entry.id,
+          code: unsupported ? error.code : "MARKDOWN_TEMPLATE_RENDER_FAILED",
+          block_type: unsupported ? error.blockType : undefined,
+        },
+        "render.markdown_unavailable",
+      );
+      void reply.header("content-type", "text/plain; charset=utf-8");
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header("x-agent-markdown-status", unsupported ? "unsupported" : "render-failed");
+      return reply.status(unsupported ? 406 : 503).send("Markdown representation unavailable\n");
+    }
     if (html === null) return renderNotFound(reply, requestLocale ?? undefined);
+    const requestSearch = new URL(reply.request.url, "http://local").search;
+    if (outputFormat === "markdown") {
+      void reply.header("content-type", "text/markdown; charset=utf-8");
+      void reply.header("cache-control", "no-cache");
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header("content-language", effectiveLocale);
+      if (!explicitMarkdown) appendVaryAccept(reply);
+      else
+        void reply.header(
+          "content-location",
+          `${markdownPathForHtml(requestPath)}${requestSearch}`,
+        );
+      const pageRobots = renderedHead.value?.robots ?? null;
+      const robots = explicitMarkdown
+        ? [
+            "noindex",
+            ...new Set(
+              (pageRobots ?? "")
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s !== "" && !/^(?:index|noindex)$/i.test(s)),
+            ),
+          ].join(", ")
+        : pageRobots;
+      if (robots !== null) void reply.header("x-robots-tag", robots);
+      void reply.header(
+        "link",
+        `<${renderedHead.value?.canonical ?? requestPath}>; rel="canonical"`,
+      );
+      return reply.send(html);
+    }
     // System document slots (ADR-0016): analytics rides public pages only.
     const injection = analyticsPageInjection(application, {
       pageId: entry.id,
@@ -2025,6 +2763,14 @@ export async function registerSiteRoute(
     const pageHtml = applySystemSlots(html, injection);
     void reply.header("content-type", "text/html; charset=utf-8");
     void reply.header("cache-control", "no-cache");
+    void reply.header("content-language", effectiveLocale);
+    appendVaryAccept(reply);
+    if (markdownEnabled) {
+      void reply.header(
+        "link",
+        `<${markdownPathForHtml(requestPath)}${requestSearch}>; rel="alternate"; type="text/markdown"`,
+      );
+    }
     // Public-page security baseline (PCMS-OPS-T106): CSP composed from the
     // theme's validated assets.csp declaration (M17 §55 — the header was
     // defined but never applied to public HTML before M17), plus the hash of
@@ -2546,6 +3292,7 @@ export async function registerSiteRoute(
     const auth = await authenticateRequest(application, request, { cookieSecure }).catch(
       () => null,
     );
+    const extensionSourceKey = sourceKey?.(request.ip);
     const ctx: OperationContext | null =
       auth === null
         ? null
@@ -2553,6 +3300,7 @@ export async function registerSiteRoute(
             actor: auth.actor,
             transport: "rest",
             requestId: request.id === undefined ? "req_web" : String(request.id),
+            ...(extensionSourceKey === undefined ? {} : { sourceKey: extensionSourceKey }),
           };
     // PREPUBLIC §5: transport facts for public mutations and the server-issued guest cookie.
     const rawHeaders = request.headers;
@@ -2578,6 +3326,7 @@ export async function registerSiteRoute(
             "idempotency-key": header("idempotency-key"),
           },
         },
+        ...(extensionSourceKey === undefined ? {} : { sourceKey: extensionSourceKey }),
       },
       ctx,
     );
@@ -2667,16 +3416,47 @@ export async function registerSiteRoute(
       }
     }
     try {
-      const resolution = await application.requestResolver.resolve({ path });
+      let requestPath = path;
+      let explicitMarkdown = false;
+      let representation = preferredRepresentation(request.headers.accept);
+      let resolution: Awaited<ReturnType<typeof application.requestResolver.resolve>>;
+      if (path.endsWith(".md")) {
+        requestPath = htmlPathFromMarkdown(path, true);
+        resolution = await application.requestResolver.resolve({ path: requestPath });
+        if (
+          resolution.kind === "redirect" &&
+          resolution.location.startsWith("/") &&
+          !resolution.location.startsWith("//") &&
+          markdownPathForHtml(resolution.location) === path
+        ) {
+          // The HTML path policy may add/remove a slash; resolving that
+          // canonical path avoids redirecting an alias back to itself.
+          requestPath = resolution.location;
+          resolution = await application.requestResolver.resolve({ path: requestPath });
+        }
+        if (
+          resolution.kind === "home" ||
+          resolution.kind === "route" ||
+          resolution.kind === "redirect"
+        ) {
+          explicitMarkdown = true;
+          representation = "markdown";
+        }
+      } else {
+        resolution = await application.requestResolver.resolve({ path });
+      }
       switch (resolution.kind) {
         case "home":
           return await renderReply(
             reply,
             resolution.entryId,
             true,
-            path,
+            requestPath,
             resolution.locale ?? null,
             request.query as Record<string, unknown>,
+            representation,
+            explicitMarkdown,
+            request.headers.accept,
           );
         case "route":
           if (resolution.route.targetType !== "entry") break;
@@ -2684,14 +3464,49 @@ export async function registerSiteRoute(
             reply,
             resolution.route.targetId,
             false,
-            path,
+            requestPath,
             resolution.locale ?? null,
             request.query as Record<string, unknown>,
+            representation,
+            explicitMarkdown,
+            request.headers.accept,
           );
         case "redirect":
-          return reply.redirect(resolution.location, resolution.statusCode);
+          return reply.redirect(
+            explicitMarkdown &&
+              resolution.location.startsWith("/") &&
+              !resolution.location.startsWith("//")
+              ? markdownPathForHtml(resolution.location)
+              : resolution.location,
+            resolution.statusCode,
+          );
         default:
           break;
+      }
+      const vary = reply.getHeader("vary");
+      const varyValue = Array.isArray(vary) ? vary.join(", ") : String(vary ?? "");
+      if (
+        varyValue !== "*" &&
+        !varyValue.split(",").some((v) => v.trim().toLowerCase() === "accept")
+      ) {
+        void reply.header("vary", varyValue ? `${varyValue}, Accept` : "Accept");
+      }
+      const accept = request.headers.accept;
+      if (!acceptsHtml(accept)) {
+        void reply.header("x-robots-tag", "noindex, nofollow");
+        if (
+          accept
+            ?.split(",")
+            .some(
+              (part) =>
+                /^application\/(?:[\w.+-]+\+)?json(?:\s*;|\s*$)/i.test(part.trim()) &&
+                !/;\s*q=0(?:\.0*)?(?:\s*;|\s*$)/i.test(part),
+            )
+        ) {
+          return reply.status(404).send({ error: { code: "NOT_FOUND", message: "Not found" } });
+        }
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        return reply.status(404).send("Not found\n");
       }
       const locale = (await application.localization.peelPrefix(path))?.locale;
       return await renderNotFound(reply, locale);
@@ -2704,18 +3519,27 @@ export async function registerSiteRoute(
 
   // Non-GET extension routes (session/admin mutations): dispatch-only.
   for (const method of ["POST", "PUT", "DELETE", "PATCH"] as const) {
-    fastify.route({
-      method,
-      url: "/*",
-      async handler(request: FastifyRequest, reply: FastifyReply) {
-        const path = new URL(request.url, "http://local").pathname;
-        const localePrefix = await application.localization.peelPrefix(path).catch(() => null);
-        const extensionScope: { readonly path: string; readonly locale?: string } =
-          localePrefix === null ? { path } : localePrefix;
-        if (await tryExtensionDispatch(request, reply, extensionScope)) return reply;
-        void reply.header("content-type", "application/json; charset=utf-8");
-        return reply.status(404).send({ error: { code: "NOT_FOUND", message: "no such route" } });
-      },
-    });
+    const register = (instance: FastifyInstance) =>
+      instance.route({
+        method,
+        url: "/*",
+        async handler(request: FastifyRequest, reply: FastifyReply) {
+          const path = new URL(request.url, "http://local").pathname;
+          const localePrefix = await application.localization.peelPrefix(path).catch(() => null);
+          const extensionScope: { readonly path: string; readonly locale?: string } =
+            localePrefix === null ? { path } : localePrefix;
+          if (await tryExtensionDispatch(request, reply, extensionScope)) return reply;
+          void reply.header("content-type", "application/json; charset=utf-8");
+          return reply.status(404).send({ error: { code: "NOT_FOUND", message: "no such route" } });
+        },
+      });
+    if (method === "POST") {
+      void fastify.register(async (instance) => {
+        registerExtensionFormParser(instance);
+        register(instance);
+      });
+    } else {
+      register(fastify);
+    }
   }
 }

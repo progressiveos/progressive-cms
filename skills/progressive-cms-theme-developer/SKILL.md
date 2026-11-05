@@ -1,6 +1,6 @@
 # Skill: progressive-cms-theme-developer
 
-**Version:** 1.3.0 (active-theme CLI update) (PCMS-SKILL-T007; PCMS-PCPUB E10 transport policy)
+**Version:** 1.3.1 (paired Markdown guidance)
 **Purpose:** adapt a design (static HTML/CSS, Astro/Tailwind site, Figma
 export, legacy template) into a **human-maintainable Progressive CMS Theme**
 using the Git working tree, public Theme Contract and machine discovery —
@@ -51,11 +51,10 @@ deep instructions = `references/`; short launcher prompt =
    (`GET /discovery/navigation/placements`), media presets
    (`GET /discovery/media/presets`), theme settings schema and active theme
    state (`GET /theme/state`, `GET /discovery/theme`).
-4. Read public contract documentation (`docs/specs/
-   Progressive_CMS_Theme_Contract_v1_Spec.md`) and — if the task permits — an
+4. Read the public [Theme Contract guide](../../docs/themes.md) and — if the task permits — an
    existing reference theme as a contract example. **Do not** reconstruct the
    contract by reading Core implementation files (`packages/*` internals);
-   that is contract archaeology and counts as an eval violation.
+   that is unsupported contract archaeology.
 
 ## Transport policy
 
@@ -86,6 +85,8 @@ material when the target is a remote site.
    navigation_placements, media_presets, settings_schema, assets).
 4. **Implement templates/components** with readable names; replace hardcoded
    content with CMS bindings (entry fields, blocks, placements, settings).
+   For Core 1.0.0-rc.36+, provide a paired `markdown_file` for new page templates
+   and follow the Markdown contract below.
 5. **Implement every declared block renderer** — a template that can receive
    a block type it cannot render is a defect; add fixtures for each renderer.
 6. **Design tokens + typed settings** — colors/typography/spacing/breakpoints
@@ -100,7 +101,7 @@ material when the target is a remote site.
    blocking diagnostics; then `cms site validate --json`.
 10. **Preview** the candidate theme and run Playwright responsive +
     accessibility checks (mobile/tablet/desktop). Fix and re-run.
-11. **Human maintainability gate (T010)**: write/update `THEME.md` —
+11. **Human maintainability gate**: write/update `THEME.md` —
     theme structure, tokens, header/footer, buttons, page templates, block
     renderers, media presets, settings, fixtures, common changes, build &
     validation. Update `CHANGELOG.md`. Test: can a normal frontend developer
@@ -131,7 +132,7 @@ For a site-specific visual need, in order:
 
 ## Error handling
 
-Classification and responses are in common rules §10. Theme-specific notes:
+Classification and responses are in [the shared error rules](../references/common-operating-rules.md#10-error-classification-and-response). Theme-specific notes:
 
 - `theme validate` failures are VALIDATION — fix the reported contract
   issue; never weaken the theme manifest to pass.
@@ -147,3 +148,43 @@ End with a report valid against
 target, actor, task, changed files, schema proposal (if any), validation
 gates, preview/test results, activation state (expected: `none` or
 `blocked_by_permission`), warnings, remaining human action. No secrets.
+
+## Published Markdown (Core 1.0.0-rc.36+)
+
+New themes should pair each page template with a Markdown Liquid file. Existing
+themes without a pair retain automatic Core fallback; adding a pair gives it
+priority. Use the same published data, with `body_markdown`, `blocks_markdown`,
+`fallback_markdown` and `entry.fields.<field>_markdown` semantic projections.
+Never scrape HTML or export navigation, forms, private settings or decorative
+content as the main document. Keep substantive content complete.
+
+Example template binding within `templates[]`:
+
+```json
+{"id":"page-default","file":"templates/page.liquid","markdown_file":"templates/page.md.liquid","markdown_contract":{"version":1,"dependencies":["entry.fields.title","entry.fields.intro_markdown","blocks_markdown"]}}
+```
+
+```liquid
+# {{ entry.fields.title }}
+
+{{ entry.fields.intro_markdown }}
+
+{{ blocks_markdown }}
+```
+
+The optional dependency declaration is checked against immutable template source;
+it cannot assert availability by itself. Core infers dependencies without it.
+Discovery verifies a bounded Liquid subset: scalar/projection output, safe
+filters, scalar if/unless guards, bounded array loops and static include/render.
+Arbitrary tags, dynamic partials, false declarations and exhausted budgets are
+diagnostic exclusions. An available direct Markdown URL can therefore be absent
+from discovery when its Liquid cannot be proven safely. A heading alone does not
+prove substantive content. See the exact subset/limits in
+[Themes](../../docs/themes.md).
+
+On authorized published test material, check `.md` (root `/index.md`), HTML with
+`Accept: text/markdown` and `/llms.txt`. Every advertised Markdown URL must return
+substantive Markdown with HTTP 200 with expected fields, blocks, media and useful links. Empty or
+unsupported projection returns HTTP 406; fix the content/template rather than hiding
+that failure. Validate locale and selected theme revision, settings and robots
+when a document is excluded.

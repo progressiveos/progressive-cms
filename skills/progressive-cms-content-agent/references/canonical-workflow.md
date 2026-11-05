@@ -192,7 +192,7 @@ workflow, not an unsupported v2 upload. The skill still supports v1 servers.
 - The token is the enforcement; this skill never grants anything.
 - No direct PostgreSQL, no file-system shortcuts, no Core patches.
 - Bounded retry (≤3) for TRANSIENT only, same idempotency key. Error
-  classes and responses: common rules §10.
+  classes and responses: [the shared error rules](../../references/common-operating-rules.md#10-error-classification-and-response).
 - One logical submission = one stable idempotency key; a rerun of the same
   task performs zero duplicate mutations.
 

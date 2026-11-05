@@ -41,6 +41,9 @@ export interface ExtensionOperationView {
 export interface ExtensionOperationCallContext {
   readonly actor: { readonly id: string; readonly type: string };
   readonly requestId: string;
+  /** Opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01);
+   * present only when the transport resolved a trustworthy peer. */
+  readonly sourceKey?: string;
   /**
    * Resolved runtime of the calling extension: validated config with
    * `$secret_ref` slots resolved. `config === null` means installed+enabled
@@ -247,6 +250,7 @@ export function createExtensionOperationsService(
         input,
         actor: callContext.actor,
         requestId: callContext.requestId,
+        ...(callContext.sourceKey === undefined ? {} : { sourceKey: callContext.sourceKey }),
         extension: callContext.extension,
         site: callContext.site,
         locale: callContext.locale,

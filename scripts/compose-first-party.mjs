@@ -138,6 +138,9 @@ function composeModuleExpr(pkg) {
   const rel = pkg.dir.replace("extensions/", "");
   const alias = importAlias(pkg, "module");
   if (manifest.entrypoint?.factory !== undefined) {
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,99}$/.test(manifest.entrypoint.factory)) {
+      fail(`${pkg.dir}: invalid extension factory name`);
+    }
     return {
       imports: [
         `import { ${manifest.entrypoint.factory} as ${alias} } from "./${rel}/src/index.js";`,
@@ -180,6 +183,16 @@ function composeModuleExpr(pkg) {
   for (const job of manifest.registrations?.jobs ?? []) {
     named.push([job.handler, importAlias(pkg, `${job.handler}`)]);
   }
+  // D07 count handlers use the same trusted named-export mechanism.
+  for (const obligation of manifest.registrations?.obligations ?? []) {
+    named.push([obligation.count_handler, importAlias(pkg, `${obligation.count_handler}`)]);
+  }
+  for (const [name] of named) {
+    if (typeof name !== "string" || !/^[a-z][a-zA-Z0-9_]{0,99}$/.test(name)) {
+      fail(`${pkg.dir}: invalid extension handler name`);
+    }
+  }
+  const uniqueNamed = [...new Map(named.map(([name, handlerAlias]) => [name, handlerAlias]))];
   if (named.length === 0) {
     return {
       imports: [`import * as ${alias} from "./${rel}/src/index.js";`],
@@ -187,11 +200,11 @@ function composeModuleExpr(pkg) {
     };
   }
   return {
-    imports: named.map(
+    imports: uniqueNamed.map(
       ([name, handlerAlias]) =>
         `import { ${name} as ${handlerAlias} } from "./${rel}/src/index.js";`,
     ),
-    expr: `{ ${named
+    expr: `{ ${uniqueNamed
       .map(([name, handlerAlias]) => `${name}: ${handlerAlias}`)
       .join(", ")} } as unknown as Record<string, unknown>`,
   };

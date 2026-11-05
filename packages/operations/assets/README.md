@@ -3,7 +3,7 @@
 ## pcms-mark.svg
 
 Progressive CMS gradient "P" mark used by the Core-owned maintenance page
-(CMS Maintenance Mode and the nginx emergency fallback — task brief §27/§70)
+(CMS Maintenance Mode and the nginx emergency fallback)
 and by the Admin shell/favicon (`apps/admin/public/brand/mark-2026.svg` is
 the same artwork).
 

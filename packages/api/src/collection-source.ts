@@ -157,20 +157,19 @@ export function parseCollectionFeedQuery(
  * unpublished or unrouted ids simply do not appear; the returned order is the
  * caller's requested order.
  */
-export async function queryPublishedCardRows(
-  deps: CollectionFeedDeps,
+function publishedCardRowsQuery(
   input: {
     readonly context: string;
     readonly entryIds: readonly string[];
     readonly siteId?: string | null;
   },
-): Promise<readonly CollectionFeedItemRow[]> {
+  trackRequested = false,
+): { sql: string; params: readonly unknown[] } {
   const ids = [...new Set(input.entryIds)].filter((id) => STABLE_ID_RE.test(id));
-  if (ids.length === 0) return [];
   const routeLocale = input.context === "default" ? "x-default" : input.context;
   const sql = `
     WITH requested AS (
-      SELECT t.idx,
+      SELECT t.idx, t.entry_id AS requested_entry_id,
              CASE WHEN $3::text = 'default' THEN t.entry_id ELSE (
                SELECT translation.id FROM entries translation
                WHERE COALESCE(translation.translation_group_id, translation.id) = (
@@ -181,7 +180,7 @@ export async function queryPublishedCardRows(
              ) END AS entry_id
       FROM unnest($1::uuid[]) WITH ORDINALITY AS t(entry_id, idx)
     )
-    SELECT p.entity_id::text AS entry_id, e.content_type_id AS content_type,
+    SELECT ${trackRequested ? "q.idx, q.requested_entry_id::text, " : ""}p.entity_id::text AS entry_id, e.content_type_id AS content_type,
            -- The row contract promises an ISO instant (the collection feed
            -- gets it as JSON text); a raw timestamptz would arrive as a Date.
            to_jsonb(p.published_at) #>> '{}' AS published_at,
@@ -201,14 +200,68 @@ export async function queryPublishedCardRows(
       LIMIT 1
     ) rt ON true
     ORDER BY q.idx`;
-  const { rows } = await deps.pool.query<CollectionFeedItemRow & Record<string, unknown>>(sql, [
-    ids,
-    input.context,
-    input.context,
-    routeLocale,
-    input.siteId ?? null,
-  ]);
-  return rows;
+  return { sql, params: [ids, input.context, input.context, routeLocale, input.siteId ?? null] };
+}
+
+export async function queryPublishedCardRows(
+  deps: CollectionFeedDeps,
+  input: {
+    readonly context: string;
+    readonly entryIds: readonly string[];
+    readonly siteId?: string | null;
+  },
+): Promise<readonly CollectionFeedItemRow[]> {
+  if (input.entryIds.length === 0) return [];
+  const query = publishedCardRowsQuery(input);
+  return (
+    await deps.pool.query<CollectionFeedItemRow & Record<string, unknown>>(query.sql, query.params)
+  ).rows;
+}
+
+/** Whole published rows only: callers must diagnose exclusions, never render a truncated card. */
+export async function queryPublishedCardRowsBounded(
+  deps: CollectionFeedDeps,
+  input: {
+    readonly context: string;
+    readonly entryIds: readonly string[];
+    readonly siteId?: string | null;
+  },
+): Promise<{
+  readonly items: readonly CollectionFeedItemRow[];
+  readonly excludedEntryIds: readonly string[];
+  readonly resolvedEntryIds: Readonly<Record<string, string>>;
+}> {
+  const ids = [...new Set(input.entryIds)].filter((id) => STABLE_ID_RE.test(id));
+  const requested = ids.slice(0, 1000);
+  if (requested.length === 0) return { items: [], excludedEntryIds: [], resolvedEntryIds: {} };
+  const query = publishedCardRowsQuery({ ...input, entryIds: requested }, true);
+  const result = await deps.pool.query<{
+    items: CollectionFeedItemRow[];
+    excluded: string[];
+    resolved: Record<string, string>;
+  }>(
+    `WITH candidates AS MATERIALIZED (${query.sql}),
+      sizes AS MATERIALIZED (
+        SELECT candidates.*, octet_length((to_jsonb(candidates) - 'idx' - 'requested_entry_id')::text)::bigint AS bytes
+        FROM candidates
+      ), budget AS MATERIALIZED (
+        SELECT sizes.*, sum(CASE WHEN bytes <= $6 THEN bytes ELSE 0 END) OVER (ORDER BY idx) AS used
+        FROM sizes
+      )
+      SELECT COALESCE(jsonb_agg(to_jsonb(budget) - 'idx' - 'requested_entry_id' - 'bytes' - 'used' ORDER BY idx)
+        FILTER (WHERE bytes <= $6 AND used <= $7), '[]'::jsonb) AS items,
+        COALESCE(jsonb_agg(requested_entry_id ORDER BY idx)
+        FILTER (WHERE bytes > $6 OR used > $7), '[]'::jsonb) AS excluded,
+        COALESCE(jsonb_object_agg(requested_entry_id, entry_id)
+        FILTER (WHERE bytes <= $6 AND used <= $7), '{}'::jsonb) AS resolved
+      FROM budget`,
+    [...query.params, 128 * 1024, 2 * 1024 * 1024],
+  );
+  return {
+    items: result.rows[0]?.items ?? [],
+    excludedEntryIds: [...(result.rows[0]?.excluded ?? []), ...ids.slice(1000)],
+    resolvedEntryIds: result.rows[0]?.resolved ?? {},
+  };
 }
 
 /**
@@ -218,10 +271,11 @@ export async function queryPublishedCardRows(
  * bounded offset paging (page/page_size — feeds need total + stable pages,
  * not keyset cursors).
  */
-export async function queryCollectionFeed(
+function collectionFeedQuery(
   deps: CollectionFeedDeps,
   input: CollectionFeedInput,
-): Promise<CollectionFeedResult> {
+  bounded = false,
+): { sql: string; params: readonly unknown[] } {
   for (const key of input.contentTypes) {
     if (!deps.isKnownContentType(key)) {
       throw new ApiError(
@@ -294,6 +348,27 @@ export async function queryCollectionFeed(
   // Base: everything the collection could ever return for this context;
   // feed: base under the active tag filter; facets intentionally read BASE so
   // the UI can always offer every tag plus a reset (Theme Contract §43).
+  // Filter aggregate inputs by the measured budget; CASE around jsonb_agg alone still allocates.
+  const selectedTags = `
+    SELECT v.value AS tag, count(*)::int AS count
+    FROM base,
+         jsonb_array_elements_text(
+           CASE WHEN jsonb_typeof(base.fields->$6::text) = 'array'
+                THEN base.fields->$6::text ELSE '[]'::jsonb END
+         ) AS v
+    GROUP BY v.value
+    ORDER BY count(*) DESC, v.value ASC
+    LIMIT 100`;
+  const selectedItems = `
+    SELECT * FROM feed
+    ORDER BY ${orderBy}
+    LIMIT $8 OFFSET $9`;
+  const tagJsonObject = "jsonb_build_object('tag', t.tag, 'count', t.count)";
+  const itemJsonObject = `jsonb_build_object(
+    'entry_id', f.entry_id, 'content_type', f.content_type,
+    'published_at', f.published_at, 'fields', f.fields,
+    'blocks', f.blocks, 'route_path', f.route_path,
+    'route_locale', f.route_locale)`;
   const sql = `
     WITH RECURSIVE subtree AS (
       SELECT child.id FROM entries child
@@ -327,49 +402,63 @@ export async function queryCollectionFeed(
     feed AS (
       SELECT * FROM base
       WHERE $5::text IS NULL OR fields->$6::text @> $7::jsonb
-    )
+    )${
+      bounded
+        ? `,
+    selected_tags AS MATERIALIZED (${selectedTags}),
+    selected_items AS MATERIALIZED (${selectedItems}),
+    dependency_budgets AS MATERIALIZED (
+      SELECT
+        (SELECT COALESCE(sum(octet_length((${tagJsonObject})::text)::bigint), 0)
+                  + 2 * count(*) + 2 FROM selected_tags t) AS tags_bytes,
+        (SELECT COALESCE(sum(octet_length((${itemJsonObject})::text)::bigint), 0)
+                  + 2 * count(*) + 2 FROM selected_items f) AS items_bytes
+    )`
+        : ""
+    }
     SELECT (SELECT count(*) FROM feed)::int AS total,
       COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('tag', t.tag, 'count', t.count))
-        FROM (
-          SELECT v.value AS tag, count(*)::int AS count
-          FROM base,
-               jsonb_array_elements_text(
-                 CASE WHEN jsonb_typeof(base.fields->$6::text) = 'array'
-                      THEN base.fields->$6::text ELSE '[]'::jsonb END
-               ) AS v
-          GROUP BY v.value
-          ORDER BY count(*) DESC, v.value ASC
-          LIMIT 100
-        ) t
+        ${
+          bounded
+            ? `SELECT CASE WHEN budget.tags_bytes <= $13 THEN (
+                 SELECT jsonb_agg(${tagJsonObject} ORDER BY t.count DESC, t.tag ASC)
+                 FROM selected_tags t WHERE budget.tags_bytes <= $13
+               ) ELSE 'null'::jsonb END FROM dependency_budgets budget`
+            : `SELECT jsonb_agg(${tagJsonObject}) FROM (${selectedTags}) t`
+        }
       ), '[]'::jsonb) AS tags,
       COALESCE((
-        SELECT jsonb_agg(jsonb_build_object(
-                 'entry_id', f.entry_id, 'content_type', f.content_type,
-                 'published_at', f.published_at, 'fields', f.fields,
-                 'blocks', f.blocks, 'route_path', f.route_path,
-                 'route_locale', f.route_locale))
-        FROM (
-          SELECT * FROM feed
-          ORDER BY ${orderBy}
-          LIMIT $8 OFFSET $9
-        ) f
+        ${
+          bounded
+            ? `SELECT CASE WHEN budget.items_bytes <= $13 THEN (
+                 SELECT jsonb_agg(${itemJsonObject} ORDER BY ${orderBy})
+                 FROM selected_items f WHERE budget.items_bytes <= $13
+               ) ELSE 'null'::jsonb END FROM dependency_budgets budget`
+            : `SELECT jsonb_agg(${itemJsonObject}) FROM (${selectedItems}) f`
+        }
       ), '[]'::jsonb) AS items`;
-  const { rows } = await deps.pool.query<FeedRow>(sql, [
-    routeLocale,
-    input.context,
-    [...input.contentTypes],
-    input.sectionEntryId,
-    input.tag,
-    input.tagField,
-    tagJson,
-    input.pageSize,
-    offset,
-    excluded,
-    order.by === "field" ? (order.field ?? null) : null,
-    input.siteId ?? null,
-  ]);
-  const row = rows[0];
+
+  return {
+    sql,
+    params: [
+      routeLocale,
+      input.context,
+      [...input.contentTypes],
+      input.sectionEntryId,
+      input.tag,
+      input.tagField,
+      tagJson,
+      input.pageSize,
+      offset,
+      excluded,
+      order.by === "field" ? (order.field ?? null) : null,
+      input.siteId ?? null,
+      ...(bounded ? [128 * 1024] : []),
+    ],
+  };
+}
+
+function feedResult(input: CollectionFeedInput, row: FeedRow | undefined): CollectionFeedResult {
   if (row === undefined) {
     return {
       total: 0,
@@ -389,4 +478,80 @@ export async function queryCollectionFeed(
     tags: row.tags ?? [],
     items: row.items ?? [],
   };
+}
+
+export async function queryCollectionFeed(
+  deps: CollectionFeedDeps,
+  input: CollectionFeedInput,
+): Promise<CollectionFeedResult> {
+  const query = collectionFeedQuery(deps, input);
+  const { rows } = await deps.pool.query<FeedRow>(query.sql, query.params);
+  return feedResult(input, rows[0]);
+}
+
+export type CollectionFeedBatchResult =
+  | { readonly result: CollectionFeedResult; readonly reason: null }
+  | {
+      readonly result: null;
+      readonly reason: "collection_dependency_limit" | "collection_dependency_invalid";
+    };
+
+/** Batches the existing feed query; incomplete results never masquerade as empty feeds. */
+export async function queryCollectionFeedsBatch(
+  deps: CollectionFeedDeps,
+  inputs: readonly CollectionFeedInput[],
+): Promise<readonly CollectionFeedBatchResult[]> {
+  if (inputs.length === 0) return [];
+  if (inputs.length > 32)
+    throw new ApiError("COLLECTION_SOURCE_INVALID", "batch exceeds 32 collection requests", {
+      status: 400,
+    });
+  const params: unknown[] = [];
+  const invalid = new Set<number>();
+  const statements = inputs.flatMap((input, ord) => {
+    try {
+      if (
+        !Number.isInteger(input.pageSize) ||
+        input.pageSize < 1 ||
+        input.pageSize > COLLECTION_MAX_PAGE_SIZE ||
+        !Number.isInteger(input.page) ||
+        input.page < 1 ||
+        input.page > 1000
+      ) {
+        throw new ApiError("COLLECTION_PAGE_INVALID", "invalid bounded collection page", {
+          status: 400,
+        });
+      }
+      const query = collectionFeedQuery(deps, input, true);
+      const offset = params.length;
+      params.push(...query.params);
+      return [
+        `SELECT ${ord} AS ord, CASE WHEN feed.items = 'null'::jsonb OR feed.tags = 'null'::jsonb THEN NULL ELSE to_jsonb(feed) END AS value FROM (${query.sql.replace(/\$(\d+)/g, (_, index: string) => `$${Number(index) + offset}`)}) feed`,
+      ];
+    } catch {
+      invalid.add(ord);
+      return [];
+    }
+  });
+  if (!statements.length)
+    return inputs.map(() => ({ result: null, reason: "collection_dependency_invalid" as const }));
+
+  const rowLimit = params.push(128 * 1024);
+  const totalLimit = params.push(2 * 1024 * 1024);
+  const { rows } = await deps.pool.query<{ ord: number; value: FeedRow | null }>(
+    `WITH candidates AS MATERIALIZED (${statements.join(" UNION ALL ")}),
+      sizes AS MATERIALIZED (SELECT *, octet_length(value::text)::bigint AS bytes FROM candidates),
+      budget AS (SELECT *, sum(CASE WHEN bytes <= $${rowLimit} THEN bytes ELSE 0 END) OVER (ORDER BY ord) AS used FROM sizes)
+      SELECT ord, CASE WHEN bytes <= $${rowLimit} AND used <= $${totalLimit} THEN value ELSE NULL END AS value
+      FROM budget ORDER BY ord`,
+    params,
+  );
+  return inputs.map((input, index) => {
+    if (invalid.has(index))
+      return { result: null, reason: "collection_dependency_invalid" as const };
+    const row = rows.find((row) => row.ord === index);
+    return row?.value == null
+      ? { result: null, reason: "collection_dependency_limit" }
+      : { result: feedResult(input, row.value), reason: null };
+  });
 }

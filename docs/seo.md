@@ -30,6 +30,10 @@ Core selects/generates `og-v1` (1200×630 JPEG) at semantic assignment/preview/v
 
 Use `GET /api/v1/discovery/seo/preview` and `/discovery/seo/structured-data` with `?entry_id=<entry-id>`, then validate with `GET /api/v1/discovery/seo/validate?entry_id=<entry-id>` (seo.validate permission). Inspect real public HTML after publication: one title/description/canonical, `og:image`, `twitter:image`, robots and appropriate JSON-LD. Confirm `/robots.txt` and `/sitemap.xml` against the published canonical routes. Themes cannot replace protected Core head metadata.
 
+## Markdown representation and discovery
+
+Published pages can also respond to `Accept: text/markdown` or an explicit `.md` URL. The explicit Markdown URL is noindex and points back to the HTML canonical; negotiated Markdown keeps the HTML page's effective robots and canonical policy. This does not make the canonical HTML page noindex. `GET /llms.txt` is a bounded inventory of public sitemap pages whose Markdown output can be proven; it may omit a page that still renders directly. See [Markdown representations](markdown.md) for negotiation, headers, availability controls and the discovery limits.
+
 ## Search-provider ownership verification
 
 This is separate from a Yandex Metrica counter check. Use a real proof obtained from the site owner's Yandex Webmaster or Google Search Console account; never invent a token. The dedicated Admin tab is **Settings → Site ownership verification** at `/admin/#/settings?tab=verification`; Analytics links directly to it. On targets with this feature, follow these steps:

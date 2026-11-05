@@ -3,6 +3,7 @@
 // fields, SEO overrides and social overrides stay clearly separated.
 import { useCallback, useEffect, useState } from "react";
 import { apiGet, apiPut } from "../../../api/client.js";
+import { useAuth } from "../../../auth/AuthContext.js";
 import { Dialog } from "../../../design/dialog.js";
 import { useToast } from "../../../design/toast.js";
 import {
@@ -28,6 +29,13 @@ interface SeoDocumentWire {
   readonly social_description: string | null;
   readonly social_image: { readonly asset_id: string } | null;
   readonly structured_data_type_hint: string | null;
+}
+
+interface EntryMarkdownWire {
+  readonly enabled: boolean;
+  readonly generation: number;
+  readonly globalEnabled: boolean;
+  readonly globalGeneration: number;
 }
 
 interface ResolvedValue {
@@ -166,6 +174,7 @@ function ProvenanceLine(props: {
 }
 
 export function SeoTab(props: { readonly entryId: string }) {
+  const auth = useAuth();
   const toast = useToast();
   const [document, setDocument] = useState<SeoDocumentWire | null>(null);
   const [resolved, setResolved] = useState<ResolvedWire | null>(null);
@@ -173,16 +182,20 @@ export function SeoTab(props: { readonly entryId: string }) {
   const [busy, setBusy] = useState(false);
   const [pickingImage, setPickingImage] = useState(false);
   const [ldOpen, setLdOpen] = useState(false);
+  const [markdown, setMarkdown] = useState<EntryMarkdownWire | null>(null);
+  const [markdownBusy, setMarkdownBusy] = useState(false);
 
   const reload = useCallback(() => {
     setLoadError(null);
     Promise.all([
       apiGet<{ document: SeoDocumentWire | null }>(`/entries/${props.entryId}/seo`),
       apiGet<ResolvedWire>(`/discovery/seo/metadata/${props.entryId}`).catch(() => null),
+      apiGet<EntryMarkdownWire>(`/entries/${props.entryId}/markdown`),
     ])
-      .then(([stored, resolvedResult]) => {
+      .then(([stored, resolvedResult, markdownSettings]) => {
         setDocument(stored.document ?? { ...EMPTY_DOCUMENT });
         setResolved(resolvedResult);
+        setMarkdown(markdownSettings);
       })
       .catch(() => setLoadError(t("seo.load_failed")));
   }, [props.entryId]);
@@ -214,6 +227,23 @@ export function SeoTab(props: { readonly entryId: string }) {
     }
   };
 
+  const saveMarkdown = async (enabled: boolean) => {
+    if (markdown === null) return;
+    setMarkdownBusy(true);
+    try {
+      await apiPut(`/entries/${props.entryId}/markdown`, {
+        enabled,
+        expected_generation: markdown.generation,
+      });
+      toast(t("markdown.entry_saved"), "success");
+      reload();
+    } catch {
+      toast(t("markdown.entry_save_failed"), "error");
+    } finally {
+      setMarkdownBusy(false);
+    }
+  };
+
   const origin = window.location.origin;
   const title = resolved?.resolved.title.value ?? document.seo_title ?? t("seo.default_title");
   const description = resolved?.resolved.description.value ?? document.meta_description ?? "";
@@ -223,6 +253,21 @@ export function SeoTab(props: { readonly entryId: string }) {
     <div data-testid="seo-tab">
       <div className="pcms-columns pcms-columns--tree">
         <div>
+          {markdown?.globalEnabled ? (
+            <section className="pcms-panel" data-testid="entry-markdown-settings">
+              <h3>{t("markdown.entry_title")}</h3>
+              <p className="pcms-field__hint">{t("markdown.entry_hint")}</p>
+              <label className="pcms-check">
+                <input
+                  type="checkbox"
+                  checked={markdown.enabled}
+                  disabled={markdownBusy || !auth.can("content.edit")}
+                  onChange={(event) => void saveMarkdown(event.target.checked)}
+                />
+                {t("markdown.entry_enabled")}
+              </label>
+            </section>
+          ) : null}
           <h3>{t("seo.overrides_title")}</h3>
           <Field label={t("seo.title_label")} hint={t("seo.title_hint")}>
             <Input

@@ -1,6 +1,6 @@
 # Choose editable content and theme composition
 
-Discover Content Types, registered blocks and accepted theme templates first. Reuse a fitting existing type. For a new model, start from [content-types.json](../assets/examples/content-types.json):
+Discover Content Types, registered blocks and accepted theme templates first. Reuse a fitting existing type. For extension blocks, take the id and props schema from `/discovery/blocks`; use the namespaced id's `@1` renderer only when that extension is deployed. For a new model, start from [content-types.json](../assets/examples/content-types.json):
 
 | Content | Example type | bodyPolicy | Rendering |
 |---|---|---|---|
@@ -19,3 +19,9 @@ Use `entry.title`, `entry.fields`, Core-rendered `body_html`/`blocks_html`, disc
 The starter puts news/project feeds on its generic page template. Condition them or declare separate templates for the intended landing pages; do not leave both feeds on contacts or every service page. Use the [collections reference](collections.md) for feed scope, ordering, card projection and `related_content` options. Forms use the returned definition id and supported scalar/consent schema. Revisit renderer conversion when changing field types.
 
 Core validates `payload.blocks` under `block_document`; a `block_document`-typed field has no independent full block-tree revalidation pass. Validate the explicit document and inspect preview/public rendering. Write acceptance alone is not render acceptance.
+
+## Markdown output for published pages
+
+Markdown is a second representation of the selected published revision. Core supplies a fallback if a template has no paired Markdown file; new themes should add `markdown_file` to the HTML template manifest entry. A paired file can use `entry.title`, `entry.fields.<field>_markdown`, `body_markdown`, `blocks_markdown` and `fallback_markdown`; use `blocks_markdown` for Block Document content and `body_markdown` for RichText bodies.
+
+The optional `markdown_contract` uses `version: 1` and unique `dependencies` with the dotted paths actually read by the Liquid template and its partials. This declaration is statically checked; it does not turn availability on. Keep the paired template within the analyzer's bounded Liquid subset and preserve Markdown projections when they are meant to prove substantive content. A title or H1 alone is not content. The starter contains a page and article example.

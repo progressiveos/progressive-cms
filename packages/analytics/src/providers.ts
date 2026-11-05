@@ -150,11 +150,14 @@ ym(${id}, "init", ${JSON.stringify(options)}, {
                 ],
               }
             : {}),
-          // Counter-check debugger (`?_ym_debug=2` check flow) renders its
-          // panel through style ATTRIBUTES — hashes can never authorize those
-          // (reproduced 2026-10-18). Diagnostic-grade, provider-gated; themes
-          // can never declare this channel (§34).
-          ...(cfg.debugMode ? { style_src_attr: ["'unsafe-inline'"] } : {}),
+          // Counter-check injects inline <style> blocks and style attributes.
+          // Keep the page-wide relaxation provider-gated and default-off.
+          ...(cfg.debugMode
+            ? {
+                style_src: ["'unsafe-inline'"],
+                style_src_attr: ["'unsafe-inline'"],
+              }
+            : {}),
         },
         blobFrame: cfg.webvisor,
       },

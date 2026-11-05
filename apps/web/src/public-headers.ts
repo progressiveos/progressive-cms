@@ -46,7 +46,12 @@ export function publicSecurityHeaders(
   },
 ): PublicSecurityHeaders {
   const declared: Record<string, string[]> = { ...(csp ?? {}) } as Record<string, string[]>;
-  const mergedStyle = [...(declared.style_src ?? []), ...inlineStyleHashes];
+  const diagnosticInlineStyles = system?.origins.style_src?.includes("'unsafe-inline'") === true;
+  // CSP ignores unsafe-inline when the same directive contains a hash source.
+  const mergedStyle = [
+    ...(declared.style_src ?? []),
+    ...(diagnosticInlineStyles ? [] : inlineStyleHashes),
+  ];
   if (mergedStyle.length > 0) declared.style_src = mergedStyle;
   if (system !== undefined) {
     for (const [directive, origins] of Object.entries(system.origins)) {

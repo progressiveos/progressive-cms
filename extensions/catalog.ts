@@ -137,7 +137,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: progressiveSiteMigration_module as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-site-migration",
-      contentSha256: "82951dc350d5d41329947e62f1997f9d936fc611b01a170b2ea12b4de4d9918b",
+      contentSha256: "5d3141c72f3cece1b43a5088edcfa4826d52618ab783464ac67c4433dd185c41",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
