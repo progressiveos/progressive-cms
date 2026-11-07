@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Progressive CMS — единый установщик: первичная установка И обновление.
-# PCMS-INSTALLER:5
+# PCMS-INSTALLER:7
 #
 # Один скрипт на все фазы жизни инстанса; режим определяется сам:
 #
@@ -318,6 +318,27 @@ if [ "$OPT_PG_SETUP_ONLY" = 1 ]; then
   exit 0
 fi
 
+# Product identity comes from the archive, never its download basename.
+is_core_archive() {
+  local listing
+  listing=$(unzip -Z1 "$1" 2>/dev/null) || return 1
+  grep -Eq '^[^/]+/build-metadata\.json$' <<< "$listing" &&
+    grep -Eq '^[^/]+/update-manifest\.json$' <<< "$listing" &&
+    ! grep -Eq '^[^/]+/extension-package\.json$' <<< "$listing"
+}
+
+retain_core_archives() {
+  local artifact kept=0
+  while IFS= read -r -d '' artifact; do
+    is_core_archive "$artifact" || continue
+    kept=$((kept + 1))
+    if [ "$kept" -gt 2 ]; then
+      rm -f -- "$artifact" "$artifact.sha256"
+      log "retention: удалён старый входящий Core-артефакт $(basename "$artifact")"
+    fi
+  done < <(find "$INCOMING" -maxdepth 1 -type f -name '*.zip' -printf '%T@ %p\0' | sort -z -nr | cut -z -d ' ' -f 2-)
+}
+
 install_from_incoming() ( # $1 = требовать ли целевой манифест (1 — только юнит)
   local require_manifest=$1 expect_version=$OPT_EXPECT_VERSION expect_policy=$OPT_EXPECT_POLICY
   [ -d "$INCOMING" ] || die "нет каталога: $INCOMING"
@@ -333,18 +354,12 @@ install_from_incoming() ( # $1 = требовать ли целевой мани
     expect_policy=$(jq -r .rollback_policy "$INCOMING/update-manifest.json")
   fi
 
-  # Keep the two newest release archives and remove stale temporary files.
-  if [ "$(id -u)" = "0" ]; then
-    find "$INCOMING" -maxdepth 1 -name '*.zip' -type f | sort -r | tail -n +3 | while read -r stale; do
-      rm -f "$stale" "$stale.sha256"
-      log "уборка incoming/: удалён $stale (ретеншен — два новейших zip)"
-    done
-    find "$INCOMING" -maxdepth 1 -type f ! -name '*.zip' ! -name '*.zip.sha256' ! -name 'update-manifest.json' -mtime +30 -delete 2>/dev/null || true
-  fi
-
+  # Select and verify the requested Core before any retention. Extension archives
+  # and pending deployment receipts belong to their own activation/recovery path.
   local matched= matched_count=0 artifact listing manifest_member embedded embedded_policy
   for artifact in "$INCOMING"/*.zip; do
     [ -e "$artifact" ] || continue
+    is_core_archive "$artifact" || continue
     if [ -f "$artifact.sha256" ]; then
       (cd "$(dirname "$artifact")" && sha256sum -c "$(basename "$artifact").sha256" --quiet)
     else
@@ -362,16 +377,17 @@ install_from_incoming() ( # $1 = требовать ли целевой мани
         matched=$artifact; matched_count=$((matched_count + 1))
       fi
     else
-      matched=$artifact; matched_count=$((matched_count + 1))
+      if [ -z "$matched" ] || [ "$artifact" -nt "$matched" ]; then matched=$artifact; fi
+      matched_count=$((matched_count + 1))
     fi
   done
 
   if [ "$matched_count" -gt 1 ]; then
-    [ -n "$expect_version" ] || { matched=$(ls -1t "$INCOMING"/*.zip | head -1); matched_count=1; }
+    [ -n "$expect_version" ] || matched_count=1
   fi
   [ "$matched_count" -eq 1 ] || die "ожидался ровно один артефакт для цели '${expect_version:-<новейший>}', найдено $matched_count"
 
-  local meta_member release_id target_dir stage src previous_target dir base stale fresh_copy tmp_pin
+  local meta_member release_id target_dir stage src previous_target dir base fresh_copy tmp_pin
   meta_member=$(unzip -Z1 "$matched" | grep '[^/]*/build-metadata.json$' | head -1)
   release_id=$(unzip -p "$matched" "$meta_member" | jq -r .releaseId)
   [ -n "$release_id" ] && [ "$release_id" != "null" ] || die "в артефакте нет releaseId"
@@ -445,11 +461,7 @@ install_from_incoming() ( # $1 = требовать ли целевой мани
     rm -rf -- "$dir"
     log "retention: удалён старый релиз $base"
   done
-  stale=$(ls -1t "$INCOMING"/*.zip 2>/dev/null | tail -n +3 || true)
-  for artifact in $stale; do
-    rm -f -- "$artifact" "$artifact.sha256"
-    log "retention: удалён старый входящий артефакт $(basename "$artifact")"
-  done
+  retain_core_archives
 
   # Self-refresh пина: только копией с маркером НЕ ниже исполняющейся версии —
   # старый артефакт не имеет права откатить логику установщика.
@@ -477,6 +489,28 @@ seed_reference_theme() {
 }
 
 cms_cli() { PCMS_CONFIG_FILE=$CONFIG node "$CURRENT/packages/cli/src/bin/cms.js" "$@"; }
+
+bootstrap_agent_access() {
+  local previous_umask capture
+  previous_umask=$(umask)
+  umask 077
+  capture=$(mktemp /root/.agent-bootstrap.XXXXXX) || die "не удалось создать защищённый временный файл для agent token"
+  chmod 600 "$capture"
+  if ! cms_cli token bootstrap --json > "$capture"; then
+    die "не удалось создать доступ cms-creator; защищённый ответ сохранён в $capture; проверьте OWNER и журнал установки"
+  fi
+  if jq -e '(.raw_secret | type) == "string" and (.raw_secret | length) > 0' "$capture" >/dev/null; then
+    mv -f "$capture" /root/agent-bootstrap.json || die "секрет создан, но не сохранён; защищённый файл сохранён в $capture"
+    chmod 600 /root/agent-bootstrap.json || die "секрет сохранён в /root/agent-bootstrap.json, но не удалось подтвердить права"
+    log "первичный доступ cms-creator сохранён в /root/agent-bootstrap.json"
+  elif jq -e 'type == "object" and (has("raw_secret") | not)' "$capture" >/dev/null; then
+    rm -f "$capture"
+    log "cms-creator уже настроен; существующий /root/agent-bootstrap.json сохранён"
+  else
+    die "ответ token bootstrap не распознан; защищённый файл сохранён в $capture"
+  fi
+  umask "$previous_umask"
+}
 
 install_cli_launcher() { # $1 = operator command path
   local target=$1 temp
@@ -533,6 +567,7 @@ NODE
 stage_artifact() { # $1 = путь к .zip; кладёт в incoming (+ sidecar при необходимости)
   local artifact=$1
   [ -r "$artifact" ] || die "артефакт не найден: $artifact"
+  is_core_archive "$artifact" || die "ожидался установочный Core ZIP с build/update manifests: $artifact"
   mkdir -p "$INCOMING"; chown root:"$SERVICE_USER" "$INCOMING"; chmod 2770 "$INCOMING"
   # Уже лежит в incoming (файл-пуш мимо --artifact) — копировать нечего.
   if [ "$(readlink -f "$artifact")" != "$(readlink -f "$INCOMING/$(basename "$artifact")")" ]; then
@@ -815,6 +850,7 @@ NODE
   else
     log "владелец уже существует — создание пропущено (пароль в /root/owner-bootstrap.txt от первой установки)"
   fi
+  bootstrap_agent_access
   unset OWNER_PW
 
   # --- итог --------------------------------------------------------------------------------
@@ -863,6 +899,12 @@ if [ "$OPT_PROFILE" = external-rp ]; then
 fi
 
 if [ "$IS_ORCHESTRATED" = 1 ]; then
+  # One installer and one orchestration engine; extension activation runs outside Web.
+  if [ -f "$INCOMING/extension-update.json" ]; then
+    cd "$CURRENT"
+    exec node "$CURRENT/apps/web/src/independent-update-runner.js" "$CONFIG" "$INCOMING"
+  fi
+
   # Юнит progressive-cms-install.service: только артефакт; миграции/рестарты/doctor
   # делает оркестратор (`cms update apply` / apply-update из реестра).
   if [ -f "$INCOMING/rollback-deployment.json" ]; then

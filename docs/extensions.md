@@ -14,6 +14,10 @@ Discover installed extension ids/versions and registered capabilities. Verify th
 
 The manifest is declarative; its named handlers resolve from trusted composition. Public Core does not promise a Shop domain simply because extensions can add views/fields/providers. Read [Payments](payments.md) for the separate adapter boundary.
 
+## Independently delivered packages
+
+Core can verify signed compiled extension packages independently of the Core release. The `pcms-extension-package/1` archive is bound to its extension id and signing key; inventory hashes, manifest and Core compatibility are checked before modules are imported. Configure `registry.independentExtensions.rootDir` and `trustFile` with protected operator-owned paths and trusted Ed25519 public keys. A package must still satisfy Extension Contract 2.0 and be explicitly enabled. A public Core download does not imply a public compiled extension package or catalogue card is available.
+
 ## Extension-defined Block Document blocks
 
 An extension can register a block through `registrations.blocks[]` using `block_type` and an optional object `props_schema`. Its block descriptor appears in `/discovery/blocks` when its artifact is deployed. Extension block ids are lowercase dotted namespaced ids (for example, `shop.listing`); a theme maps the discovered id and version to a renderer key such as `shop.listing@1`. Extension block props use schema version 1 and children are not allowed. See [Typed Blocks](blocks.md) for authoring and seal behavior.

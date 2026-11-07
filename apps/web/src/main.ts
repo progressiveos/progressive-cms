@@ -5,9 +5,11 @@
 // It never runs migrations (Operations spec §12). Since M09 it also mounts
 // the REST /api/v1 transport over the shared application layer.
 import { AsyncLocalStorage } from "node:async_hooks";
+import { execFile } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { createSecretBox } from "@pcms/auth";
 import { effectiveContentTypeDefinitions } from "@pcms/content";
 import {
@@ -21,8 +23,14 @@ import {
   loadConfig,
   loadSecrets,
   newRequestId,
+  resolveLocalHttpUrl,
   systemClock,
 } from "@pcms/core";
+import {
+  finishCoreUpdateLeaseAfterWebBoot,
+  loadIndependentExtensionCatalog,
+  recordIndependentGeneration,
+} from "@pcms/extensions/internal";
 import { readSelectedReleaseStatus, resolveReleaseIdentity } from "@pcms/operations";
 import type { FastifyInstance } from "fastify";
 import { loadContentTypeDefinitions } from "./content-types.js";
@@ -334,7 +342,30 @@ export async function buildWebRuntime(options: {
   // ADR-0017 R2: the update orchestrator reconciles installed extensions
   // with the shipped artifacts through the same trusted catalog (a second
   // lifecycle INSTANCE is fine — the DB revision/ledger is the authority).
-  const extensionCatalog = createFirstPartyExtensionCatalog({ pool });
+  let extensionCatalog = createFirstPartyExtensionCatalog({ pool });
+  if (config.registry?.independentExtensions !== undefined) {
+    const deployment = config.registry.independentExtensions;
+    extensionCatalog = await loadIndependentExtensionCatalog({
+      base: extensionCatalog,
+      storeDir: deployment.rootDir,
+      trustFile: deployment.trustFile,
+      coreVersion: readCmsVersionFromRelease(),
+      factoryInput: { pool },
+      ...(config.nodeEnv === "production"
+        ? {}
+        : { ownerUid: process.getuid?.() ?? 0, allowDev: true }),
+    });
+    await recordIndependentGeneration(
+      pool,
+      "web",
+      extensionCatalog,
+      readCmsVersionFromRelease(),
+    ).catch((error: unknown) =>
+      logger.warn("extension.generation.unavailable", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
   const updateOrchestrationPorts =
     updateManifestDocument === undefined
       ? undefined
@@ -346,7 +377,7 @@ export async function buildWebRuntime(options: {
           backupUnit: "progressive-cms-backup.service",
           installUnit: "progressive-cms-install.service",
           backupDir: "/var/backups/progressive-cms",
-          healthUrl: `http://127.0.0.1:${config.http.port}/health/ready`,
+          healthUrl: resolveLocalHttpUrl(config.http.host, config.http.port),
           pool,
           lifecycle: createExtensionLifecycleService({
             pool,
@@ -373,6 +404,26 @@ export async function buildWebRuntime(options: {
     ...(contentTypeDefinitions === undefined ? {} : { contentTypeDefinitions }),
     ...(config.seo?.environment === undefined ? {} : { seoEnvironment: config.seo.environment }),
     environmentClassification: config.nodeEnv === "production" ? "production" : "development",
+    ...(config.registry?.independentExtensions === undefined ||
+    releaseId === undefined ||
+    releaseRoot === undefined
+      ? {}
+      : {
+          registryExtensionDeployment: {
+            storeDir: config.registry.independentExtensions.rootDir,
+            trustFile: config.registry.independentExtensions.trustFile,
+            releaseId,
+            allowDev: config.nodeEnv !== "production",
+            ownerUid: config.nodeEnv === "production" ? 0 : (process.getuid?.() ?? 0),
+            schedule: async () => {
+              await promisify(execFile)("systemctl", [
+                "start",
+                "--no-block",
+                "progressive-cms-install.service",
+              ]);
+            },
+          },
+        }),
     // Community skills (off by default; the operator opts in via config).
     ...(config.skills?.communityDir === undefined
       ? {}
@@ -488,7 +539,13 @@ export async function buildWebRuntime(options: {
   // Public site (composition capability): Routing → published revision →
   // theme render; registered after the maintenance gate so anonymous
   // requests keep receiving the branded 503 while it is enabled.
-  await registerSiteRoute(fastify, { application, sourceKey: sourceKeyOf });
+  await registerSiteRoute(fastify, {
+    application,
+    sourceKey: sourceKeyOf,
+    ...(config.http.publicCspMode === undefined
+      ? {}
+      : { publicCspMode: config.http.publicCspMode }),
+  });
   registerMediaFilesRoute(fastify, { application });
   // Theme public assets (M17-T007; ADR-0011): the external-RP profile has no
   // in-container nginx, so the application serves /themes/<name>/assets/*.
@@ -566,6 +623,13 @@ export async function startWeb(options: {
   });
 
   const address = await fastify.listen({ port: config.http.port, host: config.http.host });
+  const booted = resolveReleaseIdentity(fileURLToPath(import.meta.url));
+  if (booted.mode === "release")
+    await finishCoreUpdateLeaseAfterWebBoot(pool, booted.identity.version).catch((error: unknown) =>
+      logger.warn("update.lease.boot_confirmation_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
   logger.info("web.ready", { operation: "web.boot", address, node: process.version });
   return runtime;
 }

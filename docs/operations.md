@@ -2,6 +2,18 @@
 
 Contract owner: Core operations and deployment scripts.
 
+## Creator credentials
+
+After creating the initial human OWNER, use `cms token bootstrap --json` to issue the fixed operational `Site-Creator` credential. Use `--rotate` to replace it and optionally `--ttl-hours 1..8760` to set its lifetime. Bootstrap is idempotent; the credential is shown once and installation stores it in `/root/agent-bootstrap.json` mode `0600`. Securely transfer it, then remove the bootstrap file. The fixed profile excludes access management and reserved PII, refund, privacy and Skills permissions.
+
+Once a trusted independent `progressive.shop` install is enabled, the primary creator can request its separate service account:
+
+```sh
+cms extensions creator-token progressive.shop --site example --environment production --yes --json
+```
+
+The CLI calls `POST /api/v1/extensions/progressive.shop/creator-token` with `site_key`, `environment` and optional `rotate`. The response is `no-store`; a repeated request does not return the secret again. Core derives Shop permissions from the trusted installed manifest and combines them with the fixed operational Core profile. It clamps target and lifetime to the parent credential, accepts no caller-supplied scope/account name, and the child cannot delegate. Parent revoke, expiry or rotation invalidates child credentials. Disabling Shop removes its handlers and Shop access but does not revoke the child's separately granted Core permissions. Do not place credentials in command history, logs or URLs.
+
 Check `cms doctor`, `cms info` and service logs before changing configuration in an authorized installed-operator context. Remote clients can check `/health/live` (process liveness), `/health/ready` (dependency readiness: 200 ready or 503 not_ready) and scoped `/api/v1/system/status`; public health bodies intentionally contain no secret/configuration diagnostics. Distinguish Web, Worker, database, proxy, outbox and provider failures. Keep secrets and access tokens out of diagnostic exports.
 
 The standard deployment includes backup and restore scripts. A backup set contains a database dump, media and configuration/release metadata with checksums; secret values are a separate recovery responsibility. Private backup sets and manifests are never public documentation assets. Restore rehearsals use disposable targets and must verify database/media consistency.

@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 // Extensions REST operations (PCMS-EXT-T019; Extensions spec §48). Transport
 // only — authorization/audit live in extensions-ops.ts. Discovery routes are
 // authenticated reads; lifecycle mutations are extensions.manage and audited.
 import { recordSecurityEvent } from "@pcms/auth";
 import type { ApplicationServices, OperationContext } from "../../context.js";
+import { ApiError } from "../../errors.js";
+import { provisionShopCreatorTokenOp } from "../../agent-creator-ops.js";
 import {
   clearExtensionSecretOp,
   getExtensionConfigOp,
@@ -23,6 +26,7 @@ import {
   listExtensions,
   uninstallExtension,
 } from "../../extensions-ops.js";
+import { registryExtensionPlan } from "../../registry-extension-ops.js";
 import type { ApiRoute, RouteResult } from "../registry.js";
 import { jsonBody } from "./helpers.js";
 
@@ -59,8 +63,77 @@ const UNINSTALL_SCHEMA = {
   },
 } as const;
 
+const SHOP_CREATOR_TOKEN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["site_key", "environment"],
+  properties: {
+    site_key: { type: "string", minLength: 1, maxLength: 200 },
+    environment: { type: "string", minLength: 1, maxLength: 200 },
+    rotate: { type: "boolean" },
+  },
+} as const;
+
 export function makeExtensionsRoutes(): ApiRoute[] {
   const routes: ApiRoute[] = [
+    {
+      spec: {
+        method: "POST",
+        url: "/extensions/progressive.shop/creator-token",
+        operationId: "provision_shop_creator_token",
+        summary: "Issue a scoped Shop-Creator credential for the current trusted Shop install.",
+        tag: "extensions",
+        auth: "authenticated",
+        csrf: true,
+        permission: "extensions.manage",
+        bodySchema: SHOP_CREATOR_TOKEN_SCHEMA,
+      },
+      async handle(app, ctx, request) {
+        const body = jsonBody(request) as {
+          site_key: string;
+          environment: string;
+          rotate?: boolean;
+        };
+        return {
+          status: 200,
+          body: await provisionShopCreatorTokenOp(app, ctx, body),
+          headers: { "cache-control": "no-store" },
+        };
+      },
+    },
+    {
+      spec: {
+        method: "GET",
+        url: "/extensions/:extensionId/assets/:digest/admin.js",
+        operationId: "get_extension_admin_module",
+        summary: "Verified independently deployed Admin module",
+        tag: "extensions",
+        auth: "authenticated",
+      },
+      async handle(app, _ctx, request) {
+        const { extensionId, digest } = request.params as { extensionId: string; digest: string };
+        const artifact = app.extensions.catalog.get(extensionId);
+        if (
+          !artifact?.independentPackage?.adminModule ||
+          artifact.independentPackage.digest !== digest ||
+          !(await app.extensions.lifecycle.enabledIds()).includes(extensionId)
+        )
+          throw new ApiError(
+            "EXTENSION_NOT_DEPLOYED",
+            "extension module is not available in this generation",
+            { status: 404 },
+          );
+        return {
+          status: 200,
+          body: readFileSync(artifact.independentPackage.adminModule),
+          headers: {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "private, max-age=31536000, immutable",
+            "x-content-type-options": "nosniff",
+          },
+        };
+      },
+    },
     {
       spec: {
         method: "GET",
@@ -171,13 +244,36 @@ export function makeExtensionsRoutes(): ApiRoute[] {
         bodySchema: {
           type: "object",
           additionalProperties: false,
-          required: ["manifest"],
-          properties: { manifest: { type: "object" } },
+          oneOf: [{ required: ["manifest"] }, { required: ["product_id", "version"] }],
+          properties: {
+            manifest: { type: "object" },
+            product_id: { type: "string", maxLength: 130 },
+            version: { type: "string", maxLength: 32 },
+            approved_permissions: {
+              type: "array",
+              maxItems: 128,
+              uniqueItems: true,
+              items: { type: "string", maxLength: 130 },
+            },
+          },
         },
       },
       handle: (app, ctx, request) =>
         handle(app, ctx, () =>
-          getUpdatePreflight(app, ctx, { manifest: jsonBody(request).manifest }),
+          jsonBody(request).product_id === undefined
+            ? getUpdatePreflight(app, ctx, { manifest: jsonBody(request).manifest })
+            : registryExtensionPlan(app, ctx, {
+                productId: String(jsonBody(request).product_id),
+                version: String(jsonBody(request).version),
+                ...(jsonBody(request).approved_permissions === undefined
+                  ? {}
+                  : { approvedPermissions: jsonBody(request).approved_permissions as string[] }),
+              }).then((result) => ({
+                ...result.preflight,
+                no_op: result.noOp,
+                new_permissions: result.newPermissions,
+                product_id: result.packageIdentity.manifest.id,
+              })),
         ),
     },
     {

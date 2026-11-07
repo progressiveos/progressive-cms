@@ -3,6 +3,7 @@
 // UI (nav/routes/translations) and unregisters everything else. Called at
 // Admin start and re-run whenever the Extensions screen mutates lifecycle
 // state (window event pcms:extensions-changed).
+import * as React from "react";
 import { useEffect, useSyncExternalStore } from "react";
 import { apiGet } from "../api/client.js";
 import { t } from "../i18n/index.js";
@@ -18,13 +19,33 @@ import {
 } from "./registry.js";
 import { requestExtensionApi } from "./request.js";
 
+let refreshGeneration = 0;
+const previousIndependentIds = new Set<string>();
+/** @internal */
+export function __resetIndependentContributions(ids: readonly string[]): void {
+  for (const id of previousIndependentIds) unregisterExtensionContributions(id);
+  previousIndependentIds.clear();
+  for (const id of ids) previousIndependentIds.add(id);
+}
+
 export async function refreshExtensionContributions(
   t: (key: string, vars?: Record<string, string | number>) => string,
+  loadModule: (
+    path: string,
+  ) => Promise<{
+    registerAdminContributions: (api: AdminContributionApi) => void | Promise<void>;
+  }> = async (path) => import(/* @vite-ignore */ path),
 ): Promise<void> {
+  const generation = ++refreshGeneration;
   let enabled: Set<string>;
+  let independent: readonly { id: string; state: string | null; admin_module_url?: string }[] = [];
   try {
-    const result = await apiGet<{ items: readonly { id: string; state: string | null }[] }>(
-      "/extensions",
+    const result = await apiGet<{
+      items: readonly { id: string; state: string | null; admin_module_url?: string }[];
+    }>("/extensions");
+    if (generation !== refreshGeneration) return;
+    independent = result.items.filter(
+      (entry) => entry.admin_module_url !== undefined && entry.state === "ENABLED",
     );
     enabled = new Set(
       result.items.filter((entry) => entry.state === "ENABLED").map((entry) => entry.id),
@@ -32,18 +53,67 @@ export async function refreshExtensionContributions(
   } catch {
     return; // not authenticated yet — retried on the next trigger
   }
-  for (const contribution of extensionContributions as readonly ExtensionContribution[]) {
+  __resetIndependentContributions(independent.map((entry) => entry.id));
+  const generations = new Map(
+    independent.map((entry) => [entry.id, entry.admin_module_url?.split("/").at(-2)]),
+  );
+  const dynamic: ExtensionContribution[] = independent.map((entry) => ({
+    extensionId: entry.id,
+    register: async (api) => {
+      const path = entry.admin_module_url;
+      if (
+        !path ||
+        !/^\/api\/v1\/extensions\/[a-z0-9.%_-]+\/assets\/[a-f0-9]{64}\/admin\.js$/.test(path)
+      )
+        throw new Error("invalid independent Admin module URL");
+      if (!("__PCMS_EXTENSION_REACT__" in globalThis))
+        Object.defineProperty(globalThis, "__PCMS_EXTENSION_REACT__", { value: React });
+      const module = await loadModule(path);
+      if (generation !== refreshGeneration) return;
+      await module.registerAdminContributions(api);
+    },
+  }));
+  for (const contribution of [
+    ...extensionContributions,
+    ...dynamic,
+  ] as readonly ExtensionContribution[]) {
     unregisterExtensionContributions(contribution.extensionId);
     if (!enabled.has(contribution.extensionId)) continue;
     const api: AdminContributionApi = {
       extensionId: contribution.extensionId,
-      request: requestExtensionApi,
+      request: <T>(
+        method: string,
+        path: string,
+        options?: import("@pcms/extensions").AdminRequestOptions,
+      ) =>
+        requestExtensionApi<T>(
+          method,
+          path,
+          generations.has(contribution.extensionId)
+            ? {
+                ...options,
+                headers: {
+                  ...options?.headers,
+                  "x-pcms-extension-context": `${contribution.extensionId}@${generations.get(contribution.extensionId)}`,
+                },
+              }
+            : options,
+        ),
       t,
-      nav: (section) => registerNavSection({ ...section, extensionId: contribution.extensionId }),
-      route: (route) => registerRoute({ ...route, extensionId: contribution.extensionId }),
-      translations: (fragment) => registerContributionTranslations(fragment),
+      nav: (section) => {
+        if (generation === refreshGeneration)
+          registerNavSection({ ...section, extensionId: contribution.extensionId });
+      },
+      route: (route) => {
+        if (generation === refreshGeneration)
+          registerRoute({ ...route, extensionId: contribution.extensionId });
+      },
+      translations: (fragment) => {
+        if (generation === refreshGeneration) registerContributionTranslations(fragment);
+      },
     };
     await contribution.register(api);
+    if (generation !== refreshGeneration) return;
   }
 }
 

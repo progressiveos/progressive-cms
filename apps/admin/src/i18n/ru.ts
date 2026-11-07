@@ -508,12 +508,18 @@ export const ru = {
   "registry.install": "Установить",
   "registry.installed_toast": "Пакет {id} установлен",
   "registry.releases_title": "Релизы движка",
+  "registry.extension_updates_title": "Обновления расширений",
   "registry.releases_empty": "Релизов в репозитории пока нет.",
   "registry.col_version": "Версия",
   "registry.col_sha256": "SHA-256",
   "registry.col_notes": "Заметки",
   "registry.col_actions": "Действия",
   "registry.update_to_version": "Обновить до этой версии",
+  "registry.extension_confirm_title": "Установка или обновление расширения",
+  "registry.extension_permissions": "Новые разрешения, запрошенные этой версией:",
+  "registry.extension_no_new_permissions": "Новые разрешения не запрашиваются.",
+  "registry.extension_restart_hint":
+    "CMS создаст резервную копию и перезапустится. Данные и настройки сохраняются.",
   "registry.backup_retention_warning":
     "Новая резервная копия проверена. Старые копии не удалось удалить; обновление не блокируется. Оператору нужно проверить владельца и права каталогов резервных копий.",
   "registry.update_applied_toast": "Обновление применено: версия {version}",

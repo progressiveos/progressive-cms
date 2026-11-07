@@ -59,6 +59,7 @@ export function httpStatusForError(error: unknown): number {
     return 500;
   }
   if (/_NOT_FOUND$|_TARGET_MISSING$/.test(code)) return 404;
+  if (code === "UPDATE_ALREADY_RUNNING") return 409;
   if (
     /_CONFLICT$|_COLLISION$|_STALE$|_TAKEN$|_ALREADY_(EXISTS|WORKING|COMPLETED|REGISTERED)$/.test(
       code,

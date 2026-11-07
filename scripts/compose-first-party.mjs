@@ -20,8 +20,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { transformSync } from "esbuild";
+import {
+  assertPackageDirectory,
+  packageContentDigest,
+  validateExtensionAssets,
+  validateSupplyArchive,
+} from "./extension-package-assets.mjs";
 
 const ROOT = process.cwd();
 const LOCK_PATH = "extensions/first-party.lock.json";
@@ -40,27 +46,7 @@ function sha256(data) {
  * relative paths, node_modules excluded — derived artifacts are installed
  * from the package's own lockfile), hash-of-hashes. A byte change anywhere
  * in the package changes the digest — this is the R2 artifact identity. */
-function digestDir(dir) {
-  const files = [];
-  const walk = (current) => {
-    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) =>
-      a.name < b.name ? -1 : 1,
-    )) {
-      if (entry.isDirectory() && entry.name === "node_modules") continue;
-      const full = join(current, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.isFile()) files.push(full);
-    }
-  };
-  walk(dir);
-  if (files.length === 0) fail(`package dir ${dir} is empty`);
-  const hasher = createHash("sha256");
-  for (const file of files) {
-    const rel = relative(dir, file).split(sep).join("/");
-    hasher.update(`${rel}\n${sha256(readFileSync(file))}\n`);
-  }
-  return hasher.digest("hex");
-}
+const digestDir = packageContentDigest;
 
 function readLock() {
   if (!existsSync(LOCK_PATH)) fail(`${LOCK_PATH} missing — run write-lock`);
@@ -84,6 +70,7 @@ function manifestOf(dir) {
  * before a byte is unpacked; the CONTENT digest is verified after. A package
  * with its own package.json+lockfile gets `npm ci` into the vendored dir. */
 function materializeExternal(pkg) {
+  assertPackageDirectory(pkg.dir);
   const dir = pkg.dir;
   if (existsSync(dir)) {
     try {
@@ -107,9 +94,10 @@ function materializeExternal(pkg) {
       `${tarball}: supply digest mismatch (expected ${pkg.source.sha256}, got ${supply}) — refusing to unpack`,
     );
   }
+  const strip = pkg.source.strip_components ?? 2;
+  validateSupplyArchive(tarball, strip);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const strip = pkg.source.strip_components ?? 2;
   execFileSync("tar", ["-xzf", tarball, "-C", dir, `--strip-components=${strip}`]);
   if (digestDir(dir) !== pkg.content_sha256) {
     fail(
@@ -316,6 +304,7 @@ function generateAdminContributions(lock, mode) {
   for (const pkg of lock.packages) {
     const manifest = manifestOf(pkg.dir);
     if (manifest.admin_contributions !== true) continue;
+    validateExtensionAssets(ROOT, pkg);
     if (mode === "standard" && pkg.composition === "ui-test") continue;
     const rel = pkg.dir.replace("extensions/", "");
     entries.push(
@@ -344,6 +333,7 @@ function generateAdminContributions(lock, mode) {
 function check() {
   const lock = readLock();
   for (const pkg of lock.packages) {
+    assertPackageDirectory(pkg.dir);
     if (pkg.source !== undefined) materializeExternal(pkg);
   }
   const onDisk = packageDirsOnDisk();
@@ -357,6 +347,7 @@ function check() {
     if (manifest.id !== pkg.id) fail(`${pkg.dir}: manifest id ${manifest.id} != lock id ${pkg.id}`);
     if (manifest.version !== pkg.version)
       fail(`${pkg.dir}: manifest version ${manifest.version} != lock version ${pkg.version}`);
+    validateExtensionAssets(ROOT, pkg);
     const digest = digestDir(pkg.dir);
     if (digest !== pkg.content_sha256) {
       fail(
@@ -390,6 +381,7 @@ function writeLock() {
           ? {}
           : { permission_namespace: manifest.permission_namespace }),
         ...(previousEntry?.source === undefined ? {} : { source: previousEntry.source }),
+        ...(previousEntry?.assets === undefined ? {} : { assets: previousEntry.assets }),
         ...(previousEntry?.composition === undefined
           ? {}
           : { composition: previousEntry.composition }),
@@ -425,10 +417,16 @@ if (command === "prepare-supply") {
   writeLock();
 } else if (command === "write-catalog") {
   const lock = readLock();
+  for (const pkg of lock.packages) if (pkg.source !== undefined) materializeExternal(pkg);
+  for (const pkg of lock.packages) validateExtensionAssets(ROOT, pkg);
   writeFileSync(CATALOG_PATH, generateCatalog(lock, { includeUiTest: false }));
   writeFileSync(
     CATALOG_PATH.replace(".ts", ".ui-test.generated.ts"),
     generateCatalog(lock, { includeUiTest: true }),
+  );
+  writeFileSync(
+    "apps/admin/src/extension/contributions.generated.ts",
+    generateAdminContributions(lock, "standard"),
   );
 } else if (command === "check") {
   check();

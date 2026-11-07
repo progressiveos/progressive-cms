@@ -35,6 +35,7 @@ import { BLOCK_DOCUMENT_SCHEMA_VERSION } from "@pcms/blocks";
 import { CONFIG_SCHEMA_VERSION } from "@pcms/core";
 import {
   EXTENSION_CONTRACT_VERSION,
+  EXTENSION_PACKAGE_CONTRACT_VERSION,
   parseReleaseManifest,
   SUPPORTED_NODE_RANGE,
   SUPPORTED_POSTGRES_RANGE,
@@ -53,6 +54,7 @@ import { SEARCH_INDEX_VERSION } from "@pcms/search";
 import { THEME_CONTRACT_VERSION } from "@pcms/themes";
 import { checkNativeSourceSupply } from "./check-native-source-supply.mjs";
 import { assertReleaseZipClean, readPreparedOfficialSkillFiles } from "./check-release-zip.mjs";
+import { stageExtensionAssets, validateExtensionAssets } from "./extension-package-assets.mjs";
 import { assertReleaseZipPermissions, packReleaseZip } from "./pack-release-zip.mjs";
 import { pruneReleaseDependencyTests } from "./prune-release-dependency-tests.mjs";
 import {
@@ -134,16 +136,15 @@ if (gitDirty && process.argv.includes("--require-clean")) {
   );
 }
 
+const composeCheck = spawnSync(process.execPath, ["scripts/compose-first-party.mjs", "check"], {
+  cwd: repoRoot,
+  stdio: "inherit",
+});
+if (composeCheck.status !== 0) fail("first-party lock check failed (see above)");
+
 if (!skipBuild) {
   // Clean before compilation; keep outputs available for an explicit --skip-build.
   rmSync(join(repoRoot, "dist"), { recursive: true, force: true });
-  // First-party lock gate BEFORE tsc: it materializes external packages
-  // (verify-then-unpack, ADR-0017 R4) that the generated catalog imports.
-  const composeCheck = spawnSync(process.execPath, ["scripts/compose-first-party.mjs", "check"], {
-    cwd: repoRoot,
-    stdio: "inherit",
-  });
-  if (composeCheck.status !== 0) fail("first-party lock check failed (see above)");
   console.log("build-release: npm run build");
   sh("npm", ["run", "build"]);
 }
@@ -180,7 +181,21 @@ if (!process.argv.includes("--allow-version-reuse")) {
   }
 }
 
-const builtAt = new Date();
+const compositionPath = join(repoRoot, "composition-manifest.json");
+const sourceComposition = existsSync(compositionPath)
+  ? JSON.parse(readFileSync(compositionPath, "utf8"))
+  : undefined;
+if (sourceComposition !== undefined) {
+  const { composition_id, ...identity } = sourceComposition;
+  if (
+    sourceComposition.schema !== "pcms-composition-build/1" ||
+    sourceComposition.core?.version !== version ||
+    gitDirty ||
+    createHash("sha256").update(JSON.stringify(identity)).digest("hex") !== composition_id
+  )
+    fail("unsealed or invalid composition provenance");
+}
+const builtAt = sourceComposition ? new Date(sourceComposition.builtAtUtc) : new Date();
 const releaseId = createReleaseId({ version, builtAt, commit: gitCommit });
 const stage = join(outRoot, releaseId);
 const packageNames = new Set(
@@ -201,6 +216,11 @@ const contractVersions = [
   { key: "cms", version, source: "package.json" },
   { key: "config_schema", version: CONFIG_SCHEMA_VERSION, source: "cms:core" },
   { key: "extension_contract", version: EXTENSION_CONTRACT_VERSION, source: "cms:extensions" },
+  {
+    key: "extension_package",
+    version: EXTENSION_PACKAGE_CONTRACT_VERSION,
+    source: "cms:extensions",
+  },
   { key: "rest_api", version: API_CONTRACT_VERSION, source: "cms:api" },
   { key: "mcp", version: MCP_PROTOCOL_VERSION, source: "cms:mcp" },
   { key: "theme_contract", version: THEME_CONTRACT_VERSION, source: "cms:themes" },
@@ -253,6 +273,26 @@ cpSync(join(repoRoot, "apps/admin/dist"), join(stage, RELEASE_LAYOUT.adminDistDi
 const firstPartyLock = JSON.parse(
   readFileSync(join(repoRoot, "extensions/first-party.lock.json"), "utf8"),
 );
+if (sourceComposition !== undefined) {
+  const actual = firstPartyLock.packages.map(
+    ({ id, dir, version, content_sha256, source, assets }) => ({
+      id,
+      dir,
+      version,
+      content_sha256,
+      source: source
+        ? { sha256: source.sha256, strip_components: source.strip_components ?? 2 }
+        : null,
+      assets: assets ?? {},
+    }),
+  );
+  const expected = sourceComposition.packages.map(({ source_commit, ...pkg }) => pkg);
+  if (
+    JSON.stringify(actual) !== JSON.stringify(expected) ||
+    sh("git", ["status", "--porcelain"]).stdout.trim()
+  )
+    fail("composition lock or source changed after sealing");
+}
 const firstPartyPackages =
   composition === "core-only"
     ? []
@@ -262,6 +302,8 @@ const firstPartyExtensions = firstPartyPackages.map((pkg) => ({
   id: pkg.id,
   version: pkg.version,
   content_sha256: pkg.content_sha256,
+  dir: pkg.dir,
+  assets: validateExtensionAssets(repoRoot, pkg),
   migrations: existsSync(join(repoRoot, pkg.dir, "migrations"))
     ? readdirSync(join(repoRoot, pkg.dir, "migrations"))
         .filter((name) => name.endsWith(".sql"))
@@ -327,30 +369,11 @@ for (const entry of readdirSync(join(repoRoot, "extensions"), { withFileTypes: t
       );
     }
   }
-  const allowedExtensionAssets =
-    entry.name === "progressive-site-migration" ? new Set(["agent"]) : new Set();
-  for (const entry2 of readdirSync(join(repoRoot, "extensions", entry.name), {
-    withFileTypes: true,
-  })) {
-    if (
-      [
-        "src",
-        "node_modules",
-        "manifest.json",
-        "migrations",
-        "README.md",
-        "package.json",
-        "package-lock.json",
-        "LICENSE",
-        "NOTICE",
-      ].includes(entry2.name)
-    )
-      continue;
-    if (!allowedExtensionAssets.has(entry2.name)) {
-      fail(`unreviewed extension release asset: ${extensionDir}/${entry2.name}`);
-    }
-    copy(`extensions/${entry.name}/${entry2.name}`, `extensions/${entry.name}/${entry2.name}`);
-  }
+  stageExtensionAssets(
+    repoRoot,
+    stage,
+    firstPartyPackages.find((pkg) => pkg.dir === extensionDir),
+  );
   // External packages own their npm dependencies: the vendored node_modules
   // (installed by the lock gate's materialize step) ships with the package.
   if (existsSync(join(repoRoot, "extensions", entry.name, "package.json"))) {
@@ -443,7 +466,15 @@ writeFileSync(
 const extensionDirsForPolicy = new Set(
   [...packagedExtensionDirs].map((dir) => dir.replace(/^extensions\//, "")),
 );
-const releasePolicyContext = { packageNames, extensionDirs: extensionDirsForPolicy, themeDirs };
+const extensionRuntimeAssets = new Set(
+  firstPartyExtensions.flatMap((pkg) => pkg.assets.runtime.map((path) => `${pkg.dir}/${path}`)),
+);
+const releasePolicyContext = {
+  packageNames,
+  extensionDirs: extensionDirsForPolicy,
+  extensionRuntimeAssets,
+  themeDirs,
+};
 const copySkillFiles = (sourceDir, relativeDir = "") => {
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
     const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
@@ -548,7 +579,10 @@ const metadata = createReleaseBuildMetadata({
   nodeVersion: process.version,
   contractVersions,
 });
-writeFileSync(join(stage, RELEASE_LAYOUT.buildMetadata), `${JSON.stringify(metadata, null, 2)}\n`);
+writeFileSync(
+  join(stage, RELEASE_LAYOUT.buildMetadata),
+  `${JSON.stringify({ ...metadata, ...(sourceComposition === undefined ? {} : { source_composition: sourceComposition }) }, null, 2)}\n`,
+);
 
 // M17-T002/T004: canonical release manifest — the single document the runtime
 // (doctor, update preflight, agent bootstrap) reads for deployed identity and
@@ -574,6 +608,7 @@ const releaseManifest = {
   migration_head: coreDbMigrations.at(-1)?.name ?? null,
   core_db_migrations: coreDbMigrations,
   first_party_extensions: firstPartyExtensions,
+  ...(sourceComposition === undefined ? {} : { source_composition: sourceComposition }),
   composition,
   required_runtime: { node: SUPPORTED_NODE_RANGE, postgres: SUPPORTED_POSTGRES_RANGE },
   contract_versions: Object.fromEntries(
@@ -703,12 +738,13 @@ if (catalogSmoke.status !== 0) {
 // --- pack (zip — the product-wide artifact format, registry contract) -------
 console.log("build-release: packing");
 const artifactPath = join(outRoot, `progressive-cms-${releaseId}.zip`);
-await packReleaseZip(outRoot, releaseId, artifactPath);
+await packReleaseZip(outRoot, releaseId, artifactPath, sourceComposition ? builtAt : undefined);
 assertReleaseZipPermissions(artifactPath);
 sh("unzip", ["-tq", artifactPath]);
 const cleanEntryCount = assertReleaseZipClean(artifactPath, releaseId, {
   packageNames,
   extensionDirs: extensionDirsForPolicy,
+  extensionRuntimeAssets,
   themeDirs,
   docsIncluded: docsSummary !== null,
   preparedDocsDir: docsSummary?.source,

@@ -105,8 +105,11 @@ CSS-брейкпоинты (тема): `--bp-tablet: 768px`, `--bp-desktop: 1080
 
 Публичный JS (`assets/js/theme.js`): мобильное меню, лайтбокс, клиентский
 калькулятор (whitelist-парсер, без `eval`). Запрещены: секреты, service-токены,
-`eval`/`new Function`, сторонние скрипты без CSP-декларации.
-CSP строит CMS из `assets.csp` темы (разрешён только `https://` и `'self'`).
+`eval`/`new Function`. CSP по умолчанию (`http.publicCspMode: compatible`)
+разрешает внешние HTTP(S) ресурсы для публичных страниц. Режим `strict`
+оставляет только ресурсы своего сайта и явные источники из `assets.csp`;
+`assets.csp` принимает только `https://` и `'self'`. Этот режим не меняет CSP
+админки и API.
 
 ## Forms integration boundary
 

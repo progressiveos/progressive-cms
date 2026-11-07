@@ -123,7 +123,14 @@ export interface McpOperations {
   ): Promise<unknown>;
   cleanupEntryRevisions(ctx: OperationContextLike, input: { entry_id: string }): Promise<unknown>;
   registryReleases(): Promise<unknown>;
-  applyRegistryUpdate(ctx: OperationContextLike, version: string): Promise<unknown>;
+  applyRegistryUpdate(
+    ctx: OperationContextLike,
+    version: string,
+    options?: {
+      readonly productId?: string;
+      readonly approvedPermissions?: readonly string[];
+    },
+  ): Promise<unknown>;
   getCurrentActor(ctx: OperationContextLike): unknown;
   getAgentBootstrap(ctx: OperationContextLike): unknown;
   resolveExternalIdentity(
@@ -314,7 +321,14 @@ export interface McpOperations {
     ctx: OperationContextLike,
     input: { extension_id: string },
   ): Promise<unknown>;
-  getUpdatePreflight(ctx: OperationContextLike): Promise<unknown>;
+  getUpdatePreflight(
+    ctx: OperationContextLike,
+    input?: {
+      readonly productId: string;
+      readonly version: string;
+      readonly approvedPermissions?: readonly string[];
+    },
+  ): Promise<unknown>;
   listDeprecations(ctx: OperationContextLike): Promise<unknown>;
   installExtension(ctx: OperationContextLike, input: { extension_id: string }): Promise<unknown>;
   enableExtension(ctx: OperationContextLike, input: { extension_id: string }): Promise<unknown>;

@@ -37,6 +37,10 @@ export interface DeployedExtensionArtifact {
    * Undefined for artifacts without lock provenance (test fixtures).
    */
   readonly contentSha256: string | undefined;
+  readonly independentPackage?: {
+    readonly digest: string;
+    readonly adminModule: string | undefined;
+  };
 }
 
 export interface ExtensionCatalog {
@@ -85,6 +89,10 @@ export function defineExtensionArtifact(input: {
   readonly migrationsDir?: string | undefined;
   /** Lock content digest (ADR-0017 R2); bound by the generated catalog. */
   readonly contentSha256?: string | undefined;
+  readonly independentPackage?: {
+    readonly digest: string;
+    readonly adminModule: string | undefined;
+  };
 }): DeployedExtensionArtifact {
   const validation = validateExtensionManifest(input.manifest);
   if (!validation.ok) {
@@ -106,6 +114,9 @@ export function defineExtensionArtifact(input: {
     migrationsDir: input.migrationsDir,
     extensionsDir: input.extensionsDir,
     contentSha256: input.contentSha256,
+    ...(input.independentPackage === undefined
+      ? {}
+      : { independentPackage: input.independentPackage }),
   };
 }
 

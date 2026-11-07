@@ -90,7 +90,7 @@ export function checkReleaseZip(zipPath, releaseId, context) {
       entry.startsWith(prefix) &&
       /^(?:deploy|config|skills|extensions)\//.test(entry.slice(prefix.length)) &&
       !entry.split("/").includes("node_modules") &&
-      (/\.(?:md|txt|json|sql|sh|service|path|conf|example|rules|html)$/i.test(entry) ||
+      (/\.(?:md|txt|json|sql|sh|service|path|conf|example|rules|html|liquid)$/i.test(entry) ||
         (entry.startsWith(`${prefix}skills/`) && /\.(?:yaml|yml|js|css|liquid)$/i.test(entry))),
   );
   for (const entry of publicTextEntries) {

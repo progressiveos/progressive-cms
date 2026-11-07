@@ -1,6 +1,6 @@
 # Choose editable content and theme composition
 
-Discover Content Types, registered blocks and accepted theme templates first. Reuse a fitting existing type. For extension blocks, take the id and props schema from `/discovery/blocks`; use the namespaced id's `@1` renderer only when that extension is deployed. For a new model, start from [content-types.json](../assets/examples/content-types.json):
+Discover Content Types, registered blocks and accepted theme templates first. Reuse a fitting existing type. For extension blocks, take the id and props schema from `/discovery/blocks`; use the namespaced id's `@1` renderer only when that trusted extension is deployed and enabled. If the block is absent, ask the operator for the approved signed compiled package; this Skill does not build or upload extension source. For a new model, start from [content-types.json](../assets/examples/content-types.json):
 
 | Content | Example type | bodyPolicy | Rendering |
 |---|---|---|---|

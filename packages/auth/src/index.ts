@@ -78,6 +78,7 @@ export {
   type BuiltinRoleKey,
   builtinRolePermissions,
   isRegisteredPermission,
+  listRegisteredPermissions,
   PERMISSION_REGISTRY,
   type PermissionDefinition,
   permissionDefinition,
@@ -148,6 +149,15 @@ export {
 } from "./users.js";
 
 export const PACKAGE_NAME = "@pcms/auth";
+export {
+  bootstrapAgentAccess,
+  provisionShopCreatorAccess,
+  deriveShopCreatorScopes,
+  cmsCreatorScopes,
+  isReservedAgentScope,
+  type AgentCredential,
+  type ShopCreatorManifest,
+} from "./agent-bootstrap.js";
 export {
   type ActorResolver,
   createActorResolver,

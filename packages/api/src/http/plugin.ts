@@ -257,6 +257,24 @@ export function createApiV1(domainRoutes: readonly ApiRoute[]) {
     }
 
     async function execute(route: ApiRoute, request: FastifyRequest): Promise<RouteResult> {
+      const extensionContext = request.headers["x-pcms-extension-context"];
+      if (extensionContext !== undefined) {
+        const match =
+          typeof extensionContext === "string"
+            ? /^([a-z0-9][a-z0-9.-]*)@([a-f0-9]{64})$/.exec(extensionContext)
+            : null;
+        if (
+          !match ||
+          application.extensions.catalog.get(match[1] ?? "")?.independentPackage?.digest !==
+            match[2]
+        )
+          throw new ApiError(
+            "EXTENSION_GENERATION_CHANGED",
+            "extension was updated; reload Admin before continuing",
+            { status: 409 },
+          );
+      }
+
       // resolveContext is invoked through the preValidation hook below; the
       // context travels on the request for the handler.
       const ctx = (request as RequestWithCtx).pcmsContext;

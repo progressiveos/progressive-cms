@@ -2,6 +2,23 @@
 
 Contract owner: Core configuration schema v1. The delivered [complete JSON Schema](reference/config-schema.json) is authoritative for nested object shapes, enums, defaults and required properties. Validate an entire configuration; this index is not a replacement for validation.
 
+`http.publicCspMode` defaults to `compatible`, allowing HTTP(S) sources for public-page scripts, styles, fonts, images, media and connections, and WS(S) connections. Set it to `strict` to retain the previous source restrictions. This affects public responses only; Admin and API policy is unchanged. Existing inline-script, `eval` and frame controls remain in force.
+
+`registry.independentExtensions` configures the protected store for independently signed compiled packages:
+
+```json
+{
+  "registry": {
+    "independentExtensions": {
+      "rootDir": "/var/lib/progressive-cms/extensions",
+      "trustFile": "/etc/progressive-cms/extension-trust.json"
+    }
+  }
+}
+```
+
+Both paths must be absolute and operator-controlled. Keep the trust file and private signing keys out of public content and backups shared with untrusted parties. The trust file contains trusted public keys; it does not contain signing secrets. See [Extensions](extensions.md#independently-delivered-packages).
+
 Secret values never belong in this document. Configuration selects named env/file sources and runtime secret references. Paths below are generic product installation locations, not a real site's private topology.
 
 | Section | Purpose | Operational rule |

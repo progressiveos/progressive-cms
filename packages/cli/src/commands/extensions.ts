@@ -8,7 +8,12 @@
 // All operations run against the CMS API (PCMS_API_URL + PCMS_API_TOKEN).
 
 import { type ApiClientOptions, apiCall, machineResult, resolveApiClient } from "../api-client.js";
-import { type CliCommandResult, failureResult, type GlobalOptions } from "../framework.js";
+import {
+  type CliCommandResult,
+  failureResult,
+  type GlobalOptions,
+  requireTargetSafety,
+} from "../framework.js";
 
 function clientOrThrow(options: GlobalOptions, env: NodeJS.ProcessEnv): ApiClientOptions {
   const client = resolveApiClient(options, env);
@@ -24,6 +29,7 @@ const USAGE = `usage: cms extensions <subcommand> [--json]
   enable <extensionId> [--check]
   disable <extensionId> [--check]
   uninstall <extensionId> [--check] [--confirmation <id>]
+  creator-token progressive.shop --site <site> --environment <env> --yes [--rotate]
 `;
 
 async function get(client: ApiClientOptions, path: string): Promise<CliCommandResult> {
@@ -55,6 +61,27 @@ export async function extensionsCommand(invocation: {
   try {
     const client = clientOrThrow(options, env);
     switch (subcommand) {
+      case "creator-token": {
+        if (
+          operand !== "progressive.shop" ||
+          rest.some((arg) => arg !== "--rotate") ||
+          rest.filter((arg) => arg === "--rotate").length > 1
+        ) {
+          return { exitCode: 2, stdout: "", stderr: USAGE };
+        }
+        if (options.site === undefined || options.site.trim() === "") {
+          throw Object.assign(new Error("creator-token requires an explicit --site target"), {
+            code: "CLI_USAGE_INVALID",
+          });
+        }
+        const safety = requireTargetSafety(options, "extensions creator-token");
+        if (safety !== null) return safety;
+        return await post(client, "/extensions/progressive.shop/creator-token", {
+          site_key: options.site,
+          environment: options.environment!,
+          ...(rest.includes("--rotate") ? { rotate: true } : {}),
+        });
+      }
       case "list":
         return await get(client, "/extensions");
       case "compatibility":

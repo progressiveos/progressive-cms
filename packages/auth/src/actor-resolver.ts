@@ -11,6 +11,7 @@
 import type { DbPool } from "@pcms/core";
 import type { ActorContext } from "./actor.js";
 import { AuthError } from "./errors.js";
+import { assertCreatorParentEnabled } from "./agent-bootstrap.js";
 import { createRoleService } from "./roles.js";
 import {
   type AccessTokenRecord,
@@ -73,6 +74,7 @@ export function createActorResolver(
       if (row.account_status !== "ENABLED") {
         throw new AuthError("AUTH_SERVICE_ACCOUNT_DISABLED", "service account is disabled", 403);
       }
+      await assertCreatorParentEnabled(pool, row.created_by);
       if (row.revoked_at !== null) {
         throw new AuthError("AUTH_TOKEN_REVOKED", "token has been revoked", 401);
       }
@@ -115,6 +117,7 @@ export function createActorResolver(
       };
       await pool.query("UPDATE access_tokens SET last_used_at = now() WHERE id = $1", [row.id]);
       const actor: ActorContext = {
+        accessTokenId: token.id,
         type: "SERVICE_ACCOUNT",
         id: row.service_account_id,
         permissions: new Set(effective),

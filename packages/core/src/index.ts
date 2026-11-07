@@ -20,6 +20,7 @@ export {
   type LoadConfigOptions,
   loadConfig,
   resolveConfigFile,
+  resolveLocalHttpUrl,
   validateConfigDocument,
 } from "./config/loader.js";
 export {
@@ -29,6 +30,7 @@ export {
   type DbSslMode,
   type LogLevel,
   type NodeEnv,
+  type PublicCspMode,
   type SecretRef,
 } from "./config/schema.js";
 export { buildDbConnectionInfo } from "./db/connection.js";

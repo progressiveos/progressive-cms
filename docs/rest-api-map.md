@@ -83,7 +83,7 @@ The complete fixed registry follows below. Enabled extensions can additionally c
 HTTP routes outside `/api/v1` are listed after the registry. They include health, signed preview, public files/site rendering, Admin assets and extension dispatch. They are not all REST JSON endpoints. Fastify also supplies HEAD handling for GET routes; this is not a separate application operation.
 
 <!-- interface-map:start -->
-## Fixed REST registry: 325 operations
+## Fixed REST registry: 327 operations
 
 | Area | Operations | Purpose |
 |---|---:|---|
@@ -92,7 +92,7 @@ HTTP routes outside `/api/v1` are listed after the registry. They include health
 | [bundle](#rest-bundle) | 4 | Validate/ingest coordinated content; async acceptance is not completed publication. |
 | [content](#rest-content) | 55 | Manage editable identities, drafts, schema definitions and localization. Read generations before CAS writes. |
 | [discovery](#rest-discovery) | 79 | Read effective contracts, rendering defaults and typed capabilities. |
-| [extensions](#rest-extensions) | 22 | Discover and manage deployed extension composition, typed operations and updates. |
+| [extensions](#rest-extensions) | 24 | Discover and manage deployed extension composition, typed operations and updates. |
 | [forms](#rest-forms) | 19 | Version definitions and run anonymous server-validated interactions; history can contain personal data. |
 | [integrations](#rest-integrations) | 25 | Configure connectors, notifications and delivery reliability; secret slots are write-only. |
 | [interactions](#rest-interactions) | 13 | Read/moderate/export submissions, quiz runs and leads with separate scopes. |
@@ -5480,6 +5480,20 @@ JSON body schema:
     },
     "wait": {
       "type": "boolean"
+    },
+    "product_id": {
+      "type": "string",
+      "maxLength": 130,
+      "pattern": "^[a-z0-9][a-z0-9.-]+$"
+    },
+    "approved_permissions": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 130
+      }
     }
   }
 }
@@ -5494,7 +5508,11 @@ const version = typeof body.version === "string" ? body.version : "";
 const wait = body.wait !== false;
 return {
   status: 200,
-  body: await registryApplyUpdateOp(app, ctx, version, { wait })
+  body: await registryApplyUpdateOp(app, ctx, version, {
+    wait,
+    ...body.product_id === void 0 ? {} : { productId: body.product_id },
+    ...body.approved_permissions === void 0 ? {} : { approvedPermissions: body.approved_permissions }
+  })
 };
 ```
 
@@ -5773,7 +5791,30 @@ return { status: 200, body: { published: true, registry: result } };
 
 Path parameters: none.
 
-Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Query schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "maxLength": 130
+    },
+    "version": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "approved_permissions": {
+      "type": "string",
+      "maxLength": 16384
+    },
+    "preview": {
+      "type": "boolean"
+    }
+  }
+}
+```
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
@@ -5782,15 +5823,28 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 Response construction:
 ```javascript
 const bytes = request.body;
+const query = request.query;
 const sha256 = createHash("sha256").update(bytes).digest("hex");
 const manifest = await extractUpdateManifest(bytes);
 const targetVersion = String(manifest.version ?? "");
+const leaseId = await reserveUpdateLease(app.pool, "progressive.cms");
 const artifactName = `progressive-cms-registry-${targetVersion}.zip`;
 const applied = await applyUpdate(app, ctx, {
   manifest,
   backup_confirmation: targetVersion,
-  confirmed_from_registry: true
+  confirmed_from_registry: true,
+  reserved_lease_id: leaseId
 });
+return {
+  status: 200,
+  body: await uploadIndependentExtensionPackage(app, ctx, {
+    productId: query.product_id,
+    version: query.version,
+    approvedPermissions: approved,
+    bytes,
+    ...query.preview === void 0 ? {} : { preview: query.preview }
+  })
+};
 return { status: 200, body: { staged: artifactName, sha256, update: applied } };
 ```
 
@@ -5811,7 +5865,23 @@ return { status: 200, body: { staged: artifactName, sha256, update: applied } };
 
 Path parameters: none.
 
-Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+Query schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "maxLength": 130
+    },
+    "request_id": {
+      "type": "string",
+      "maxLength": 36
+    }
+  }
+}
+```
 
 JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
@@ -5819,7 +5889,12 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 
 Response construction:
 ```javascript
-const record = await latestUpdateRecord(app.pool);
+const query = request.query;
+const productId = query.product_id ?? "progressive.cms";
+const record = await latestUpdateRecord(app.pool, {
+  productId,
+  ...query.request_id === void 0 ? {} : { requestId: query.request_id }
+});
 return {
   status: 200,
   body: {
@@ -5831,6 +5906,8 @@ return {
     },
     update: record === null ? null : {
       id: record.id,
+      request_id: record.validationSummary.update_lease_id ?? null,
+      product_id: productId,
       status: record.status,
       from_version: record.fromVersion,
       to_version: record.toVersion,
@@ -6963,6 +7040,7 @@ Discover and manage deployed extension composition, typed operations and updates
 | Method/path | Operation | Purpose |
 |---|---|---|
 | `GET /api/v1/extensions` | [list_extensions](#list_extensions) | Deployed extensions with lifecycle state, capabilities and compatibility. |
+| `GET /api/v1/extensions/{extensionId}/assets/{digest}/admin.js` | [get_extension_admin_module](#get_extension_admin_module) | Verified independently deployed Admin module |
 | `GET /api/v1/extensions/{extensionId}/compatibility` | [get_extension_compatibility](#get_extension_compatibility) | Compatibility issues for one extension. |
 | `GET /api/v1/extensions/{extensionId}/config` | [get_extension_config](#get_extension_config) | Extension settings view: manifest config schema, public (non-secret) config, declared secret slots with presence only. |
 | `PUT /api/v1/extensions/{extensionId}/config` | [update_extension_config](#update_extension_config) | Merge the non-secret extension settings (partial updates preserve sibling keys and stored secret refs); schema-validated, audited. |
@@ -6981,6 +7059,7 @@ Discover and manage deployed extension composition, typed operations and updates
 | `GET /api/v1/extensions/contracts` | [get_contract_versions](#get_contract_versions) | Independent contract versions (cms, config, extension, REST, MCP, theme, …). |
 | `GET /api/v1/extensions/deprecations` | [list_deprecations](#list_deprecations) | Machine-readable deprecation records with replacement/removal metadata. |
 | `GET /api/v1/extensions/operations` | [list_all_extension_operations](#list_all_extension_operations) | Typed application operations across all enabled deployed extensions — the capability-binding discovery (ADR-0017 S4): generic consumers (Admin media studio, CLI) find operations by `capability`, never by extension id. |
+| `POST /api/v1/extensions/progressive.shop/creator-token` | [provision_shop_creator_token](#provision_shop_creator_token) | Issue a scoped Shop-Creator credential for the current trusted Shop install. |
 | `POST /api/v1/update/apply` | [update_apply](#update_apply) | Update orchestration contract: fails closed without the M15 deployment adapter. |
 | `GET /api/v1/update/preflight` | [get_update_preflight](#get_update_preflight) | Read-only preflight against the configured target release manifest (no writes). |
 | `POST /api/v1/update/preflight` | [submit_update_preflight](#submit_update_preflight) | Read-only preflight against an operator-supplied target manifest. |
@@ -7011,6 +7090,45 @@ Declared response schema: not declared by the registry; inspect the operation-sp
 Response construction (the shared `handle` wrapper returns HTTP 200 with its callback result):
 ```javascript
 return handle(app, ctx, () => listExtensions(app, ctx));
+```
+
+<a id="get_extension_admin_module"></a>
+
+### GET /api/v1/extensions/{extensionId}/assets/{digest}/admin.js
+
+**get_extension_admin_module** — Verified independently deployed Admin module
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | No fixed route scope; actor/domain-specific checks can still apply. |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/extensions.ts` |
+| Handler-local error codes (not the whole domain error set) | `EXTENSION_NOT_DEPLOYED` |
+
+Path parameters: `extensionId`, `digest`.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const { extensionId, digest } = request.params;
+const artifact = app.extensions.catalog.get(extensionId);
+return {
+  status: 200,
+  body: readFileSync(artifact.independentPackage.adminModule),
+  headers: {
+    "content-type": "text/javascript; charset=utf-8",
+    "cache-control": "private, max-age=31536000, immutable",
+    "x-content-type-options": "nosniff"
+  }
+};
 ```
 
 <a id="get_extension_compatibility"></a>
@@ -7919,6 +8037,64 @@ return handle(app, ctx, async () => ({
 }));
 ```
 
+<a id="provision_shop_creator_token"></a>
+
+### POST /api/v1/extensions/progressive.shop/creator-token
+
+**provision_shop_creator_token** — Issue a scoped Shop-Creator credential for the current trusted Shop install.
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `extensions.manage` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/extensions.ts` |
+
+Path parameters: none.
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "site_key",
+    "environment"
+  ],
+  "properties": {
+    "site_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "rotate": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const body = jsonBody(request);
+return {
+  status: 200,
+  body: await provisionShopCreatorTokenOp(app, ctx, body),
+  headers: { "cache-control": "no-store" }
+};
+```
+
 <a id="update_apply"></a>
 
 ### POST /api/v1/update/apply
@@ -8025,12 +8201,39 @@ JSON body schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "manifest"
+  "oneOf": [
+    {
+      "required": [
+        "manifest"
+      ]
+    },
+    {
+      "required": [
+        "product_id",
+        "version"
+      ]
+    }
   ],
   "properties": {
     "manifest": {
       "type": "object"
+    },
+    "product_id": {
+      "type": "string",
+      "maxLength": 130
+    },
+    "version": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "approved_permissions": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 130
+      }
     }
   }
 }
@@ -8043,7 +8246,16 @@ Response construction (the shared `handle` wrapper returns HTTP 200 with its cal
 return handle(
   app,
   ctx,
-  () => getUpdatePreflight(app, ctx, { manifest: jsonBody(request).manifest })
+  () => jsonBody(request).product_id === void 0 ? getUpdatePreflight(app, ctx, { manifest: jsonBody(request).manifest }) : registryExtensionPlan(app, ctx, {
+    productId: String(jsonBody(request).product_id),
+    version: String(jsonBody(request).version),
+    ...jsonBody(request).approved_permissions === void 0 ? {} : { approvedPermissions: jsonBody(request).approved_permissions }
+  }).then((result) => ({
+    ...result.preflight,
+    no_op: result.noOp,
+    new_permissions: result.newPermissions,
+    product_id: result.packageIdentity.manifest.id
+  }))
 );
 ```
 

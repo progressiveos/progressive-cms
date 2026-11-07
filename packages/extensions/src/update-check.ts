@@ -12,6 +12,12 @@ import type { CompatibilitySnapshot } from "./scanner.js";
 import type { ContractVersionKey } from "./versions.js";
 
 export interface UpdatePreflight {
+  readonly product?: {
+    readonly kind: "extension";
+    readonly id: string;
+    readonly digest: string;
+    readonly coreVersion: string;
+  };
   readonly outcome: PreflightOutcome;
   readonly issues: readonly CompatibilityIssue[];
   readonly current: { readonly version: string };
@@ -120,6 +126,20 @@ export function checkUpdate(input: {
   // honest plan, not the executed set.
   const plannedExtensionMigrations: string[] = [];
   for (const pkg of target.first_party_extensions ?? []) {
+    if (
+      snapshot.extensions.some(
+        (extension) => extension.id === pkg.id && extension.independentPackage,
+      )
+    )
+      issues.push({
+        code: "UPDATE_COMPATIBILITY_BLOCKED",
+        severity: "error",
+        blocking: true,
+        category: "extension",
+        subject: pkg.id,
+        message: "target Core statically includes an independently deployed extension",
+        remediation: "select a Core composition without this independently managed package",
+      });
     const installed = snapshot.extensions.find((entry) => entry.id === pkg.id && entry.installed);
     if (installed === undefined) continue; // not installed — nothing to migrate
     if (installed.artifactDigest === pkg.content_sha256) continue; // artifact unchanged
@@ -143,6 +163,21 @@ export function checkUpdate(input: {
   // Extension compatibility against the target release.
   for (const extension of snapshot.extensions) {
     if (!extension.installed) continue;
+    if (
+      extension.independentPackage &&
+      (!target.contract_versions.extension_package ||
+        !satisfiesSafe(target.contract_versions.extension_package, "^1.0"))
+    ) {
+      issues.push({
+        code: "UPDATE_COMPATIBILITY_BLOCKED",
+        severity: "error",
+        blocking: true,
+        category: "contract",
+        subject: extension.id,
+        message: "target Core cannot preserve independently deployed extension package contract 1",
+        remediation: "select a Core release supporting the installed independent packages",
+      });
+    }
     if (
       extension.extensionContractVersion !== undefined &&
       !target.supports_extension_contracts.includes(extension.extensionContractVersion)

@@ -292,6 +292,11 @@ function toTypedConfig(doc: Record<string, unknown>): AppConfig {
       // Audit 2026-09-27 lesson: normalized fields are carried EXPLICITLY —
       // an omitted key silently falls back to the nodeEnv default downstream.
       ...(http.cookieSecure === undefined ? {} : { cookieSecure: http.cookieSecure as boolean }),
+      ...(http.publicCspMode === undefined
+        ? {}
+        : {
+            publicCspMode: http.publicCspMode as NonNullable<AppConfig["http"]["publicCspMode"]>,
+          }),
       ...(http.securityTxt === undefined
         ? {}
         : { securityTxt: http.securityTxt as NonNullable<AppConfig["http"]["securityTxt"]> }),
@@ -444,6 +449,14 @@ function toTypedConfig(doc: Record<string, unknown>): AppConfig {
             ...(registryReportUpdates === undefined
               ? {}
               : { reportUpdates: registryReportUpdates }),
+            ...(registryDoc.independentExtensions === undefined
+              ? {}
+              : {
+                  independentExtensions: registryDoc.independentExtensions as {
+                    rootDir: string;
+                    trustFile: string;
+                  },
+                }),
           },
         };
   const integrationsDoc = doc.integrations as Record<string, unknown> | undefined;
@@ -620,4 +633,23 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     );
   }
   return validation.config;
+}
+
+const UNSPECIFIED_HTTP_HOSTS = new Set(["", "0.0.0.0", "::"]);
+
+/**
+ * Loopback-reachable HTTP URL for the web process configured with {http.host,
+ * http.port}. Unspecified bind addresses become 127.0.0.1 (connecting to
+ * 0.0.0.0/:: directly is not portable), IPv6 literals are bracketed, and
+ * IPv4 literals or hostnames pass through — a web process bound to a specific
+ * address (external-rp profile) must be probed on that address, not loopback.
+ */
+export function resolveLocalHttpUrl(host: string, port: number, path = "/health/ready"): string {
+  const normalized = host.trim();
+  const target = UNSPECIFIED_HTTP_HOSTS.has(normalized)
+    ? "127.0.0.1"
+    : normalized.includes(":") && !normalized.startsWith("[")
+      ? `[${normalized}]`
+      : normalized;
+  return `http://${target}:${port}${path.startsWith("/") ? path : `/${path}`}`;
 }

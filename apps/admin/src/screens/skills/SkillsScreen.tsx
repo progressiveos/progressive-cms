@@ -10,8 +10,9 @@
 // security-check pipeline — the tab only reflects package check states.
 
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import { gt, valid } from "semver";
 import { fetchBootstrapInfo, refreshBootstrap, useBootstrap } from "../../api/bootstrap.js";
-import { ApiError, apiDelete, apiPost, apiPostRaw } from "../../api/client.js";
+import { ApiError, apiDelete, apiGet, apiPost, apiPostRaw } from "../../api/client.js";
 import {
   applyRegistryUpdate,
   confirmRegistryInstance,
@@ -20,6 +21,7 @@ import {
   fetchRegistryInstanceStatus,
   fetchUpdateStatus,
   installRegistryPackage,
+  planRegistryExtension,
   publishSkillToRegistry,
   type RegistryIndex,
   type RegistryInstanceStatus,
@@ -70,6 +72,7 @@ function RegistryPackageCard(props: {
   readonly pkg: RegistryPackageIndexItem;
   readonly canManage: boolean;
   readonly busy: boolean;
+  readonly bound: boolean;
   readonly onInstall: (pkg: RegistryPackageIndexItem) => void;
 }) {
   const { pkg } = props;
@@ -101,7 +104,7 @@ function RegistryPackageCard(props: {
       {installable ? (
         <Button
           size="sm"
-          disabled={props.busy}
+          disabled={props.busy || (pkg.kind === "extension" && !props.bound)}
           data-testid={`registry-install-${pkg.id}`}
           onClick={() => props.onInstall(pkg)}
         >
@@ -112,8 +115,58 @@ function RegistryPackageCard(props: {
   );
 }
 
+interface InstalledRegistryExtension {
+  readonly id: string;
+  readonly installed: boolean;
+  readonly installed_version: string | null;
+}
+
+/** @internal The update action reuses the package preflight/approval flow. */
+export function RegistryExtensionUpdates(props: {
+  readonly packages: readonly RegistryPackageIndexItem[];
+  readonly installed: readonly InstalledRegistryExtension[];
+  readonly bound: boolean;
+  readonly busy: boolean;
+  readonly onUpdate: (pkg: RegistryPackageIndexItem) => void;
+}) {
+  const updates = props.packages.flatMap((pkg) => {
+    const current = props.installed.find((item) => item.id === pkg.id && item.installed);
+    const version = current?.installed_version;
+    return pkg.kind === "extension" &&
+      pkg.check === "approved" &&
+      pkg.download_url !== null &&
+      version &&
+      valid(version) &&
+      valid(pkg.version) &&
+      gt(pkg.version, version)
+      ? [{ pkg, version }]
+      : [];
+  });
+  if (!updates.length) return null;
+  return (
+    <Card title={t("registry.extension_updates_title")}>
+      {updates.map(({ pkg, version }) => (
+        <div key={pkg.id}>
+          <p>
+            {pkg.id}: {version} → {pkg.version}
+          </p>
+          <Button
+            size="sm"
+            disabled={props.busy || !props.bound}
+            data-testid={`registry-update-${pkg.id}`}
+            onClick={() => props.onUpdate(pkg)}
+          >
+            {props.busy ? t("registry.update_running") : t("registry.update_to_version")}
+          </Button>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 function RegistryTab(props: {
   readonly canManage: boolean;
+  readonly canManageExtensions: boolean;
   readonly communitySkills: readonly SkillListItem[] | null;
   readonly reloadSkills: () => void;
   /** "updates" = releases + binding + manual upload (first tab); "catalog" =
@@ -124,6 +177,9 @@ function RegistryTab(props: {
   const toast = useToast();
   const bootstrap = useBootstrap();
   const [index, setIndex] = useState<RegistryIndex | null>(null);
+  const [installedExtensions, setInstalledExtensions] = useState<
+    readonly InstalledRegistryExtension[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [publishId, setPublishId] = useState("");
@@ -136,10 +192,22 @@ function RegistryTab(props: {
   const [unauthorized, setUnauthorized] = useState(false);
   const [notConfigured, setNotConfigured] = useState(false);
   const [backupWarning, setBackupWarning] = useState(false);
+  const [extensionApproval, setExtensionApproval] = useState<{
+    pkg: RegistryPackageIndexItem;
+    permissions: readonly string[];
+  } | null>(null);
 
   const reload = useCallback(() => {
     setError(null);
     setNotConfigured(false);
+    if (props.canManageExtensions) {
+      apiGet<{ items: readonly InstalledRegistryExtension[] }>("/extensions")
+        .then((result) => setInstalledExtensions(result.items))
+        .catch((err: unknown) => {
+          setInstalledExtensions([]);
+          setError(err instanceof Error ? err.message : String(err));
+        });
+    } else setInstalledExtensions([]);
     if (props.canManage) {
       fetchUpdateStatus()
         .then((status) => {
@@ -167,7 +235,7 @@ function RegistryTab(props: {
         setInstance(null);
         setInstanceStatus(null);
       });
-  }, [props.canManage]);
+  }, [props.canManage, props.canManageExtensions]);
   useEffect(reload, [reload]);
 
   const run = async (action: () => Promise<void>): Promise<void> => {
@@ -185,7 +253,19 @@ function RegistryTab(props: {
   const install = (pkg: RegistryPackageIndexItem): Promise<void> =>
     run(async () => {
       if (pkg.download_url === null) return;
-      if (pkg.kind === "theme") {
+      if (pkg.kind === "extension") {
+        const plan = await planRegistryExtension(pkg.id, pkg.version);
+        const blockers = plan.issues.filter(
+          (issue) => issue.blocking && issue.code !== "EXTENSION_PRIVILEGE_APPROVAL_REQUIRED",
+        );
+        if (blockers.length) throw new Error(blockers.map((issue) => issue.message).join("; "));
+        if (plan.no_op) {
+          toast(t("registry.update_not_required"), "success");
+          return;
+        }
+        setExtensionApproval({ pkg, permissions: plan.new_permissions });
+        return;
+      } else if (pkg.kind === "theme") {
         await apiPost("/themes/install", { download_url: pkg.download_url });
       } else {
         await installRegistryPackage(pkg.download_url);
@@ -194,23 +274,35 @@ function RegistryTab(props: {
       toast(t("registry.installed_toast", { id: pkg.id }), "success");
     });
 
-  const applyUpdate = (version: string): Promise<void> =>
+  const applyUpdate = (
+    version: string,
+    productId = "progressive.cms",
+    approvedPermissions: readonly string[] = [],
+  ): Promise<void> =>
     run(async () => {
       // Async apply (0.1.194): the POST returns RUNNING immediately, the
       // heavy work continues detached, and pcms_update_history carries the
       // outcome. The SERVER record is the only arbiter — never the shape of
       // a proxied response body (p-cms.ru 2026-10-07).
-      await applyRegistryUpdate(version);
+      const requested = await applyRegistryUpdate(version, productId, approvedPermissions);
+      if (requested.update.status === "NO_OP") {
+        toast(t("registry.update_not_required"), "success");
+        return;
+      }
       const recordDeadline = Date.now() + 180_000;
       let outcome: "SUCCEEDED" | "FAILED" | null = null;
       let failureCode: string | null = null;
       while (Date.now() < recordDeadline) {
         await new Promise((resolve) => setTimeout(resolve, 2_000));
         try {
-          const status = await fetchUpdateStatus();
+          const status = await fetchUpdateStatus(productId, requested.update.request_id);
           const record = status.update;
           setBackupWarning(record?.backup_warnings?.includes("BACKUP_RETENTION_FAILED") === true);
-          if (record !== null && record.to_version === version && record.status !== "RUNNING") {
+          if (
+            record !== null &&
+            record.to_version === version &&
+            (record.status === "SUCCEEDED" || record.status === "FAILED")
+          ) {
             outcome = record.status;
             failureCode = record.failure_code;
             break;
@@ -229,7 +321,7 @@ function RegistryTab(props: {
       // hold the toast until the running server confirms the new version,
       // then refresh the badge without a manual page reload.
       const switchDeadline = Date.now() + 45_000;
-      while (Date.now() < switchDeadline) {
+      while (productId === "progressive.cms" && Date.now() < switchDeadline) {
         await new Promise((resolve) => setTimeout(resolve, 2_000));
         try {
           if ((await fetchBootstrapInfo()).server.cms_version === version) break;
@@ -238,6 +330,8 @@ function RegistryTab(props: {
         }
       }
       await refreshBootstrap().catch(() => {});
+      if (productId !== "progressive.cms")
+        window.dispatchEvent(new Event("pcms:extensions-changed"));
       toast(t("registry.update_applied_toast", { version }), "success");
       reload();
     });
@@ -332,6 +426,50 @@ function RegistryTab(props: {
   const skills = props.communitySkills ?? [];
   return (
     <div data-testid="registry-tab">
+      <Dialog
+        open={extensionApproval !== null}
+        onClose={() => setExtensionApproval(null)}
+        title={t("registry.extension_confirm_title")}
+        footer={
+          <Button
+            disabled={busy}
+            onClick={() => {
+              if (!extensionApproval) return;
+              const approved = extensionApproval;
+              setExtensionApproval(null);
+              void applyUpdate(approved.pkg.version, approved.pkg.id, approved.permissions);
+            }}
+          >
+            {extensionApproval &&
+            installedExtensions.some(
+              (item) => item.id === extensionApproval.pkg.id && item.installed,
+            )
+              ? t("registry.update_to_version")
+              : t("registry.install")}
+          </Button>
+        }
+      >
+        {extensionApproval ? (
+          <>
+            <p>
+              {extensionApproval.pkg.id} {extensionApproval.pkg.version}
+            </p>
+            <p>{t("registry.extension_permissions")}</p>
+            {extensionApproval.permissions.length ? (
+              <ul>
+                {extensionApproval.permissions.map((permission) => (
+                  <li key={permission}>
+                    <code>{permission}</code>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>{t("registry.extension_no_new_permissions")}</p>
+            )}
+            <p>{t("registry.extension_restart_hint")}</p>
+          </>
+        ) : null}
+      </Dialog>
       {error !== null ? <ErrorPanel message={error} onRetry={reload} /> : null}
 
       {props.view === "catalog" ? (
@@ -347,8 +485,9 @@ function RegistryTab(props: {
                 <RegistryPackageCard
                   key={`${pkg.kind}:${pkg.id}`}
                   pkg={pkg}
-                  canManage={props.canManage}
+                  canManage={pkg.kind === "extension" ? props.canManageExtensions : props.canManage}
                   busy={busy}
+                  bound={instanceStatus?.status === "confirmed"}
                   onInstall={install}
                 />
               ))}
@@ -359,6 +498,15 @@ function RegistryTab(props: {
 
       {props.view === "updates" ? (
         <div style={{ marginTop: 16 }}>
+          {props.canManageExtensions ? (
+            <RegistryExtensionUpdates
+              packages={index.packages}
+              installed={installedExtensions}
+              busy={busy}
+              bound={instanceStatus?.status === "confirmed"}
+              onUpdate={(pkg) => void install(pkg)}
+            />
+          ) : null}
           <Card title={t("registry.releases_title")}>
             {backupWarning ? <p role="status">{t("registry.backup_retention_warning")}</p> : null}
             {index.releases.length === 0 ? (
@@ -371,7 +519,7 @@ function RegistryTab(props: {
                       <th>{t("registry.col_version")}</th>
                       <th>{t("registry.col_sha256")}</th>
                       <th>{t("registry.col_notes")}</th>
-                      {props.canManage ? <th>{t("registry.col_actions")}</th> : null}
+                      {props.canManageExtensions ? <th>{t("registry.col_actions")}</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -382,14 +530,14 @@ function RegistryTab(props: {
                           <code>{release.sha256.slice(0, 12)}</code>…
                         </td>
                         <td>{release.notes}</td>
-                        {props.canManage ? (
+                        {props.canManageExtensions ? (
                           <td>
                             {release.version === (bootstrap?.server.cms_version ?? "") ? (
                               <Badge tone="success">{t("registry.update_not_required")}</Badge>
                             ) : (
                               <Button
                                 size="sm"
-                                disabled={busy}
+                                disabled={busy || instanceStatus?.status !== "confirmed"}
                                 onClick={() => void applyUpdate(release.version)}
                               >
                                 {busy
@@ -667,6 +815,7 @@ export default function SkillsScreen() {
       <TabPanel id="updates" active={active === "updates"}>
         <RegistryTab
           canManage={canManage}
+          canManageExtensions={can("extensions.manage")}
           communitySkills={communitySkills}
           reloadSkills={reload}
           view="updates"
@@ -675,6 +824,7 @@ export default function SkillsScreen() {
       <TabPanel id="catalog" active={active === "catalog"}>
         <RegistryTab
           canManage={canManage}
+          canManageExtensions={can("extensions.manage")}
           communitySkills={communitySkills}
           reloadSkills={reload}
           view="catalog"

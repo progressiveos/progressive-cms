@@ -69,6 +69,7 @@ export {
   type EvolutionMetadata,
   type EvolutionPhase,
 } from "./evolution.js";
+export { planIndependentExtensionUpdate } from "./independent-update.js";
 export {
   blockingIssues,
   type CompatibilityIssue,
@@ -138,6 +139,23 @@ export {
   type Socks5ProxyConfig,
 } from "./outbound.js";
 export {
+  readExtensionPackageArchive,
+  stageIndependentExtensionPackage,
+} from "./package-archive.js";
+export {
+  assertExtensionAssetPath,
+  assertExtensionStorePath,
+  canonicalPackageJson,
+  type ExtensionPackageDescriptor,
+  type ExtensionPackageTrust,
+  extensionFileSha256,
+  loadIndependentExtensionCatalog,
+  readIndependentExtensionPackages,
+  type VerifiedExtensionPackage,
+  verifyExtensionPackage,
+  verifyExtensionPackageDescriptor,
+} from "./package-delivery.js";
+export {
   ANONYMOUS_PRINCIPAL,
   createExtensionPlatformServices,
   type ExtensionCallContext,
@@ -206,6 +224,13 @@ export {
   type UpdatePreflight,
 } from "./update-check.js";
 export {
+  claimUpdateLease,
+  deferUpdateLeaseUntilWebBoot,
+  finishCoreUpdateLeaseAfterWebBoot,
+  releaseUpdateLease,
+  reserveUpdateLease,
+} from "./update-lease.js";
+export {
   CONTRACT_VERSION_KEYS,
   type ContractVersionEntry,
   type ContractVersionKey,
@@ -213,7 +238,10 @@ export {
   createContractVersionRegistry,
   createSystemContractVersionRegistry,
   discoverCmsVersion,
+  EXTENSION_PACKAGE_CONTRACT_VERSION,
   SUPPORTED_NODE_RANGE,
   SUPPORTED_POSTGRES_RANGE,
   type SystemContractVersions,
 } from "./versions.js";
+
+export { recordIndependentGeneration, independentGenerationDigest } from "./delivery-generation.js";

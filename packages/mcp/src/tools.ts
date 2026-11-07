@@ -1751,9 +1751,32 @@ export const TOOLS: readonly McpTool[] = [
     description: "Read-only update preflight against the configured target release manifest.",
     permission: "extensions.manage",
     mutation: false,
-    inputSchema: objectSchema({}),
-    async run(operations, ctx) {
-      return operations.getUpdatePreflight(ctx);
+    inputSchema: {
+      ...objectSchema({
+        product_id: { type: "string" },
+        version: { type: "string" },
+        approved_permissions: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 128,
+          uniqueItems: true,
+        },
+      }),
+      dependencies: { product_id: ["version"], version: ["product_id"] },
+    },
+    async run(operations, ctx, args) {
+      return operations.getUpdatePreflight(
+        ctx,
+        args["product_id"] === undefined
+          ? undefined
+          : {
+              productId: args["product_id"] as string,
+              version: args["version"] as string,
+              ...(args["approved_permissions"] === undefined
+                ? {}
+                : { approvedPermissions: args["approved_permissions"] as string[] }),
+            },
+      );
     },
   },
   {
@@ -2297,9 +2320,26 @@ export const TOOLS: readonly McpTool[] = [
       "Apply a registry release through the standard orchestrator (version must be strictly newer than the running one; backup → install → migrate → restart → doctor). Requires extensions.manage. If the connection drops mid-apply the server-side run continues.",
     permission: "extensions.manage",
     mutation: true,
-    inputSchema: objectSchema({ version: { type: "string" } }, ["version"]),
+    inputSchema: objectSchema(
+      {
+        version: { type: "string" },
+        product_id: { type: "string" },
+        approved_permissions: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 128,
+          uniqueItems: true,
+        },
+      },
+      ["version"],
+    ),
     async run(operations, ctx, args) {
-      return operations.applyRegistryUpdate(ctx, args["version"] as string);
+      return operations.applyRegistryUpdate(ctx, args["version"] as string, {
+        ...(args["product_id"] === undefined ? {} : { productId: args["product_id"] as string }),
+        ...(args["approved_permissions"] === undefined
+          ? {}
+          : { approvedPermissions: args["approved_permissions"] as string[] }),
+      });
     },
   },
 ];

@@ -176,6 +176,11 @@ export function permissionDefinition(key: string): PermissionDefinition | undefi
   return REGISTERED.get(key) ?? EXTENSION_REGISTERED.get(key);
 }
 
+/** Grantable keys include explicitly registered extensions; built-in bundles do not. */
+export function listRegisteredPermissions(): readonly PermissionDefinition[] {
+  return [...PERMISSION_REGISTRY, ...EXTENSION_REGISTERED.values()];
+}
+
 /**
  * Extension-declared permission keys (ADR-0017 R1). A trusted first-party
  * package with `permission_namespace` in its manifest may bring its OWN
@@ -231,9 +236,8 @@ function bundle(...keys: string[]): readonly string[] {
 
 /**
  * Built-in role bundles (spec §40–§44). Sorted per role for reviewability.
- * Owner holds every registered permission by construction — including keys
- * added in future minor releases (the OWNER bundle is "all registered",
- * evaluated at resolution time, not stored).
+ * Owner holds every platform permission, including future platform appends.
+ * Extension namespace keys require an explicit custom-role or token grant.
  */
 export const BUILTIN_ROLE_BUNDLES: Readonly<
   Record<Exclude<BuiltinRoleKey, "OWNER">, readonly string[]>

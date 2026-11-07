@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { apiGet } from "./client.js";
 
 export interface BootstrapInfo {
-  readonly site: { readonly key: string; readonly title: string };
+  readonly site: { readonly key: string; readonly title: string } | null;
   readonly environment: { readonly classification: string };
   readonly server: { readonly cms_version: string; readonly server_time: string };
   /** Opt-in multilingual discovery (absent on older servers / single mode). */

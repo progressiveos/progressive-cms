@@ -11,6 +11,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DbPool } from "@pcms/core";
 import { newStableId } from "@pcms/core";
+import type { ActorContext } from "./actor.js";
 import { AuthError } from "./errors.js";
 import { assertAllRegistered, isRegisteredPermission } from "./permissions.js";
 import { recordSecurityEvent, type SecurityEventSink } from "./security-events.js";
@@ -147,7 +148,7 @@ function toTokenRecord(row: TokenRow): AccessTokenRecord {
 
 export function createMachineIdentityService(
   pool: DbPool,
-  deps: { securitySink?: SecurityEventSink | null } = {},
+  deps: { securitySink?: SecurityEventSink | null; actor?: Pick<ActorContext, "type" | "id"> } = {},
 ): MachineIdentityService {
   return {
     async createServiceAccount(input) {
@@ -174,8 +175,8 @@ export function createMachineIdentityService(
       if (record === null) throw new AuthError("AUTH_VALIDATION", "creation failed");
       await recordSecurityEvent(pool, deps.securitySink, {
         type: "SERVICE_ACCOUNT_CREATED",
-        actorType: "OPERATOR",
-        actorId: input.createdBy ?? null,
+        actorType: deps.actor?.type ?? "OPERATOR",
+        actorId: deps.actor?.id ?? input.createdBy ?? null,
         subjectType: "service_account",
         subjectId: id,
         metadata: { name },
@@ -211,8 +212,8 @@ export function createMachineIdentityService(
       }
       await recordSecurityEvent(pool, deps.securitySink, {
         type: "SERVICE_ACCOUNT_DISABLED",
-        actorType: "OPERATOR",
-        actorId: null,
+        actorType: deps.actor?.type ?? "OPERATOR",
+        actorId: deps.actor?.id ?? null,
         subjectType: "service_account",
         subjectId: id,
         metadata: { reason },
@@ -235,8 +236,8 @@ export function createMachineIdentityService(
       }
       await recordSecurityEvent(pool, deps.securitySink, {
         type: "SERVICE_ACCOUNT_DELETED",
-        actorType: "OPERATOR",
-        actorId: null,
+        actorType: deps.actor?.type ?? "OPERATOR",
+        actorId: deps.actor?.id ?? null,
         subjectType: "service_account",
         subjectId: id,
         metadata: { name: deleted, reason },
@@ -303,8 +304,8 @@ export function createMachineIdentityService(
       const token = toTokenRecord(rows.rows[0]!);
       await recordSecurityEvent(pool, deps.securitySink, {
         type: "TOKEN_CREATED",
-        actorType: "OPERATOR",
-        actorId: input.createdBy ?? null,
+        actorType: deps.actor?.type ?? "OPERATOR",
+        actorId: deps.actor?.id ?? input.createdBy ?? null,
         subjectType: "token",
         subjectId: id,
         metadata: {
@@ -335,8 +336,8 @@ export function createMachineIdentityService(
       }
       await recordSecurityEvent(pool, deps.securitySink, {
         type: "TOKEN_REVOKED",
-        actorType: "OPERATOR",
-        actorId: null,
+        actorType: deps.actor?.type ?? "OPERATOR",
+        actorId: deps.actor?.id ?? null,
         subjectType: "token",
         subjectId: tokenId,
         metadata: { reason },

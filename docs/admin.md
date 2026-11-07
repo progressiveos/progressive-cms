@@ -2,6 +2,16 @@
 
 Contract owner: Core Admin/editor, revision lifecycle and actor permissions.
 
+## Updates and extension permissions
+
+**Market → Updates** offers **Update to this version** only for an approved, downloadable newer package. A managed product update also requires a confirmed Registry binding; the action stays unavailable while unbound. Review every newly requested permission before confirming. Approval records permission consent and does not grant that permission to the current user or service account; the actor still needs its own authorization. Admin does not accept arbitrary executable source uploads.
+
+## Creator service accounts
+
+After the human OWNER is created, installation provisions the fixed `Site-Creator` service account and writes its one-time credential to `/root/agent-bootstrap.json` with mode `0600`. The operator can issue or rotate it with `cms token bootstrap [--rotate] [--ttl-hours <1..8760>] [--json]`; repeated bootstrap is idempotent, and a rotated credential replaces the previous one. Protect and remove the bootstrap file after securely transferring the credential.
+
+Only this primary creator can request the fixed `Shop-Creator` account, after the trusted `progressive.shop` extension is enabled. It receives the declared Shop permissions and the fixed operational Core permissions. The caller cannot choose account names, scopes or arbitrary targets; site and environment are explicitly bound and clamped to the parent credential. The child cannot delegate. Revoking, expiring or rotating the parent invalidates its child credentials. Disabling Shop removes its handlers and invalidates Shop access, but does not revoke the child's separately granted Core permissions. Repeating a successful issuance does not reveal the secret again; rotate to obtain a replacement.
+
 ## Editor account
 
 The human editor signs in with an ordinary Admin user account, not a Service Account token. An operator provisions that user under **Users & Access → Users** and grants the role and site-scoped permissions needed to read/edit content, preview, seal and (if intended) publish, plus media read/write for image replacement. Site configuration, system recovery and reading/exporting form submissions are separate privileges. A login page or a 200 response is not authenticated acceptance.

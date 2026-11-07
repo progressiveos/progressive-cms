@@ -12,6 +12,12 @@ import { ExtensionError } from "./errors.js";
 import type { CompatibilityIssue } from "./issues.js";
 import type { ReleaseManifestV1 } from "./release-manifest.js";
 import type { UpdatePreflight } from "./update-check.js";
+import {
+  claimUpdateLease,
+  deferUpdateLeaseUntilWebBoot,
+  releaseUpdateLease,
+  reserveUpdateLease,
+} from "./update-lease.js";
 
 export const UPDATE_HISTORY_TABLE = "pcms_update_history";
 
@@ -62,6 +68,7 @@ export interface ReleaseDeploymentPort {
 }
 
 export interface ServiceRestartPort {
+  readonly webRestartDeferred?: boolean;
   restart(plan: UpdatePreflight): Promise<void>;
 }
 
@@ -166,9 +173,16 @@ function rowToRecord(row: HistoryRow): UpdateHistoryRecord {
  * deployment never applied an update. Feeds GET /registry/update-status:
  * the async apply path reports RUNNING and pollers arbitrate on THIS
  * table, never on the apply response body. */
-export async function latestUpdateRecord(pool: DbPool): Promise<UpdateHistoryRecord | null> {
+export async function latestUpdateRecord(
+  pool: DbPool,
+  filter: { readonly productId?: string; readonly requestId?: string } = {},
+): Promise<UpdateHistoryRecord | null> {
   const result = await pool.query<HistoryRow>(
-    `SELECT * FROM ${UPDATE_HISTORY_TABLE} ORDER BY started_at DESC LIMIT 1`,
+    `SELECT * FROM ${UPDATE_HISTORY_TABLE}
+     WHERE ($1::text IS NULL OR COALESCE(validation_summary->'product'->>'id', 'progressive.cms') = $1)
+       AND ($2::text IS NULL OR validation_summary->>'update_lease_id' = $2)
+     ORDER BY started_at DESC LIMIT 1`,
+    [filter.productId ?? null, filter.requestId ?? null],
   );
   const row = result.rows[0];
   return row === undefined ? null : rowToRecord(row);
@@ -185,13 +199,14 @@ export async function recordFailedUpdateAttempt(
     readonly to_version: string;
     readonly failure_code: string;
     readonly actor: UpdateActor;
+    readonly validation_summary?: Record<string, unknown>;
   },
 ): Promise<void> {
   await pool.query(
     `INSERT INTO ${UPDATE_HISTORY_TABLE}
      (id, from_version, to_version, actor_type, actor_id, started_at, completed_at,
       status, core_migrations, extension_migrations, validation_summary, failure_code, rollback_policy)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'FAILED', '[]'::jsonb, '[]'::jsonb, '{}'::jsonb, $8, 'rollback_safe')`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'FAILED', '[]'::jsonb, '[]'::jsonb, $9::jsonb, $8, 'rollback_safe')`,
     [
       randomUUID(),
       input.from_version,
@@ -201,6 +216,7 @@ export async function recordFailedUpdateAttempt(
       clock.now(),
       clock.now(),
       input.failure_code,
+      JSON.stringify(input.validation_summary ?? {}),
     ],
   );
 }
@@ -212,6 +228,8 @@ export function createUpdateOrchestrator(input: {
   readonly target: ReleaseManifestV1;
   readonly ports: UpdateOrchestrationPorts;
   readonly actor: UpdateActor;
+  readonly reservedLeaseId?: string;
+  readonly releaseLeaseOnFinish?: boolean;
 }): UpdateOrchestrator {
   const { pool, clock, preflight, target, ports, actor } = input;
 
@@ -282,7 +300,8 @@ export function createUpdateOrchestrator(input: {
     });
   };
 
-  return {
+  let activeLeaseId: string | undefined;
+  const orchestrator: UpdateOrchestrator = {
     phases: UPDATE_PHASES,
     async apply({ backupConfirmation }) {
       const record: MutableUpdateRecord = {
@@ -296,6 +315,8 @@ export function createUpdateOrchestrator(input: {
         coreMigrations: preflight.plannedCoreMigrations,
         extensionMigrations: preflight.plannedExtensionMigrations,
         validationSummary: {
+          ...(preflight.product === undefined ? {} : { product: preflight.product }),
+          update_lease_id: activeLeaseId,
           preflight_outcome: preflight.outcome,
           issues: preflight.issues.length,
           phase_order: history,
@@ -383,6 +404,12 @@ export function createUpdateOrchestrator(input: {
             "postflight doctor reported the updated installation as unhealthy",
           );
         }
+        if (
+          preflight.product === undefined &&
+          ports.serviceRestart?.webRestartDeferred &&
+          activeLeaseId
+        )
+          await deferUpdateLeaseUntilWebBoot(pool, activeLeaseId, target.version);
         transition("SUCCEEDED");
         await ports.maintenance?.exit(preflight);
       } catch (error) {
@@ -425,6 +452,23 @@ export function createUpdateOrchestrator(input: {
         [limit],
       );
       return result.rows.map(rowToRecord);
+    },
+  };
+  return {
+    ...orchestrator,
+    apply: async (options) => {
+      const id =
+        input.reservedLeaseId ??
+        (await reserveUpdateLease(pool, preflight.product?.id ?? "progressive.cms"));
+      activeLeaseId = id;
+      let claimed = false;
+      try {
+        await claimUpdateLease(pool, id);
+        claimed = true;
+        return await orchestrator.apply(options);
+      } finally {
+        if (claimed && input.releaseLeaseOnFinish !== false) await releaseUpdateLease(pool, id);
+      }
     },
   };
 }

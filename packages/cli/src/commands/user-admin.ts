@@ -1,15 +1,17 @@
 // Local operator recovery commands (PCMS-AUTH-T026; Auth spec §10/§26/§62/
 // §63).
 //
-// `cms user …`, `cms session revoke-all`, `cms token revoke` — break-glass
-// capabilities requiring LOCAL operator access to the deployment's config,
-// secrets and database. Not a universal backdoor: no hidden HTTP endpoint,
-// no master password; the operator can only do what the machine's admin
-// could already do, and every action writes a security audit event with the
-// OPERATOR actor. Passwords arrive via stdin (never argv — process listings
-// are readable by every local user).
+// `cms user …`, `cms session revoke-all`, `cms token issue`, `cms token
+// revoke` — break-glass capabilities requiring LOCAL operator access to the
+// deployment's config, secrets and database. Not a universal backdoor: no
+// hidden HTTP endpoint, no master password; the operator can only do what
+// the machine's admin could already do, and every action writes a security
+// audit event with the OPERATOR actor. Passwords arrive via stdin (never
+// argv — process listings are readable by every local user).
 import { readFileSync } from "node:fs";
 import {
+  AGENT_SCOPE_PRESETS,
+  bootstrapAgentAccess,
   createMachineIdentityService,
   createPasswordCredentialService,
   createPasswordPolicy,
@@ -20,6 +22,7 @@ import {
   createTotpService,
   createUserIdentityService,
   recordSecurityEvent,
+  type ServiceAccountRecord,
 } from "@pcms/auth";
 import {
   buildDbConnectionInfo,
@@ -78,12 +81,147 @@ export async function sessionAdmin(invocation: UserAdminInvocation): Promise<Use
 
 export async function tokenAdmin(invocation: UserAdminInvocation): Promise<UserAdminResult> {
   const [subcommand, ...rest] = invocation.args;
+  if (subcommand === "issue")
+    return runWithPool(invocation, rest, async (services, flags) => issueToken(services, flags));
+  if (subcommand === "bootstrap")
+    return runWithPool(invocation, rest, async (services, flags) => {
+      const ttlHours = flags["ttl-hours"] === undefined ? undefined : Number(flags["ttl-hours"]);
+      if (ttlHours !== undefined && (!Number.isInteger(ttlHours) || ttlHours < 1 || ttlHours > 8760))
+        throw new Error("--ttl-hours must be an integer between 1 and 8760");
+      const result = await bootstrapAgentAccess(services.pool, {
+        ...(flags.rotate === true ? { rotate: true } : {}),
+        ...(ttlHours === undefined ? {} : { ttlHours }),
+      });
+      const payload = {
+        profile: result.profile,
+        account_id: result.account_id,
+        token_id: result.token_id,
+        created: result.created,
+        ...(result.raw_secret === undefined ? {} : { raw_secret: result.raw_secret }),
+        expires_at: result.expires_at,
+        scopes: [...result.scopes],
+      };
+      if (flags.json === true) return ok(payload, true);
+      const lines = Object.entries(payload).map(([key, value]) =>
+        `${key}: ${Array.isArray(value) ? value.join(",") : String(value)}`,
+      );
+      return {
+        exitCode: 0,
+        stdout: `${["ok", ...lines].join("\n")}\n`,
+        stderr:
+          result.raw_secret === undefined
+            ? ""
+            : "the secret is stored only as a SHA-256 hash and cannot be shown again — copy it now\n",
+      };
+    });
   if (subcommand !== "revoke") return tokenUsage();
   return runWithPool(invocation, rest, async (services, flags) => {
     const tokenId = flags["token-id"];
     if (tokenId === undefined) throw new Error("--token-id is required");
     await services.machines.revokeAccessToken(tokenId, "operator:token revoke");
     return ok({ revoked: tokenId }, flags.json === true);
+  });
+}
+
+// Owner policy (pinned by tests/auth/agent-scope-presets.test.ts): agents
+// never self-escalate (tokens.manage), never mutate identity (users/roles
+// manage), never touch lead/interaction PII, refund money movement, privacy
+// actions or skill management. Read-shaped users.read/roles.read stay legal
+// (readonly_diagnostics ships them by design). The five scenario presets are
+// pre-screened — this guard is what structurally refuses the `all` preset
+// here. Broader grants stay with the Admin issuer, where the owner-role gate
+// applies.
+const OPERATOR_CLI_FORBIDDEN_AGENT_SCOPES: ReadonlySet<string> = new Set([
+  "tokens.manage",
+  "users.manage",
+  "roles.manage",
+  "interactions.read",
+  "interactions.manage",
+  "interactions.export",
+  "leads.read",
+  "leads.manage",
+  "leads.export",
+  "payments.refund",
+  "privacy.manage",
+  "skills.manage",
+]);
+
+async function issueToken(services: Services, flags: FlagMap): Promise<UserAdminResult> {
+  const name = flags.name?.trim();
+  const presetKey = flags.preset;
+  if (name === undefined || presetKey === undefined)
+    throw new Error("--name and --preset are required");
+  const preset = AGENT_SCOPE_PRESETS[presetKey];
+  if (preset === undefined)
+    throw new Error(
+      `unknown preset "${presetKey}"; available: ${Object.keys(AGENT_SCOPE_PRESETS).join(", ")}`,
+    );
+  const reserved = [...preset].filter((scope) => OPERATOR_CLI_FORBIDDEN_AGENT_SCOPES.has(scope));
+  if (reserved.length > 0)
+    throw new Error(
+      `preset "${presetKey}" carries operator-reserved scopes (${reserved.join(", ")}); issue it from the Admin instead`,
+    );
+  const ttlHours = flags["ttl-hours"] === undefined ? 8760 : Number(flags["ttl-hours"]);
+  if (!Number.isInteger(ttlHours) || ttlHours < 1 || ttlHours > 8760)
+    throw new Error("--ttl-hours must be an integer between 1 and 8760");
+  const account = await resolveAgentServiceAccount(services, name, preset, flags);
+  const issued = await services.machines.createAccessToken({
+    serviceAccountId: account.id,
+    scopes: preset,
+    ttlMilliseconds: ttlHours * 3_600_000,
+    ...(flags.site === undefined ? {} : { siteKey: flags.site }),
+    ...(flags.environment === undefined ? {} : { environment: flags.environment }),
+    ...(flags.description === undefined ? {} : { description: flags.description }),
+    createdBy: "operator:cli",
+  });
+  const payload = {
+    token_id: issued.token.id,
+    prefix: issued.token.prefix,
+    raw_secret: issued.rawSecret,
+    expires_at: issued.token.expiresAt?.toISOString() ?? null,
+    scopes: [...issued.token.scopes],
+  };
+  if (flags.json === true) return ok(payload, true);
+  return {
+    exitCode: 0,
+    stdout: `${[
+      "ok",
+      `token_id: ${payload.token_id}`,
+      `prefix: ${payload.prefix}`,
+      `token: ${payload.raw_secret}`,
+      `expires_at: ${payload.expires_at ?? "never"}`,
+      `scopes: ${payload.scopes.join(",")}`,
+    ].join("\n")}\n`,
+    stderr: "the secret is stored only as a SHA-256 hash and cannot be shown again — copy it now\n",
+  };
+}
+
+async function resolveAgentServiceAccount(
+  services: Services,
+  name: string,
+  preset: readonly string[],
+  flags: FlagMap,
+): Promise<ServiceAccountRecord> {
+  const existing = (await services.machines.listServiceAccounts()).find(
+    (account) => account.name === name && account.status === "ENABLED",
+  );
+  if (existing !== undefined) {
+    // Re-issue on the same agent identity; a different allowance means the
+    // Admin manages that account, and the CLI must not silently widen it.
+    const sameAllowance =
+      existing.allowedScopes !== null &&
+      [...existing.allowedScopes].sort().join(",") === [...preset].sort().join(",");
+    if (!sameAllowance)
+      throw new Error(
+        `service account "${name}" already exists with a different allowance; manage it from the Admin`,
+      );
+    return existing;
+  }
+  return services.machines.createServiceAccount({
+    name,
+    purpose: flags.purpose ?? "agent bootstrap token (cms token issue)",
+    allowedScopes: preset,
+    createdBy: "operator:cli",
   });
 }
 
@@ -96,7 +234,7 @@ interface Services {
   machines: ReturnType<typeof createMachineIdentityService>;
 }
 
-type FlagMap = Record<string, string | undefined> & { json?: boolean };
+type FlagMap = Record<string, string | undefined> & { json?: boolean; rotate?: boolean };
 
 async function runWithPool(
   invocation: UserAdminInvocation,
@@ -240,7 +378,19 @@ function parseFlags(args: readonly string[]): FlagMap {
     const arg = args[i];
     if (arg === undefined) break;
     if (arg === "--json") flags.json = true;
-    else if (arg === "--email" || arg === "--name" || arg === "--config" || arg === "--token-id") {
+    else if (arg === "--rotate") flags.rotate = true;
+    else if (
+      arg === "--email" ||
+      arg === "--name" ||
+      arg === "--config" ||
+      arg === "--token-id" ||
+      arg === "--preset" ||
+      arg === "--purpose" ||
+      arg === "--ttl-hours" ||
+      arg === "--site" ||
+      arg === "--environment" ||
+      arg === "--description"
+    ) {
       const value = args[i + 1];
       if (value === undefined) throw new Error(`missing value for ${arg}`);
       flags[arg.slice(2)] = value;
@@ -304,6 +454,20 @@ function tokenUsage(): UserAdminResult {
   return {
     exitCode: 2,
     stdout: "",
-    stderr: "usage: cms token revoke --token-id <uuid> [--config <p>] [--json]\n",
+    stderr: [
+      "usage: cms token <subcommand> [flags]",
+      "",
+      "Local operator recovery (Auth spec §62; every action is audited):",
+      "  token issue --name <agent> --preset <name> [--purpose <t>] [--ttl-hours <1..8760>]",
+      "              [--site <key>] [--environment <env>] [--description <t>] [--config <p>] [--json]",
+      "      first issuance of an agent service token without the Admin; presets:",
+      "      site_development, content_work, theme_work, integrations_work,",
+      "      readonly_diagnostics; the raw secret prints exactly once",
+      "  token bootstrap [--rotate] [--ttl-hours <1..8760>] [--config <p>] [--json]",
+      "      provision the fixed cms-creator/1 access profile",
+      "  token revoke --token-id <uuid> [--config <p>] [--json]",
+      "      revoke an access token",
+      "",
+    ].join("\n"),
   };
 }

@@ -427,6 +427,7 @@ export interface ApplicationServicesInput {
   readonly registryBaseUrl?: string;
   readonly registryReportUpdates?: boolean;
   readonly registryIncomingDir?: string;
+  readonly registryExtensionDeployment?: import("./registry-extension-ops.js").RegistryExtensionDeployment;
   /** ADR-0013: signing key material for stock candidate references. */
   readonly mediaCandidateSigningKey?: string;
   readonly previewTtlMilliseconds?: number;
@@ -610,6 +611,7 @@ export interface ApplicationServices {
   readonly communitySkillsEnabled: boolean;
   readonly registryClient: import("./registry-client.js").RegistryClient | null;
   readonly registryIncomingDir: string;
+  readonly registryExtensionDeployment?: import("./registry-extension-ops.js").RegistryExtensionDeployment;
   /** Publish token from the registry.token secret slot (null = unset). */
   readonly registryAccountToken: string | null;
   /** Per-instance registry identity (2026-09-29): generated here, bound to
@@ -3159,6 +3161,7 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
         state: installation?.state,
         manifestVersion: manifest.version,
         extensionContractVersion: manifest.extension_contract,
+        ...(artifact.independentPackage ? { independentPackage: true } : {}),
         cmsCompatibility: manifest.cms_compatibility,
         fingerprintMatches:
           installation === undefined
@@ -3325,6 +3328,9 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     communitySkillsEnabled,
     registryClient,
     registryIncomingDir,
+    ...(input.registryExtensionDeployment === undefined
+      ? {}
+      : { registryExtensionDeployment: input.registryExtensionDeployment }),
     registryAccountToken: input.secrets?.get("registry.token") ?? null,
     registryInstanceCode,
     registryAccountTokenRuntime,

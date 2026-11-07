@@ -1,16 +1,15 @@
 // Public-page security headers (PCMS-OPS-T106; Operations spec §22/§57).
 //
 // Public HTML responses carry the security-header baseline plus a CSP built
-// from the theme's validated `assets.csp` declaration (`buildCspPolicy` —
-// the controlled policy layer; a theme can never inject `unsafe-*`, `data:`
-// or wildcard script origins, Theme Contract §34). Provider/connector
-// origins (spec §57) enter through the same declaration pipeline: an
-// integration adapter's required origin is a theme-declaration-level
-// extension point, not an ad-hoc header string.
+// from the configured public mode and validated theme `assets.csp` declaration.
+// Compatible mode admits HTTP(S) assets on public pages; strict mode keeps the
+// previous self-only defaults. Themes still cannot declare unsafe keywords or
+// wildcard origins, and Admin/API policies are owned by their own surfaces.
 //
 // HSTS is deliberately NOT emitted here: TLS terminates on the reverse
 // proxy, and the header belongs to the TLS-terminating layer (Operations
 // spec §21/§22 "HSTS when deployment ready").
+import type { PublicCspMode } from "@pcms/core";
 import { buildCspPolicy } from "@pcms/themes";
 
 /** Theme `assets.csp` declaration shape (structural mirror, L1 boundary). */
@@ -44,8 +43,22 @@ export function publicSecurityHeaders(
     readonly scriptHashes: readonly string[];
     readonly blobFrame: boolean;
   },
+  mode: PublicCspMode = "compatible",
 ): PublicSecurityHeaders {
   const declared: Record<string, string[]> = { ...(csp ?? {}) } as Record<string, string[]>;
+  if (mode === "compatible") {
+    const compatibleSources: Readonly<Record<string, readonly string[]>> = {
+      script_src: ["http:", "https:"],
+      style_src: ["http:", "https:"],
+      font_src: ["http:", "https:"],
+      img_src: ["http:", "https:"],
+      media_src: ["http:", "https:"],
+      connect_src: ["http:", "https:", "ws:", "wss:"],
+    };
+    for (const [directive, sources] of Object.entries(compatibleSources)) {
+      declared[directive] = [...new Set([...sources, ...(declared[directive] ?? [])])];
+    }
+  }
   const diagnosticInlineStyles = system?.origins.style_src?.includes("'unsafe-inline'") === true;
   // CSP ignores unsafe-inline when the same directive contains a hash source.
   const mergedStyle = [

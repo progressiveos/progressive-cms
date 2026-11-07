@@ -134,7 +134,7 @@ function Sidebar(props: {
   // The site title under the logo (owner 2026-10-08): with several admin
   // tabs open it must be obvious WHICH site this console controls.
   const bootstrap = useBootstrap();
-  const siteTitle = bootstrap?.site.title ?? "";
+  const siteTitle = bootstrap?.site?.title ?? "";
   return (
     <div className="pcms-sidebar__inner">
       <div className="pcms-sidebar__brand-row">

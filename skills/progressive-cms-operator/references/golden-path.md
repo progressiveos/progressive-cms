@@ -41,6 +41,11 @@ cms db migrate --json              # apply pending (advisory-locked, ledgered)
 
 ## Extensions lifecycle + settings
 
+Initial machine access and autonomous `Shop-Creator` provisioning are documented
+in the operator SKILL.md golden path. The first-party installer saves the
+`Site-Creator` credential in `/root/agent-bootstrap.json`; generic account/token
+management remains unavailable to these agents.
+
 ```bash
 cms extensions list --json
 cms extensions install progressive.prompt-enhancer --json

@@ -3,8 +3,16 @@
 //                       storage, theme source, contract versions
 //   cms info          — configuration summary (never secret values)
 //   cms capabilities  — the platform's own capability registry (static)
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSecretBox, PERMISSION_REGISTRY } from "@pcms/auth";
 import { BLOCK_DOCUMENT_SCHEMA_VERSION, MAX_BLOCKS_PER_DOCUMENT } from "@pcms/blocks";
@@ -18,6 +26,10 @@ import {
   migrationStatus,
   systemClock,
 } from "@pcms/core";
+import {
+  readIndependentExtensionPackages,
+  type VerifiedExtensionPackage,
+} from "@pcms/extensions/internal";
 import {
   heartbeatAgeMilliseconds,
   heartbeatIsFresh,
@@ -63,6 +75,84 @@ interface CheckResult {
   readonly name: string;
   readonly ok: boolean;
   readonly detail: string;
+}
+
+/** Read deployed lock identities without executing extension code or depending on cwd.
+ * @internal */
+export function __extensionViewsCoverage(
+  root: string,
+  mountedIds: readonly string[],
+  independent: readonly VerifiedExtensionPackage[] = [],
+): CheckResult {
+  const name = "extension-views-coverage";
+  if (mountedIds.length === 0)
+    return { name, ok: true, detail: "no enabled mounted extension views" };
+  try {
+    const releaseManifest = join(root, RELEASE_LAYOUT.releaseManifest);
+    const inventory = JSON.parse(
+      readFileSync(
+        existsSync(releaseManifest)
+          ? releaseManifest
+          : join(root, "extensions/first-party.lock.json"),
+        "utf8",
+      ),
+    ) as {
+      first_party_extensions?: readonly { id: string; dir?: string }[];
+      packages?: readonly { id: string; dir?: string }[];
+    };
+    const packages = inventory.first_party_extensions ?? inventory.packages ?? [];
+    const missing: string[] = [];
+    const containedFile = (directory: string, path: string): boolean => {
+      if (!path.split("/").every((part) => /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part))) return false;
+      try {
+        const file = realpathSync(resolve(directory, path));
+        const within = relative(realpathSync(directory), file);
+        return (
+          within !== ".." &&
+          !within.startsWith(`..${sep}`) &&
+          !resolve(file).startsWith(`${sep}${sep}`) &&
+          statSync(file).isFile()
+        );
+      } catch {
+        return false;
+      }
+    };
+    for (const id of new Set(mountedIds)) {
+      const external = independent.find((entry) => entry.manifest.id === id);
+      const pkg = packages.find((entry) => entry.id === id);
+      if (!external && (!pkg?.dir || !/^extensions\/[a-z0-9][a-z0-9-]*$/.test(pkg.dir)))
+        throw new Error(`deployed package directory unavailable: ${id}`);
+      const directory = external?.directory ?? join(root, pkg?.dir ?? "");
+      const packageReal = realpathSync(directory);
+      const packageRelative = relative(realpathSync(root), packageReal);
+      if (!external && (packageRelative.startsWith(`..${sep}`) || packageRelative === ".."))
+        throw new Error(`package escapes release root: ${id}`);
+      const manifest = JSON.parse(readFileSync(join(directory, "manifest.json"), "utf8")) as {
+        id: string;
+        registrations?: {
+          views?: readonly {
+            view_id: string;
+            base_template: string;
+            view_model_schema_version: string;
+          }[];
+        };
+      };
+      if (manifest.id !== id) throw new Error(`deployed manifest identity mismatch: ${id}`);
+      for (const view of manifest.registrations?.views ?? []) {
+        if (!containedFile(directory, view.base_template))
+          missing.push(`${id}/${view.view_id}: ${view.base_template}`);
+      }
+    }
+    return {
+      name,
+      ok: missing.length === 0,
+      detail: missing.length
+        ? `missing base templates: ${missing.join(", ")}`
+        : "all declared base templates of enabled mounted extensions are present",
+    };
+  } catch (error) {
+    return { name, ok: false, detail: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 function resolveConfig(env: NodeJS.ProcessEnv, cwd: string, options: GlobalOptions) {
@@ -398,75 +488,38 @@ export async function doctorCommand(invocation: DiagnosticsInvocation): Promise<
           });
         }
       }
-      // CORE-SHOP-01 P0-c (ADR-0018): every ENABLED extension view route
-      // must have a reachable template — the active theme's accepts_views
-      // override OR the package's base template file. Neither = the route
-      // answers EXTENSION_VIEW_TEMPLATE_MISSING (503): surface it here.
       try {
-        const mountRows = await withPool(env, cwd, options, (pool) =>
-          pool.query<{ extension_id: string }>(
-            "SELECT extension_id FROM pcms_extension_route_mounts WHERE retired_at IS NULL",
+        const mounts = await withPool(env, cwd, options, async (pool) => {
+          const result = await pool.query<{ extension_id: string }>(
+            `SELECT DISTINCT mounts.extension_id
+             FROM pcms_extension_route_mounts mounts
+             JOIN pcms_extension_installations installations USING (extension_id)
+             WHERE mounts.retired_at IS NULL AND installations.state = 'ENABLED'`,
+          );
+          return result.rows.map((row) => row.extension_id);
+        });
+        checks.push(
+          __extensionViewsCoverage(
+            resolveReleaseIdentity(fileURLToPath(import.meta.url)).root,
+            mounts,
+            config.registry?.independentExtensions === undefined
+              ? []
+              : readIndependentExtensionPackages({
+                  storeDir: config.registry.independentExtensions.rootDir,
+                  trustFile: config.registry.independentExtensions.trustFile,
+                  coreVersion: doctorCmsVersion(),
+                  ...(config.nodeEnv === "production"
+                    ? {}
+                    : { ownerUid: process.getuid?.() ?? 0, allowDev: true }),
+                }),
           ),
         );
-        const mounts = mountRows.rows.map((row) => row.extension_id);
-        if (mounts.length > 0 && existsSync(join(process.cwd(), "extensions", "catalog.js"))) {
-          const catalogModule = (await import(
-            `file://${join(process.cwd(), "extensions", "catalog.js")}`
-          )) as {
-            createFirstPartyExtensionCatalog?: (input: unknown) => {
-              list: () => readonly {
-                manifest: {
-                  id: string;
-                  registrations: {
-                    views: readonly {
-                      view_id: string;
-                      base_template: string;
-                      view_model_schema_version: string;
-                    }[];
-                    http_routes: readonly { view?: string }[];
-                  };
-                };
-              }[];
-            };
-          };
-          const activeTheme = JSON.parse(readFileSync(manifest, "utf8")) as {
-            templates?: readonly { accepts_views?: readonly string[] }[];
-          };
-          const themeManifestViews = new Set(
-            (activeTheme.templates ?? []).flatMap((template) => template.accepts_views ?? []),
-          );
-          const missing: string[] = [];
-          const catalog = catalogModule.createFirstPartyExtensionCatalog?.(undefined);
-          for (const extensionId of mounts) {
-            const artifact = catalog?.list().find((entry) => entry.manifest.id === extensionId);
-            if (artifact === undefined) continue;
-            for (const route of artifact.manifest.registrations.http_routes) {
-              if (route.view === undefined) continue;
-              const view = artifact.manifest.registrations.views.find(
-                (candidate) => candidate.view_id === route.view,
-              );
-              if (view === undefined) continue;
-              const major = view.view_model_schema_version.split(".")[0] ?? "1";
-              const overridden = themeManifestViews.has(`${extensionId}/${view.view_id}@${major}`);
-              const basePresent = existsSync(
-                join(process.cwd(), "extensions", extensionId, view.base_template),
-              );
-              if (!overridden && !basePresent) {
-                missing.push(`${extensionId}/${view.view_id}@${major}`);
-              }
-            }
-          }
-          checks.push({
-            name: "extension-views-coverage",
-            ok: missing.length === 0,
-            detail:
-              missing.length === 0
-                ? "every mounted extension view has a reachable template"
-                : `NO template reachable: ${missing.join(", ")} — those routes answer 503`,
-          });
-        }
-      } catch {
-        // pre-1723 database or no catalog — not a doctor failure
+      } catch (error) {
+        checks.push({
+          name: "extension-views-coverage",
+          ok: false,
+          detail: error instanceof Error ? error.message : String(error),
+        });
       }
     } else {
       checks.push({

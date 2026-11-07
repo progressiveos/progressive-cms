@@ -59,7 +59,9 @@ export interface RegistryInstallResult {
 
 export interface RegistryUpdateOutcome {
   readonly id: string | null;
-  readonly status: "RUNNING" | "SUCCEEDED" | "FAILED";
+  readonly status: "RUNNING" | "SUCCEEDED" | "FAILED" | "NO_OP";
+  readonly request_id?: string;
+  readonly product_id?: string;
   readonly from_version: string | null;
   readonly to_version: string | null;
   readonly failure_code: string | null;
@@ -79,8 +81,31 @@ export interface RegistryUpdateStatus {
   readonly update: RegistryUpdateOutcome | null;
 }
 
-export const fetchUpdateStatus = (): Promise<RegistryUpdateStatus> =>
-  apiGet<RegistryUpdateStatus>("/registry/update-status");
+export const fetchUpdateStatus = (
+  productId = "progressive.cms",
+  requestId?: string,
+): Promise<RegistryUpdateStatus> => {
+  const query = new URLSearchParams({ product_id: productId });
+  if (requestId) query.set("request_id", requestId);
+  return apiGet<RegistryUpdateStatus>(`/registry/update-status?${query}`);
+};
+
+export interface RegistryExtensionPlan {
+  readonly outcome: "READY" | "BLOCKED";
+  readonly no_op: boolean;
+  readonly new_permissions: readonly string[];
+  readonly issues: readonly {
+    readonly code: string;
+    readonly message: string;
+    readonly blocking: boolean;
+  }[];
+}
+
+export const planRegistryExtension = (
+  productId: string,
+  version: string,
+): Promise<RegistryExtensionPlan> =>
+  apiPost<RegistryExtensionPlan>("/update/preflight", { product_id: productId, version });
 
 export const fetchRegistryIndex = (): Promise<RegistryIndex> =>
   apiGet<RegistryIndex>("/registry/index");
@@ -122,8 +147,17 @@ export const confirmRegistryInstance = (): Promise<{
   readonly account_email: string;
 }> => apiPost<{ bound: boolean; account_email: string }>("/registry/instance/confirm", {});
 
-export const applyRegistryUpdate = (version: string): Promise<RegistryUpdateResult> =>
-  apiPost<RegistryUpdateResult>("/registry/apply-update", { version, wait: false });
+export const applyRegistryUpdate = (
+  version: string,
+  productId = "progressive.cms",
+  approvedPermissions: readonly string[] = [],
+): Promise<RegistryUpdateResult> =>
+  apiPost<RegistryUpdateResult>("/registry/apply-update", {
+    version,
+    product_id: productId,
+    approved_permissions: approvedPermissions,
+    wait: false,
+  });
 
 // Account-token API routes (POST/DELETE /registry/account-token) remain
 // available as an API-level fallback but have no admin UI (owner 2026-10-06:

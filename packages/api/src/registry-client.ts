@@ -46,6 +46,7 @@ export interface RegistryClient {
   /** Raw bytes of an approved package (the install path streams them into
    * the existing fail-closed installer unchanged). */
   download(downloadUrl: string): Promise<Buffer>;
+  downloadExtensionPackage?(downloadUrl: string): Promise<Buffer>;
   /** Engine release artifact bytes (sha256-verified by the caller). */
   downloadRelease(release: RegistryRelease): Promise<Buffer>;
   /**
@@ -203,6 +204,20 @@ export function createRegistryClient(options: {
   }
 
   async function fetchBytes(url: string, cap = MAX_BYTES, timeoutMs = TIMEOUT_MS): Promise<Buffer> {
+    const pinned = new URL(requireBaseUrl());
+    const target = new URL(url, pinned);
+    if (
+      !["https:", "http:"].includes(target.protocol) ||
+      target.origin !== pinned.origin ||
+      target.username ||
+      target.password ||
+      target.hash
+    )
+      throw new RegistryError(
+        "REGISTRY_ORIGIN_REFUSED",
+        "package download must use the configured Registry origin",
+      );
+    url = target.href;
     const token = await resolveToken();
     const response = await guardedFetch(
       url,
@@ -216,11 +231,25 @@ export function createRegistryClient(options: {
     if (Number.isFinite(declared) && declared > cap) {
       throw new RegistryError("REGISTRY_PACKAGE_TOO_LARGE", `download over ${cap} bytes`);
     }
-    const bytes = Buffer.from(await guardedRead(() => response.arrayBuffer()));
-    if (bytes.byteLength > cap) {
-      throw new RegistryError("REGISTRY_PACKAGE_TOO_LARGE", `download over ${cap} bytes`);
+    const reader = response.body?.getReader();
+    if (!reader) return Buffer.alloc(0);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const chunk = await guardedRead(() => reader.read());
+        if (chunk.done) break;
+        size += chunk.value.byteLength;
+        if (size > cap) {
+          await reader.cancel();
+          throw new RegistryError("REGISTRY_PACKAGE_TOO_LARGE", `download over ${cap} bytes`);
+        }
+        chunks.push(Buffer.from(chunk.value));
+      }
+      return Buffer.concat(chunks, size);
+    } finally {
+      reader.releaseLock();
     }
-    return bytes;
   }
 
   return {
@@ -239,13 +268,11 @@ export function createRegistryClient(options: {
     async download(downloadUrl) {
       return fetchBytes(downloadUrl, 2 * 1024 * 1024);
     },
+    async downloadExtensionPackage(downloadUrl) {
+      return fetchBytes(downloadUrl, 64 * 1024 * 1024, DOWNLOAD_TIMEOUT_MS);
+    },
     async downloadRelease(release) {
-      const artifactUrl = release.artifact.startsWith("http")
-        ? release.artifact
-        : baseUrl === null
-          ? release.artifact
-          : `${baseUrl}${release.artifact}`;
-      return fetchBytes(artifactUrl, RELEASE_ARTIFACT_MAX_BYTES, DOWNLOAD_TIMEOUT_MS);
+      return fetchBytes(release.artifact, RELEASE_ARTIFACT_MAX_BYTES, DOWNLOAD_TIMEOUT_MS);
     },
     /** Registry v2 binding, phase 2: the instance confirms the pending claim
      * created by the owner in the registry account area (public endpoint, rate-limited there).

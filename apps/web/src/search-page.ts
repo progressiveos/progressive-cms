@@ -15,7 +15,7 @@ import {
   RateLimitError,
   rateLimitHeaders,
 } from "@pcms/api";
-import { escapeHtmlString as escapeHtml } from "@pcms/core";
+import { escapeHtmlString as escapeHtml, type PublicCspMode } from "@pcms/core";
 import { PREVIEW_RESPONSE_HEADERS } from "@pcms/publication";
 import type { SearchResultItemViewModel, SearchResultPageViewModel } from "@pcms/themes";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -77,7 +77,11 @@ export interface SearchPageTheme {
 
 export function registerSearchPageRoute(
   fastify: FastifyInstance,
-  options: { application: ApplicationServices; theme?: SearchPageTheme },
+  options: {
+    application: ApplicationServices;
+    theme?: SearchPageTheme;
+    publicCspMode?: PublicCspMode;
+  },
 ): void {
   const handler = createSearchPageHandler(options);
   fastify.get("/search", handler);
@@ -90,6 +94,7 @@ export function createSearchPageHandler(options: {
   theme?: SearchPageTheme;
   preview?: boolean;
   locale?: string;
+  publicCspMode?: PublicCspMode;
 }): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   const themeComponent = options.theme ?? null;
   const searchRateLimit =
@@ -102,7 +107,8 @@ export function createSearchPageHandler(options: {
     // The full public-page security baseline (CSP/nosniff/permissions),
     // identical to the site pages — the system route is a public page first.
     for (const [name, value] of Object.entries(
-      options.theme?.headers ?? publicSecurityHeaders(undefined),
+      options.theme?.headers ??
+        publicSecurityHeaders(undefined, [], undefined, options.publicCspMode),
     )) {
       void reply.header(name, value);
     }
@@ -139,7 +145,10 @@ export function createSearchPageHandler(options: {
       void reply.header(
         "content-security-policy",
         mergeSystemCsp(
-          (options.theme?.headers ?? publicSecurityHeaders(undefined))["content-security-policy"],
+          (
+            options.theme?.headers ??
+            publicSecurityHeaders(undefined, [], undefined, options.publicCspMode)
+          )["content-security-policy"],
           searchInjection,
         ),
       );

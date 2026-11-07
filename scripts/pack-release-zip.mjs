@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 /** Packs the staged release directory into the product-wide zip artifact
  * (top-level <releaseId>/ prefix — same layout the tar.gz used to have). */
-export async function packReleaseZip(outRoot, releaseId, artifactPath) {
+export async function packReleaseZip(outRoot, releaseId, artifactPath, builtAt) {
   const { readdirSync, createWriteStream } = await import("node:fs");
   const yazl = (await import("yazl")).default;
   const zip = new yazl.ZipFile();
@@ -11,11 +11,16 @@ export async function packReleaseZip(outRoot, releaseId, artifactPath) {
   const visited = new Set();
   const addFile = (path, name) => {
     const mode = lstatSync(path).mode & 0o111 ? 0o100755 : 0o100644;
-    zip.addFile(path, name, { mode });
+    zip.addFile(path, name, { mode, ...(builtAt ? { mtime: builtAt } : {}) });
   };
   const addDir = (absolute, relative) => {
-    zip.addEmptyDirectory(`${releaseId}/${relative}`, { mode: 0o40755 });
-    for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    zip.addEmptyDirectory(`${releaseId}/${relative}`, {
+      mode: 0o40755,
+      ...(builtAt ? { mtime: builtAt } : {}),
+    });
+    for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((a, b) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+    )) {
       const childAbsolute = join(absolute, entry.name);
       const childRelative = relative === "" ? entry.name : `${relative}/${entry.name}`;
       const entryName = `${releaseId}/${childRelative}`;

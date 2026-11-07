@@ -48,6 +48,46 @@ cms doctor                     # runtime/config/DB/paths/secret store
 cms capabilities --json        # features, extensions, providers
 ```
 
+The installer creates a separate `Site-Creator` machine identity after the human
+OWNER and saves its one-time credential in `/root/agent-bootstrap.json` (0600).
+Use that credential for API access; do not log in as the owner. For manual
+installations the equivalent local operator command is:
+
+```bash
+cms token bootstrap --json     # raw_secret appears only on first issuance
+# Operator recovery, only when the saved credential is lost or expired:
+cms token bootstrap --rotate --json
+```
+
+The fixed profile contains all operational Core permissions, with no access
+management, token issuance, interaction/lead PII, refunds, privacy operations or
+community skill management. TTL defaults to one year (`--ttl-hours 1..8760`).
+Repeating bootstrap does not rotate or reveal the credential. Save a new secret
+securely; never replace a saved credential with an idempotent response lacking
+`raw_secret`. `cms token issue --name <agent-name> --preset <preset>` remains a
+local operator command for narrower accounts, not an agent escalation API.
+
+After installing and enabling a trusted independent `progressive.shop` package,
+`Site-Creator` can obtain a fixed `Shop-Creator` profile without human login:
+
+```bash
+cms extensions creator-token progressive.shop --site <site-key> \
+  --environment <environment> --yes --json
+```
+
+This returns a one-time `raw_secret` for a separate account, bound to that site
+and environment. Store it securely and use it as the Shop agent's API credential.
+All permissions declared by the installed Shop package and the operational Core
+profile are included; arbitrary accounts, names or scopes cannot be requested.
+Every declared Shop operation must be covered or issuance fails diagnostically.
+Repeats preserve the account and current token; `--rotate` explicitly replaces
+the token and revokes old ones. A changed package/profile also refreshes the
+credential. Its lifetime cannot exceed the requesting parent token's lifetime.
+Only the designated bootstrap identity can issue it; `Shop-Creator` cannot
+delegate. Disabling the parent account or revoking, expiring or rotating its
+credential disables child authentication. The new primary credential can
+refresh the same child account with a new token.
+
 Health surfaces: `GET /system/status` and `GET /system/metrics?hours=24`
 (1-minute samples, 72h retention). Anything not fresh → `journalctl -u
 progressive-cms-web -u progressive-cms-worker`.

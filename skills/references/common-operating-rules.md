@@ -13,6 +13,13 @@ them.
   which site, which environment, who am I, which scopes do I hold, which
   contract versions and capabilities does the server expose, which skills are
   installed, is preview available.
+- On a fresh installation, use the separate Site-Creator credential saved by
+  the installer in `/root/agent-bootstrap.json` (0600). A manual installation
+  uses the local operator command `cms token bootstrap --json` after OWNER
+  creation. The secret is shown only on issuance; repeats never reveal it.
+  Set `PCMS_API_URL`/`PCMS_API_TOKEN` through the protected environment and run
+  discovery; no owner login or password script is required. `cms token issue`
+  remains an operator path for narrower accounts, not the default bootstrap.
 - Never assume a schema, permission, capability or URL that can be queried.
 - Load only the schemas/entities the current task needs (context efficiency).
 
@@ -26,9 +33,15 @@ them.
 
 - Read the effective permissions from bootstrap. Before an action, check the
   action's required scope against them.
-- Missing scope: never attempt a bypass, work around, or ask another actor to
-  execute it indirectly. Complete all safe preparation (drafts, validation,
-  preview, plan), stop, and report the exact missing permission name.
+- Missing scope: use a documented Core creator-profile operation only when
+  explicitly eligible. After trusted Shop is enabled, the designated
+  Site-Creator can call `cms extensions creator-token progressive.shop --site
+  <key> --environment <env> --yes --json` without human login. Core chooses all
+  scopes and the child identity; callers cannot choose accounts or grants.
+  Save the one-time secret securely, use the returned credential and rediscover
+  permissions. Shop-Creator cannot delegate. Otherwise never bypass a scope or
+  ask another actor to execute it indirectly: complete safe preparation and
+  report the exact missing permission.
 - Scopes live in the token; a Skill or prompt cannot grant them.
 
 ## 4. No direct database, no Core patches

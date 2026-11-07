@@ -8,6 +8,7 @@ import { valid as semverValid } from "semver";
 import { ExtensionError } from "./errors.js";
 
 /** Production runtime policy (Operations spec §43; release manifest gates). */
+export const EXTENSION_PACKAGE_CONTRACT_VERSION = "1.0";
 export const SUPPORTED_NODE_RANGE = ">=24.21 <25";
 // M15 (PCMS-OPS-T107): the range explicitly pins the supported PostgreSQL
 // majors per CMS release. 14–16 were proven through M14; 17–18 are proven on
@@ -22,6 +23,7 @@ export const CONTRACT_VERSION_KEYS = [
   "cms",
   "config_schema",
   "extension_contract",
+  "extension_package",
   "rest_api",
   "mcp",
   "theme_contract",
@@ -101,6 +103,11 @@ export function createSystemContractVersionRegistry(
     source: string;
   }[] = [
     { key: "cms", version: input.cmsVersion, source: "cms:release" },
+    {
+      key: "extension_package",
+      version: EXTENSION_PACKAGE_CONTRACT_VERSION,
+      source: "cms:extensions",
+    },
     { key: "config_schema", version: input.configSchemaVersion, source: "cms:core" },
     {
       key: "extension_contract",

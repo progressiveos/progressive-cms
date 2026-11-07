@@ -13,7 +13,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
   ApiError,
   type ApplicationServices,
@@ -33,7 +33,7 @@ import {
 } from "@pcms/api";
 import { validateBlockDocument } from "@pcms/blocks";
 import { collectRichTextMediaIds, type FieldSchema, resolveNavigationEntries } from "@pcms/content";
-import { isStableId } from "@pcms/core";
+import { isStableId, type PublicCspMode } from "@pcms/core";
 import {
   createMediaPresetRegistry as createAssetPresetRegistry,
   createMediaViewModelProvider,
@@ -114,6 +114,7 @@ import { loadThemePlacements } from "./theme-placements.js";
 
 export interface SiteRouteOptions {
   readonly application: ApplicationServices;
+  readonly publicCspMode?: PublicCspMode;
   /**
    * Derives the opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01)
    * for extension call contexts from the transport-resolved peer. Omitted
@@ -439,7 +440,10 @@ export async function registerSiteRoute(
         : prepareDiscoveryMarkdown(candidates, environment),
   });
   if (themeDir === undefined) {
-    registerSearchPageRoute(fastify, { application });
+    registerSearchPageRoute(fastify, {
+      application,
+      ...(options.publicCspMode === undefined ? {} : { publicCspMode: options.publicCspMode }),
+    });
     return; // API-only deployment: search has built-in markup
   }
 
@@ -2772,9 +2776,8 @@ export async function registerSiteRoute(
       );
     }
     // Public-page security baseline (PCMS-OPS-T106): CSP composed from the
-    // theme's validated assets.csp declaration (M17 §55 — the header was
-    // defined but never applied to public HTML before M17), plus the hash of
-    // the contract's own tokens injection point (see tokensStyleHash).
+    // configured public mode, theme's validated assets.csp declaration, and
+    // the hash of the contract's own tokens injection point (see tokensStyleHash).
     for (const [header, value] of Object.entries(
       publicSecurityHeaders(
         currentActiveStack().manifest.assets?.csp,
@@ -2786,6 +2789,7 @@ export async function registerSiteRoute(
               scriptHashes: injection.scriptHashes,
               blobFrame: injection.blobFrame,
             },
+        options.publicCspMode,
       ),
     )) {
       void reply.header(header, value);
@@ -2862,6 +2866,7 @@ export async function registerSiteRoute(
                 scriptHashes: injection.scriptHashes,
                 blobFrame: injection.blobFrame,
               },
+          options.publicCspMode,
         ),
       )) {
         void reply.header(header, value);
@@ -2881,7 +2886,12 @@ export async function registerSiteRoute(
   function searchTheme(stack: ThemeStack, preview = false) {
     const { manifest, renderService, themeSettings, tokensCss, tokensStyleHash } = stack;
     return {
-      headers: publicSecurityHeaders(manifest.assets?.csp, [tokensStyleHash()]),
+      headers: publicSecurityHeaders(
+        manifest.assets?.csp,
+        [tokensStyleHash()],
+        undefined,
+        options.publicCspMode,
+      ),
       async render(search: import("@pcms/themes").SearchResultPageViewModel) {
         const component = manifest.components.find((c) => c.id === "search-result");
         if (!renderService.hasTemplate("search") && component === undefined) return null;
@@ -3105,7 +3115,12 @@ export async function registerSiteRoute(
       // CSP follows the RENDERING theme: a candidate preview carries the
       // candidate's policy and its own tokens style hash.
       for (const [header, value] of Object.entries(
-        publicSecurityHeaders(stack.manifest.assets?.csp, [stack.tokensStyleHash()]),
+        publicSecurityHeaders(
+          stack.manifest.assets?.csp,
+          [stack.tokensStyleHash()],
+          undefined,
+          options.publicCspMode,
+        ),
       )) {
         void reply.header(header, value);
       }
@@ -3229,7 +3244,7 @@ export async function registerSiteRoute(
       // layout so extension views never duplicate site chrome.
       try {
         const source = readFileSync(
-          join(process.cwd(), result.view.extensionsDir, result.view.baseTemplate),
+          resolve(process.cwd(), result.view.extensionsDir, result.view.baseTemplate),
           "utf8",
         );
         const engine = createThemeEngine({ templates: { __extension_view__: source } });
@@ -3249,7 +3264,12 @@ export async function registerSiteRoute(
         void reply.header("content-type", "text/html; charset=utf-8");
         void reply.header("cache-control", "no-store");
         for (const [header, value] of Object.entries(
-          publicSecurityHeaders(stack.manifest.assets?.csp, [stack.tokensStyleHash()]),
+          publicSecurityHeaders(
+            stack.manifest.assets?.csp,
+            [stack.tokensStyleHash()],
+            undefined,
+            options.publicCspMode,
+          ),
         )) {
           void reply.header(header, value);
         }
@@ -3275,7 +3295,12 @@ export async function registerSiteRoute(
     void reply.header("content-type", "text/html; charset=utf-8");
     void reply.header("cache-control", "no-cache");
     for (const [header, value] of Object.entries(
-      publicSecurityHeaders(stack.manifest.assets?.csp, [stack.tokensStyleHash()]),
+      publicSecurityHeaders(
+        stack.manifest.assets?.csp,
+        [stack.tokensStyleHash()],
+        undefined,
+        options.publicCspMode,
+      ),
     )) {
       void reply.header(header, value);
     }

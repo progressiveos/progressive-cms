@@ -507,12 +507,18 @@ export const en: Messages = {
   "registry.install": "Install",
   "registry.installed_toast": "Package {id} installed",
   "registry.releases_title": "Engine releases",
+  "registry.extension_updates_title": "Extension updates",
   "registry.releases_empty": "No releases in the registry yet.",
   "registry.col_version": "Version",
   "registry.col_sha256": "SHA-256",
   "registry.col_notes": "Notes",
   "registry.col_actions": "Actions",
   "registry.update_to_version": "Update to this version",
+  "registry.extension_confirm_title": "Install or update extension",
+  "registry.extension_permissions": "New permissions requested by this version:",
+  "registry.extension_no_new_permissions": "No new permissions requested.",
+  "registry.extension_restart_hint":
+    "The CMS will back up the installation and restart. Existing data and settings are preserved.",
   "registry.backup_retention_warning":
     "The new backup is verified. Old backups could not be removed; this does not block the update. Ask the operator to check backup directory ownership and permissions.",
   "registry.update_applied_toast": "Update applied: version {version}",

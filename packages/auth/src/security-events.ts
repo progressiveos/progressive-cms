@@ -10,6 +10,7 @@ import { type DbClient, type DbPool, newStableId } from "@pcms/core";
 import type { ActorType } from "./actor.js";
 
 export type SecurityEventType =
+  | "AGENT_PROFILE_GRANTED"
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILURE"
   | "LOGIN_THROTTLED"

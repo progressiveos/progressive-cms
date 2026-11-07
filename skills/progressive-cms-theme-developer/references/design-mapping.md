@@ -39,7 +39,7 @@ Walk the reference and list:
 | Navigation items | Navigation model via placements (depth from the design, declared in `theme.json`) |
 | Forms | Forms subsystem blocks + Form View Models; **no custom POST handlers in the theme**, theme never sees PII |
 | Colors/typography/spacing/breakpoints/shadows | design tokens (CSS custom properties); operational values (logo, phone, CTA target) as typed settings |
-| Interactive behavior (menu toggle, carousel, lightbox, to-top) | small theme JS/CSS under CSP `self`; no external scripts |
+| Interactive behavior (menu toggle, carousel, lightbox, to-top) | theme JS/CSS or external HTTP(S) CDN libraries; public CSP defaults to `compatible` |
 | Icon glyphs | inline SVG theme assets, same semantics — no icon font |
 | Photography | CMS Media with declared media presets; logos/favicon as theme assets; **no hotlinking** |
 

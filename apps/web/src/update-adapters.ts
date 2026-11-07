@@ -11,8 +11,10 @@
 //   ReleaseDeploymentPort  starts the privileged install oneshot (verifies
 //                       sha256 + embedded manifest match, stages an immutable
 //                       release, flips `current`) and validates the result
-//   ServiceRestartPort  restarts the two units and gates on /health/ready
-//   PostflightDoctor    migrations-current + heartbeat + web health
+//   ServiceRestartPort  restarts the two units (no health gate here: the
+//                       running web process cannot verify its own successor —
+//                       the update controller's doctor() gates /health/ready)
+//   PostflightDoctor    migrations-current + worker heartbeat freshness
 //   MigrationApplier    runs the NEW release's SQL migrations through the
 //                       core migrator (advisory-locked, ledger-backed)
 //
@@ -50,7 +52,8 @@ export interface UpdateAdapterOptions {
   readonly installUnit: string;
   /** Where backup sets land. */
   readonly backupDir: string;
-  /** Local web process health endpoint used as the restart gate. */
+  /** Loopback-reachable web health URL; the independent-update controller's
+   *  doctor() is the only consumer (postflight + rollback re-check). */
   readonly healthUrl: string;
   readonly pool: DbPool;
   /**
@@ -329,6 +332,7 @@ export function createProductionUpdatePorts(
     },
 
     serviceRestart: {
+      webRestartDeferred: true,
       async restart() {
         // The orchestrator runs INSIDE the web process, so restarting that
         // very unit synchronously would kill the caller mid-record. The
@@ -353,35 +357,8 @@ export function createProductionUpdatePorts(
           detached: true,
           stdio: "ignore",
         }).unref();
-        // Root restart bridge (deploy/systemd/progressive-cms-restart.{path,service}):
-        // the marker asks the root path unit to restart BOTH units. Scheduled
-        // INSIDE the fuse window (7s < 8s): by then the orchestrator has
-        // finished the doctor, history record and maintenance restore — the
-        // same invariant the fuse exists for. An earlier (synchronous) write
-        // would have the root unit restart web mid-orchestration. ENOENT
-        // means the bridge (or /run/progressive-cms) is absent — skipped.
-        setTimeout(() => {
-          try {
-            writeFileSync(
-              "/run/progressive-cms/restart-requested",
-              `${new Date().toISOString()}\n`,
-            );
-          } catch (error) {
-            const code = (error as NodeJS.ErrnoException).code;
-            if (code === "ENOENT") return; // bridge absent — skipped by design
-            if (code === "EROFS" || code === "EACCES" || code === "EPERM") {
-              // Deployment namespace propagated the runtime dir read-only
-              // (observed on LXC after fuse restarts). The fuse path above
-              // remains the live restart mechanism; the bridge is the
-              // fallback — one info line, not an error.
-              console.log(
-                `[update] restart-bridge marker skipped (${code}): fuse restart remains the live path`,
-              );
-              return;
-            }
-            console.error("[update] restart-bridge marker not written:", error);
-          }
-        }, 7_000).unref();
+        // One pending Web restart only: a second bridge trigger could interrupt
+        // a new update after the first boot already confirmed its lease.
       },
     },
 

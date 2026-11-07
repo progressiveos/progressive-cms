@@ -64,6 +64,9 @@
         },
         "cookieSecure": {
           "type": "boolean"
+        },
+        "publicCspMode": {
+          "enum": ["compatible", "strict"]
         }
       }
     },
@@ -421,6 +424,21 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "independentExtensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rootDir", "trustFile"],
+          "properties": {
+            "rootDir": {
+              "type": "string",
+              "minLength": 1
+            },
+            "trustFile": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
         "baseUrl": {
           "type": "string",
           "minLength": 1,

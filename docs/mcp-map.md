@@ -4305,13 +4305,43 @@ Complete argument schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "properties": {}
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "approved_permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 128,
+      "uniqueItems": true
+    }
+  },
+  "dependencies": {
+    "product_id": [
+      "version"
+    ],
+    "version": [
+      "product_id"
+    ]
+  }
 }
 ```
 
 Adapter input/result mapping:
 ```javascript
-return operations.getUpdatePreflight(ctx);
+return operations.getUpdatePreflight(
+  ctx,
+  args["product_id"] === void 0 ? void 0 : {
+    productId: args["product_id"],
+    version: args["version"],
+    ...args["approved_permissions"] === void 0 ? {} : { approvedPermissions: args["approved_permissions"] }
+  }
+);
 ```
 
 <a id="cms_list_deprecations"></a>
@@ -5561,6 +5591,17 @@ Complete argument schema:
   "properties": {
     "version": {
       "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "approved_permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 128,
+      "uniqueItems": true
     }
   },
   "required": [
@@ -5571,7 +5612,10 @@ Complete argument schema:
 
 Adapter input/result mapping:
 ```javascript
-return operations.applyRegistryUpdate(ctx, args["version"]);
+return operations.applyRegistryUpdate(ctx, args["version"], {
+  ...args["product_id"] === void 0 ? {} : { productId: args["product_id"] },
+  ...args["approved_permissions"] === void 0 ? {} : { approvedPermissions: args["approved_permissions"] }
+});
 ```
 
 ## Optional shipped extension tools: 3

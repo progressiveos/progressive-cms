@@ -518,18 +518,20 @@ apiCall(client, "POST", `${endpoint}/change`, {
 
 ### packages/cli/src/commands/extensions.ts
 
-Literal parsed flags: `--check`, `--confirmation`, `--extension-config`.
+Literal parsed flags: `--check`, `--confirmation`, `--extension-config`, `--rotate`.
 
 Environment keys read directly: none; shared loaders may read configuration/environment.
 
 Command/operand selection conditions:
 ```javascript
 case "compatibility"
+case "creator-token"
 case "disable"
 case "enable"
 case "install"
 case "list"
 case "uninstall"
+operand !== "progressive.shop"
 operand === ""
 ```
 
@@ -546,6 +548,12 @@ get(client, "/extensions/contracts")
 get(client, "/extensions/deprecations")
 
 get(client, `/extensions/${encodeURIComponent(operand)}/compatibility`)
+
+post(client, "/extensions/progressive.shop/creator-token", {
+          site_key: options.site,
+          environment: options.environment,
+          ...rest.includes("--rotate") ? { rotate: true } : {}
+        })
 
 post(client, `/extensions/${encodeURIComponent(operand)}/disable`, {})
 
@@ -944,15 +952,15 @@ apiCall(
 
 ### packages/cli/src/commands/registry.ts
 
-Literal parsed flags: `--version`.
+Literal parsed flags: `--approve-permission`, `--artifact`, `--product`, `--request`, `--version`.
 
 Environment keys read directly: none; shared loaders may read configuration/environment.
 
 Command/operand selection conditions:
 ```javascript
-subcommand !== "apply"
-subcommand !== "releases"
-subcommand !== "status"
+subcommand === "apply"
+subcommand === "install"
+subcommand === "plan"
 subcommand === "releases"
 subcommand === "status"
 ```
@@ -967,13 +975,35 @@ apiCall(
         )}`
       )
 
+apiCall(
+        client,
+        "GET",
+        productId2 ? `/registry/packages/${encodeURIComponent(productId2)}` : "/registry/index"
+      )
+
+apiCall(
+        client,
+        "POST",
+        `/registry/release-upload?${query}`,
+        readFileSync(artifact)
+      )
+
+apiCall(
+      client,
+      "POST",
+      subcommand === "plan" ? "/update/preflight" : "/registry/apply-update",
+      {
+        version: version.trim(),
+        ...productId ? { product_id: productId } : {},
+        approved_permissions: approvedPermissions
+      }
+    )
+
 apiCall(client, "GET", "/registry/index")
 
 apiCall(client, "GET", "/registry/instance")
 
-apiCall(client, "POST", "/registry/apply-update", {
-      version: version.trim()
-    })
+apiCall(client, "GET", `/registry/update-status?${query}`)
 ```
 
 ### packages/cli/src/commands/research.ts
@@ -1276,7 +1306,7 @@ apiCall(client, "POST", "/update/preflight", {
 
 ### packages/cli/src/commands/user-admin.ts
 
-Literal parsed flags: `--config`, `--email`, `--json`, `--name`, `--token-id`.
+Literal parsed flags: `--config`, `--description`, `--email`, `--environment`, `--json`, `--name`, `--preset`, `--purpose`, `--rotate`, `--site`, `--token-id`, `--ttl-hours`.
 
 Environment keys read directly: none; shared loaders may read configuration/environment.
 
@@ -1288,6 +1318,8 @@ case "disable-mfa"
 case "reset-password"
 subcommand !== "revoke"
 subcommand !== "revoke-all"
+subcommand === "bootstrap"
+subcommand === "issue"
 ```
 
 ### packages/cli/src/framework.ts

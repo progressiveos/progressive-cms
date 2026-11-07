@@ -29,6 +29,8 @@ export interface AuthStrength {
 }
 
 export interface ActorContext {
+  /** Server-resolved bearer identity for constrained credential delegation. */
+  readonly accessTokenId?: string;
   readonly type: ActorType;
   /** Immutable internal id: user_id, service account id, or a synthetic id. */
   readonly id: string;

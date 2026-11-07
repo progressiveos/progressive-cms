@@ -132,6 +132,7 @@ import {
   refundPayment as refundPaymentOp,
 } from "./payments-ops.js";
 import { applyRedirectImportOp, validateRedirectImportOp } from "./redirect-import-ops.js";
+import { registryExtensionPlan } from "./registry-extension-ops.js";
 import {
   cleanupThemeRevisions,
   listThemeRevisions,
@@ -346,13 +347,13 @@ export function bindOperations(app: ApplicationServices) {
       }
       return app.registryClient.index();
     },
-    applyRegistryUpdate: (ctx: OperationContext, version: string) => {
+    applyRegistryUpdate: (ctx: OperationContext, version: string, options = {}) => {
       if (app.registryClient === null) {
         throw new ApiError("REGISTRY_NOT_CONFIGURED", "registry is not configured", {
           status: 409,
         });
       }
-      return registryApplyUpdateOp(app, ctx, version);
+      return registryApplyUpdateOp(app, ctx, version, options);
     },
     getServerInfo() {
       return {
@@ -727,7 +728,19 @@ export function bindOperations(app: ApplicationServices) {
     listExtensions: (ctx: OperationContext) => listExtensionsExtOp(app, ctx),
     getExtensionCompatibility: (ctx: OperationContext, input: { extension_id: string }) =>
       getExtensionCompatibilityExtOp(app, ctx, input),
-    getUpdatePreflight: (ctx: OperationContext) => getUpdatePreflightExtOp(app, ctx),
+    getUpdatePreflight: async (
+      ctx: OperationContext,
+      input?: { productId: string; version: string; approvedPermissions?: readonly string[] },
+    ) => {
+      if (!input) return getUpdatePreflightExtOp(app, ctx);
+      const plan = await registryExtensionPlan(app, ctx, input);
+      return {
+        ...plan.preflight,
+        no_op: plan.noOp,
+        new_permissions: plan.newPermissions,
+        product_id: input.productId,
+      };
+    },
     listDeprecations: (ctx: OperationContext) => listDeprecationsExtOp(app, ctx),
     installExtension: (ctx: OperationContext, input: { extension_id: string }) =>
       installExtensionExtOp(app, ctx, input),

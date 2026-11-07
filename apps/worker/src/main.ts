@@ -46,7 +46,9 @@ import {
   createExtensionEventConsumer,
   createExtensionLifecycleService,
   type ExtensionEventSubscriptionSpec,
+  loadIndependentExtensionCatalog,
   mergeOutboxHandlers,
+  recordIndependentGeneration,
 } from "@pcms/extensions/internal";
 import { createRetentionService } from "@pcms/forms";
 import {
@@ -144,7 +146,30 @@ async function startWorker(options: {
   // M14 trusted extension catalog (composition-time only — the DB is not a
   // package manager), built through the shared first-party helper so web and
   // worker always deploy the identical artifact set (ADR-0013 §52.1).
-  const extensionCatalog = createFirstPartyExtensionCatalog({ pool });
+  let extensionCatalog = createFirstPartyExtensionCatalog({ pool });
+  if (config.registry?.independentExtensions !== undefined) {
+    const deployment = config.registry.independentExtensions;
+    extensionCatalog = await loadIndependentExtensionCatalog({
+      base: extensionCatalog,
+      storeDir: deployment.rootDir,
+      trustFile: deployment.trustFile,
+      coreVersion: readCmsVersionFromRelease(),
+      factoryInput: { pool },
+      ...(config.nodeEnv === "production"
+        ? {}
+        : { ownerUid: process.getuid?.() ?? 0, allowDev: true }),
+    });
+    await recordIndependentGeneration(
+      pool,
+      "worker",
+      extensionCatalog,
+      readCmsVersionFromRelease(),
+    ).catch((error: unknown) =>
+      logger.warn("extension.generation.unavailable", {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
   const extensionSystemCapabilities = createCapabilityRegistry();
   // Runtime secret store key (PCMS-OPS-T131): the worker executes connector
   // deliveries, so it must be able to decrypt Admin-managed secret values.

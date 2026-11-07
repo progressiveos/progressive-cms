@@ -6,7 +6,12 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PERMISSION_REGISTRY, recordSecurityEvent } from "@pcms/auth";
-import { latestUpdateRecord, recordFailedUpdateAttempt } from "@pcms/extensions/internal";
+import {
+  latestUpdateRecord,
+  recordFailedUpdateAttempt,
+  releaseUpdateLease,
+  reserveUpdateLease,
+} from "@pcms/extensions/internal";
 import { installSkillPackage, loadCommunitySkills, SkillInstallError } from "@pcms/skills";
 import { gt, valid } from "semver";
 import yauzl from "yauzl";
@@ -19,6 +24,10 @@ import {
   RegistryError,
   type RegistryRelease,
 } from "../../registry-client.js";
+import {
+  registryExtensionApply,
+  uploadIndependentExtensionPackage,
+} from "../../registry-extension-ops.js";
 import type { ApiRoute } from "../registry.js";
 
 function registryOf(app: ApplicationServices) {
@@ -160,8 +169,28 @@ export async function registryApplyUpdateOp(
   app: ApplicationServices,
   ctx: OperationContext,
   version: string,
-  opts: { readonly wait?: boolean } = {},
+  opts: {
+    readonly wait?: boolean;
+    readonly productId?: string;
+    readonly approvedPermissions?: readonly string[];
+  } = {},
 ): Promise<Record<string, unknown>> {
+  if (opts.productId !== undefined && opts.productId !== "progressive.cms")
+    return registryExtensionApply(app, ctx, {
+      productId: opts.productId,
+      version,
+      ...(opts.approvedPermissions === undefined
+        ? {}
+        : { approvedPermissions: opts.approvedPermissions }),
+    });
+  const instanceCode = await app.registryInstanceCode.read();
+  const instanceToken = await app.registryInstanceToken.read();
+  if (!instanceCode || !instanceToken)
+    throw new ApiError(
+      "REGISTRY_INSTANCE_BINDING_REQUIRED",
+      "bind this instance to Registry before applying managed updates; public downloads remain available independently",
+      { status: 409 },
+    );
   const index = await wrapRegistry(() => registryOf(app).index());
   const release = index.releases.find((candidate) => candidate.version === version);
   if (release === undefined) {
@@ -185,6 +214,11 @@ export async function registryApplyUpdateOp(
       { status: 409 },
     );
   }
+  const leaseId = await reserveUpdateLease(app.pool, "progressive.cms");
+  const run = () =>
+    applyStagedRelease(app, ctx, release, version, leaseId).finally(() =>
+      releaseUpdateLease(app.pool, leaseId),
+    );
   // Async apply (owner 2026-10-07): the synchronous POST holds the browser
   // for ~40s and long proxy chains mangle the body on the way back. With
   // wait=false the endpoint returns RUNNING immediately while the heavy
@@ -197,15 +231,17 @@ export async function registryApplyUpdateOp(
       type: ctx.actor.type,
       ...(ctx.actor.id === undefined ? {} : { id: ctx.actor.id }),
     };
-    void applyStagedRelease(app, ctx, release, version).catch(async (error: unknown) => {
+    void run().catch(async (error: unknown) => {
       console.error("[update] async apply failed:", error);
       const code = (error as { code?: string } | null)?.code;
       try {
+        if (await latestUpdateRecord(app.pool, { requestId: leaseId })) return;
         await recordFailedUpdateAttempt(app.pool, app.clock, {
           from_version: from,
           to_version: version,
           failure_code: typeof code === "string" && code !== "" ? code : "UPDATE_STAGE_FAILED",
           actor,
+          validation_summary: { update_lease_id: leaseId },
         });
       } catch {
         // best-effort: the orchestrator path records its own failures
@@ -216,6 +252,8 @@ export async function registryApplyUpdateOp(
       sha256: null,
       update: {
         id: null,
+        request_id: leaseId,
+        product_id: "progressive.cms",
         status: "RUNNING",
         failure_code: null,
         rollback_policy: null,
@@ -224,7 +262,7 @@ export async function registryApplyUpdateOp(
       },
     };
   }
-  return applyStagedRelease(app, ctx, release, version);
+  return run();
 }
 
 async function applyStagedRelease(
@@ -232,6 +270,7 @@ async function applyStagedRelease(
   ctx: OperationContext,
   release: RegistryRelease,
   version: string,
+  leaseId: string,
 ): Promise<Record<string, unknown>> {
   const bytes = await wrapRegistry(() => registryOf(app).downloadRelease(release));
   const sha256 = createHash("sha256").update(bytes).digest("hex");
@@ -258,6 +297,7 @@ async function applyStagedRelease(
     manifest,
     backup_confirmation: version,
     confirmed_from_registry: true,
+    reserved_lease_id: leaseId,
   })) as Record<string, unknown>;
   // Per-instance telemetry (2026-09-29): best-effort — never fails the
   // apply, never blocks on the registry being slow.
@@ -628,6 +668,16 @@ export function makeRegistryRoutes(): ApiRoute[] {
         permission: "extensions.manage",
         csrf: true,
         bodyLimit: RELEASE_ARTIFACT_MAX_BYTES,
+        querySchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            product_id: { type: "string", maxLength: 130 },
+            version: { type: "string", maxLength: 32 },
+            approved_permissions: { type: "string", maxLength: 16384 },
+            preview: { type: "boolean" },
+          },
+        },
       },
       async handle(app, ctx, request) {
         const bytes = request.body;
@@ -642,6 +692,41 @@ export function makeRegistryRoutes(): ApiRoute[] {
           throw new ApiError("UPDATE_MANIFEST_INVALID", "artifact must be a zip archive", {
             status: 422,
           });
+        }
+        const query = request.query as {
+          product_id?: string;
+          version?: string;
+          approved_permissions?: string;
+          preview?: boolean;
+        };
+        if (query.product_id && query.product_id !== "progressive.cms") {
+          let approved: unknown;
+          try {
+            approved = JSON.parse(query.approved_permissions ?? "[]");
+          } catch {
+            approved = null;
+          }
+          if (
+            !query.version ||
+            !Array.isArray(approved) ||
+            approved.length > 128 ||
+            approved.some((permission) => typeof permission !== "string" || permission.length > 130)
+          )
+            throw new ApiError(
+              "API_REQUEST_INVALID",
+              "extension upload requires version and an explicit permissions array",
+              { status: 422 },
+            );
+          return {
+            status: 200,
+            body: await uploadIndependentExtensionPackage(app, ctx, {
+              productId: query.product_id,
+              version: query.version,
+              approvedPermissions: approved as string[],
+              bytes,
+              ...(query.preview === undefined ? {} : { preview: query.preview }),
+            }),
+          };
         }
         const sha256 = createHash("sha256").update(bytes).digest("hex");
         // Wild-archive control (owner 2026-10-06): the manifest must parse
@@ -659,24 +744,30 @@ export function makeRegistryRoutes(): ApiRoute[] {
             { status: 409 },
           );
         }
-        const incomingDir = app.registryIncomingDir;
-        const artifactName = `progressive-cms-registry-${targetVersion}.zip`;
-        stageArtifact(incomingDir, artifactName, bytes);
-        stageArtifact(incomingDir, `${artifactName}.sha256`, `${sha256}  ${artifactName}\n`);
-        stageArtifact(incomingDir, "update-manifest.json", JSON.stringify(manifest, null, 1));
-        await recordSecurityEvent(app.pool, null, {
-          type: "UPDATE_APPLY_ATTEMPT",
-          ...auditBase(ctx),
-          subjectType: "update",
-          subjectId: `upload:${targetVersion}`,
-          metadata: { source: "manual-upload", sha256, size_bytes: bytes.byteLength },
-        });
-        const applied = (await applyUpdate(app, ctx, {
-          manifest,
-          backup_confirmation: targetVersion,
-          confirmed_from_registry: true,
-        })) as Record<string, unknown>;
-        return { status: 200, body: { staged: artifactName, sha256, update: applied } };
+        const leaseId = await reserveUpdateLease(app.pool, "progressive.cms");
+        try {
+          const incomingDir = app.registryIncomingDir;
+          const artifactName = `progressive-cms-registry-${targetVersion}.zip`;
+          stageArtifact(incomingDir, artifactName, bytes);
+          stageArtifact(incomingDir, `${artifactName}.sha256`, `${sha256}  ${artifactName}\n`);
+          stageArtifact(incomingDir, "update-manifest.json", JSON.stringify(manifest, null, 1));
+          await recordSecurityEvent(app.pool, null, {
+            type: "UPDATE_APPLY_ATTEMPT",
+            ...auditBase(ctx),
+            subjectType: "update",
+            subjectId: `upload:${targetVersion}`,
+            metadata: { source: "manual-upload", sha256, size_bytes: bytes.byteLength },
+          });
+          const applied = (await applyUpdate(app, ctx, {
+            manifest,
+            backup_confirmation: targetVersion,
+            confirmed_from_registry: true,
+            reserved_lease_id: leaseId,
+          })) as Record<string, unknown>;
+          return { status: 200, body: { staged: artifactName, sha256, update: applied } };
+        } finally {
+          await releaseUpdateLease(app.pool, leaseId);
+        }
       },
     },
     {
@@ -697,16 +788,34 @@ export function makeRegistryRoutes(): ApiRoute[] {
           properties: {
             version: { type: "string", minLength: 1, maxLength: 32 },
             wait: { type: "boolean" },
+            product_id: { type: "string", maxLength: 130, pattern: "^[a-z0-9][a-z0-9.-]+$" },
+            approved_permissions: {
+              type: "array",
+              maxItems: 128,
+              uniqueItems: true,
+              items: { type: "string", maxLength: 130 },
+            },
           },
         },
       },
       async handle(app, ctx, request) {
-        const body = request.body as { version?: unknown; wait?: unknown };
+        const body = request.body as {
+          version?: unknown;
+          wait?: unknown;
+          product_id?: string;
+          approved_permissions?: string[];
+        };
         const version = typeof body.version === "string" ? body.version : "";
         const wait = body.wait !== false;
         return {
           status: 200,
-          body: await registryApplyUpdateOp(app, ctx, version, { wait }),
+          body: await registryApplyUpdateOp(app, ctx, version, {
+            wait,
+            ...(body.product_id === undefined ? {} : { productId: body.product_id }),
+            ...(body.approved_permissions === undefined
+              ? {}
+              : { approvedPermissions: body.approved_permissions }),
+          }),
         };
       },
     },
@@ -720,9 +829,22 @@ export function makeRegistryRoutes(): ApiRoute[] {
         tag: "discovery",
         auth: "authenticated",
         permission: "extensions.manage",
+        querySchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            product_id: { type: "string", maxLength: 130 },
+            request_id: { type: "string", maxLength: 36 },
+          },
+        },
       },
-      async handle(app) {
-        const record = await latestUpdateRecord(app.pool);
+      async handle(app, _ctx, request) {
+        const query = request.query as { product_id?: string; request_id?: string };
+        const productId = query.product_id ?? "progressive.cms";
+        const record = await latestUpdateRecord(app.pool, {
+          productId,
+          ...(query.request_id === undefined ? {} : { requestId: query.request_id }),
+        });
         return {
           status: 200,
           body: {
@@ -737,6 +859,8 @@ export function makeRegistryRoutes(): ApiRoute[] {
                 ? null
                 : {
                     id: record.id,
+                    request_id: record.validationSummary.update_lease_id ?? null,
+                    product_id: productId,
                     status: record.status,
                     from_version: record.fromVersion,
                     to_version: record.toVersion,

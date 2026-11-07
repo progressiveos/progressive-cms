@@ -2774,8 +2774,7 @@ export async function listRolesOp(
   presets: Record<string, readonly string[]>;
 }> {
   requirePermission(app, ctx, "roles.read");
-  const { createRoleService, AGENT_SCOPE_PRESETS } = await import("@pcms/auth");
-  const { PERMISSION_REGISTRY } = await import("@pcms/auth");
+  const { createRoleService, AGENT_SCOPE_PRESETS, listRegisteredPermissions } = await import("@pcms/auth");
   const roles = await createRoleService(app.pool).listRoles();
   return {
     roles: roles.map((role) => ({
@@ -2785,7 +2784,7 @@ export async function listRolesOp(
       immutable: role.immutable,
       permissions: [...role.permissions].sort(),
     })),
-    permissions: PERMISSION_REGISTRY.map((definition) => ({
+    permissions: listRegisteredPermissions().map((definition) => ({
       key: definition.key,
       summary: definition.summary,
     })),

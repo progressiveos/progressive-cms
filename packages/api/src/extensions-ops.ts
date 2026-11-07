@@ -105,6 +105,11 @@ export async function listExtensions(app: ApplicationServices, ctx: OperationCon
     const issues = report.issues.filter((issue) => issue.subject === artifact.manifest.id);
     return {
       ...extensionView(artifact.manifest),
+      ...(artifact.independentPackage?.adminModule === undefined
+        ? {}
+        : {
+            admin_module_url: `/api/v1/extensions/${encodeURIComponent(artifact.manifest.id)}/assets/${artifact.independentPackage.digest}/admin.js`,
+          }),
       installed: installation !== undefined,
       state: installation?.state ?? null,
       installed_version: installation?.version ?? null,
@@ -399,6 +404,7 @@ export async function applyUpdate(
      * boot-time configured-target compare (which can never match on first
      * download) is skipped and preflight runs against THIS manifest. */
     readonly confirmed_from_registry?: boolean;
+    readonly reserved_lease_id?: string;
   },
 ) {
   requirePermission(app, ctx, "extensions.manage");
@@ -438,6 +444,9 @@ export async function applyUpdate(
     migrations: undefined,
   };
   const orchestrator = createUpdateOrchestrator({
+    ...(input.reserved_lease_id === undefined
+      ? {}
+      : { reservedLeaseId: input.reserved_lease_id, releaseLeaseOnFinish: false }),
     pool: app.pool,
     clock: app.clock,
     preflight,

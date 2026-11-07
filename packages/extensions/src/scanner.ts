@@ -19,6 +19,7 @@ export interface RuntimeRange {
 }
 
 export interface ScannedExtension {
+  readonly independentPackage?: boolean;
   readonly id: string;
   readonly deployed: boolean;
   readonly installed: boolean;

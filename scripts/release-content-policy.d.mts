@@ -1,6 +1,7 @@
 export interface ReleasePolicyContext {
   readonly packageNames: ReadonlySet<string>;
   readonly extensionDirs: ReadonlySet<string>;
+  readonly extensionRuntimeAssets?: ReadonlySet<string>;
   readonly themeDirs: ReadonlySet<string>;
   /** CORE-RC19: set when the accepted documentation folder was staged. */
   readonly docsIncluded?: boolean;

@@ -10,6 +10,7 @@
 export type NodeEnv = "development" | "production" | "test";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 export type DbSslMode = "disable" | "require" | "verify-full";
+export type PublicCspMode = "compatible" | "strict";
 
 /** Points at a secret source; the value itself is never part of config. */
 export interface SecretRef {
@@ -63,6 +64,8 @@ export interface AppConfig {
      * and keeps the default.
      */
     cookieSecure?: boolean;
+    /** Public-page CSP policy. Omitted resolves to `compatible` in the web app. */
+    publicCspMode?: PublicCspMode;
   };
   db: {
     host: string;
@@ -204,6 +207,7 @@ export interface AppConfig {
    */
   registry?: {
     baseUrl?: string;
+    independentExtensions?: { rootDir: string; trustFile: string };
     /** Consent: upload agent reports after successful registry-sourced
      * updates. Default false. */
     reportUpdates?: boolean;
@@ -311,6 +315,7 @@ export const CONFIG_SCHEMA = {
           },
         },
         cookieSecure: { type: "boolean" },
+        publicCspMode: { enum: ["compatible", "strict"] },
       },
     },
     db: {
@@ -474,6 +479,15 @@ export const CONFIG_SCHEMA = {
       type: "object",
       additionalProperties: false,
       properties: {
+        independentExtensions: {
+          type: "object",
+          additionalProperties: false,
+          required: ["rootDir", "trustFile"],
+          properties: {
+            rootDir: { type: "string", minLength: 1 },
+            trustFile: { type: "string", minLength: 1 },
+          },
+        },
         baseUrl: { type: "string", minLength: 1, maxLength: 500 },
         /** Consent: upload agent reports after successful registry-sourced
          * updates (see deploy/docs/CONFIGURATION.md). Default false. */

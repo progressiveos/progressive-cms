@@ -17,7 +17,8 @@
       "@pcms/extensions": ["./packages/extensions/src/sdk.ts"],
       "@pcms/extensions/internal": ["./packages/extensions/src/index.ts"],
       "@pcms/*": ["./packages/*/src/index.ts"]
-    }
+    },
+    "jsx": "react-jsx"
   },
   "include": [
     "packages/*/src",

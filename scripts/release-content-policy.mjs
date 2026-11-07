@@ -164,7 +164,7 @@ export function isAllowedReleasePath(path, context) {
     if (rest[0] === "manifest.json") return rest.length === 1;
     if (rest[0] === "src") return rest.length > 1;
     if (rest[0] === "migrations") return rest.length === 2 && rest[1].endsWith(".sql");
-    if (rest[0] === "agent") return rest.length > 1 && /\.(?:md|php|txt|json)$/.test(rest.at(-1));
+    if (context.extensionRuntimeAssets?.has(path)) return true;
     return false;
   }
   if (parts[0] === "db")

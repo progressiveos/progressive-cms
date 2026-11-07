@@ -76,6 +76,8 @@ const USAGE = [
   "Local operator recovery (M08; audited, no HTTP surface):",
   "  user create-owner|reset-password|disable|disable-mfa [--email <e>] ...",
   "  session revoke-all --email <e>              revoke all sessions of a user",
+  "  token issue --name <agent> --preset <name>  first agent token, no Admin needed",
+  "  token bootstrap [--rotate] [--ttl-hours 1..8760] [--config <p>] [--json]",
   "  token revoke --token-id <uuid>              revoke a service-account token",
   "",
   "M09 generation (spec §57 exit codes; --json deterministic output):",
