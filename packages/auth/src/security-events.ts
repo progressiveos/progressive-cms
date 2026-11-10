@@ -49,6 +49,10 @@ export type SecurityEventType =
   | "PAYMENT_PROVIDER_INSTANCE_UPDATED"
   | "PAYMENT_PROVIDER_INSTANCE_DELETED"
   | "PAYMENT_PROVIDER_INSTANCE_TESTED"
+  // CORE-PAYMENTS-ADMIN-CONFIG-01: one atomic settings save of a connection.
+  // Slot NAMES and presence only — never a value, ciphertext or fragment.
+  | "PAYMENT_PROVIDER_INSTANCE_SETTINGS_SAVED"
+  | "PAYMENT_CREDENTIAL_IMPORTED"
   // M14 privileged extension lifecycle and update operations
   // (Extensions spec §12–§13/§37): permission-gated AND audited.
   | "EXTENSION_INSTALLED"

@@ -244,7 +244,13 @@ export function makeExtensionsRoutes(): ApiRoute[] {
         bodySchema: {
           type: "object",
           additionalProperties: false,
-          oneOf: [{ required: ["manifest"] }, { required: ["product_id", "version"] }],
+          oneOf: [
+            { required: ["manifest"], properties: { manifest: {} } },
+            {
+              required: ["product_id", "version"],
+              properties: { product_id: {}, version: {} },
+            },
+          ],
           properties: {
             manifest: { type: "object" },
             product_id: { type: "string", maxLength: 130 },

@@ -19,6 +19,10 @@ Contract owner: Core configuration schema v1. The delivered [complete JSON Schem
 
 Both paths must be absolute and operator-controlled. Keep the trust file and private signing keys out of public content and backups shared with untrusted parties. The trust file contains trusted public keys; it does not contain signing secrets. See [Extensions](extensions.md#independently-delivered-packages).
 
+## Payment provider credential encryption
+
+`integrations.runtimeSecretsEncryptionKeySecretRef` selects the deployment secret used to encrypt payment provider credentials stored per connection. The installer provisions the key into the protected secret channel. Do not put key or provider credential values in the configuration file, Admin diagnostics, API responses or source control. A missing key blocks credential writes and provider readiness; it does not expose or replace saved values. See [Payments](payments.md#configure-a-provider-connection).
+
 Secret values never belong in this document. Configuration selects named env/file sources and runtime secret references. Paths below are generic product installation locations, not a real site's private topology.
 
 | Section | Purpose | Operational rule |

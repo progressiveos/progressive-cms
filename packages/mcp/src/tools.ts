@@ -1860,6 +1860,43 @@ export const TOOLS: readonly McpTool[] = [
     },
   },
   {
+    name: "cms_get_payment_provider_settings",
+    description:
+      "Safe settings of one payment connection: provider schema, ordinary values, credential slot PRESENCE, readiness and the callback URL. Never a credential value.",
+    permission: "payments.read",
+    mutation: false,
+    inputSchema: objectSchema({ instance_id: { type: "string" } }, ["instance_id"]),
+    async run(operations, ctx, args) {
+      return operations.getProviderInstanceSettings(ctx, {
+        instance_id: args["instance_id"] as string,
+      });
+    },
+  },
+  {
+    name: "cms_save_payment_provider_settings",
+    description:
+      "Atomically save a payment connection (name/config/enabled and explicit credential set/clear) with expected_generation. Enabling requires complete credentials; credential values are write-only.",
+    permission: "payments.configure",
+    mutation: true,
+    inputSchema: objectSchema(
+      {
+        instance_id: { type: "string" },
+        settings: {
+          type: "object",
+          description:
+            "{expected_generation?, name?, config?, enabled?, secret_updates?: {slot: {action: 'set', value} | {action: 'clear'}}}",
+        },
+      },
+      ["instance_id", "settings"],
+    ),
+    async run(operations, ctx, args) {
+      return operations.saveProviderInstanceSettings(ctx, {
+        instance_id: args["instance_id"] as string,
+        settings: args["settings"],
+      });
+    },
+  },
+  {
     name: "cms_get_payment_provider_capabilities",
     description: "Capability report: cancel/refund/provider idempotency/status sync.",
     permission: "payments.read",

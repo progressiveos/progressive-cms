@@ -6,7 +6,12 @@ export function createPaymentRefundJobHandlers(
   payments: ApplicationServices["payments"],
   logger: Logger,
   jobs: JobsService,
+  options?: {
+    /** How long a refund awaiting the provider's final answer stays parked. */
+    readonly confirmationDelayMilliseconds?: number;
+  },
 ): Record<string, JobHandler> {
+  const confirmationDelay = options?.confirmationDelayMilliseconds ?? 60_000;
   const unavailable = {
     outcome: "parked",
     delayMilliseconds: 60_000,
@@ -29,7 +34,19 @@ export function createPaymentRefundJobHandlers(
       if (intentId === "") return;
       if (!(await compose())) return unavailable;
       try {
-        await payments.service.executeRefundIntent(intentId);
+        const outcome = await payments.service.executeRefundIntent(intentId);
+        // F1: a non-final answer is not the end of this job. Parking keeps the
+        // SAME job (and its idempotency key) alive and re-runs it later, so the
+        // existing queue carries the refund to a terminal state; a second
+        // worker or a new job is not needed.
+        if (outcome.status === "SUBMITTED") {
+          return {
+            outcome: "parked",
+            delayMilliseconds: confirmationDelay,
+            reason: "refund submitted; awaiting the provider's final outcome",
+          };
+        }
+        return;
       } catch (error) {
         if ((error as { code?: string })?.code === "PAYMENT_PROVIDER_UNKNOWN") return unavailable;
         throw error;
@@ -44,9 +61,13 @@ export function createPaymentRefundJobHandlers(
           intents: stale,
         });
       }
-      const intents = await payments.service.claimDueRefundIntents(25);
+      // B1: a pending refund keeps advancing. Rows submitted at least a minute
+      // ago are re-queued so the executor can CONFIRM the provider's refund
+      // object; a money POST is never re-sent for them.
+      const dueBefore = new Date(Date.now() - 60_000);
+      const intents = await payments.service.claimDueRefundIntents(25, { dueBefore });
       for (const intentId of intents) {
-        await jobs.enqueue({
+        const enqueued = await jobs.enqueue({
           type: "payments.refund.execute",
           payload: { intent_id: intentId },
           idempotencyKey: `refund-intent-${intentId}`,
@@ -54,6 +75,12 @@ export function createPaymentRefundJobHandlers(
           maxAttempts: 5,
           origin: "worker.payments.reconcile",
         });
+        // F1: the intent is still active, but its job already finished (a
+        // pending answer used to end it). Re-open THAT job instead of creating
+        // a second one, which the active-idempotency index forbids anyway.
+        if (enqueued.duplicate && enqueued.job.state === "SUCCEEDED") {
+          await jobs.reopen(enqueued.job.id);
+        }
       }
     },
   };

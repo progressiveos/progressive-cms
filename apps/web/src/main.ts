@@ -31,12 +31,14 @@ import {
   loadIndependentExtensionCatalog,
   recordIndependentGeneration,
 } from "@pcms/extensions/internal";
+
 import { readSelectedReleaseStatus, resolveReleaseIdentity } from "@pcms/operations";
 import type { FastifyInstance } from "fastify";
 import { loadContentTypeDefinitions } from "./content-types.js";
 import { healthRoutes } from "./health.js";
 import { applyManagedMailSettings, buildMailSurface } from "./mail.js";
 import { registerMaintenanceGate } from "./maintenance-gate.js";
+import { applyPaymentCredentialUpgrade } from "./payment-credential-upgrade.js";
 import { createProductionUpdatePorts, resolveCurrentReleaseRoot } from "./update-adapters.js";
 
 /** Config path is a deployment constant; exposed for adapter diagnostics. */
@@ -386,6 +388,15 @@ export async function buildWebRuntime(options: {
             catalog: extensionCatalog,
             systemCapabilities: createCapabilityRegistry(),
           }),
+          // CORE-PAYMENTS-ADMIN-CONFIG-01: the credential import at the
+          // migration boundary needs the deployment master key and the same
+          // process secret channel the old references used.
+          ...(runtimeSecretBox === undefined ? {} : { runtimeSecretBox }),
+          secretResolver: (name: string) => secrets.get(name),
+          logger: {
+            info: (event: string, fields?: Readonly<Record<string, unknown>>) =>
+              logger.info(event, fields),
+          },
         });
   if (config.themes?.renderDir)
     await recoverThemeLifecycle({
@@ -599,6 +610,26 @@ export async function buildWebRuntime(options: {
     }
     void reply.send(response);
     return reply;
+  });
+
+  // CORE-PAYMENTS-ADMIN-CONFIG-01 review R1: the FIRST upgrade from an older
+  // release runs the update orchestrator in the OLD process, whose
+  // update-adapters know nothing about this import. The target-side step is
+  // therefore performed HERE — by the new release itself, before it serves
+  // traffic — so legacy references are retired exactly once and the new
+  // resolver (encrypted store only) never has to read deployment secrets.
+  // Idempotent; a blocked import never takes the site down, but payments stay
+  // closed with a typed diagnostic until the operator fixes the reference.
+  await applyPaymentCredentialUpgrade({
+    pool,
+    box: runtimeSecretBox,
+    legacyResolver: (name: string) => secrets.get(name),
+    logger,
+    readinessOf: async (instanceId: string) => {
+      await application.payments.ensureComposed();
+      const view = await application.payments.settings.get(instanceId);
+      return view.readiness;
+    },
   });
 
   return { config, fastify, pool, logger, application, mcp };

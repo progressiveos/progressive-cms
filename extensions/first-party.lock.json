@@ -44,61 +44,61 @@
     {
       "id": "progressive-payments.alipay",
       "dir": "extensions/progressive-payments-alipay",
-      "version": "1.0.4",
-      "content_sha256": "187813ee414380b7d8550439552b382811474d59650802b70994a72c0765b094",
+      "version": "1.0.7",
+      "content_sha256": "1e17bd895cd89f38b955113d1627a8393a8c0fa04c813e03776b6b21676bf0fa",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-alipay-1.0.4.tar.gz",
-        "sha256": "f7f0b17b95570eb7e59d0cbdc2869179d6186fca75f2f16829bfb925568f401d"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-alipay-1.0.7.tar.gz",
+        "sha256": "4c625ad4efff0e2a51cd2ae02dfdb8f7c949adcf6900e7c9197345acb49a66ed"
       }
     },
     {
       "id": "progressive-payments.paypal",
       "dir": "extensions/progressive-payments-paypal",
-      "version": "1.0.4",
-      "content_sha256": "7a212677ccfcba4e17d0862aa8bfffd32376a184fe5f8fbcdc6d4ea58700b785",
+      "version": "1.0.7",
+      "content_sha256": "95c013251854eb67c58814cf4992fac69d138cc2c6466eb1b0fb04ba96bb3f4a",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-paypal-1.0.4.tar.gz",
-        "sha256": "13ac150cffd66fb0583503f0e37266844ac1dfec2a7f74d057caab74a78eb42a"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-paypal-1.0.7.tar.gz",
+        "sha256": "6ba9bc456088fe7b408f290cb5518072171c1f2fb886c8c7219344d4c5c59fbd"
       }
     },
     {
       "id": "progressive-payments.stripe",
       "dir": "extensions/progressive-payments-stripe",
-      "version": "1.0.4",
-      "content_sha256": "bb3a7880c578e75532ec30500a5dbdf1f7bb86c50f0c670707daace34ac29def",
+      "version": "1.0.7",
+      "content_sha256": "068a5395bc9aa879ec425872811acd94be6afeba469d8f420c4fc3795802bd2a",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-stripe-1.0.4.tar.gz",
-        "sha256": "92a909e5879b7b722d11643013c7002c2ba45a751bca24c21cb38ac9d2402058"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-stripe-1.0.7.tar.gz",
+        "sha256": "80a678cafe25ce44043cea0960248d4af1510e6634bd28fc85dda15633cebcb3"
       }
     },
     {
       "id": "progressive-payments.tabby",
       "dir": "extensions/progressive-payments-tabby",
-      "version": "1.0.4",
-      "content_sha256": "63592b22c31d81a40a1dd4792a13a5cb408fe007963acc6b45db615a23ebce18",
+      "version": "1.0.7",
+      "content_sha256": "1a91eeae6248d03da0a1645b08845423fc81f3d0f98a8b4e586ae850ea71d7ed",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tabby-1.0.4.tar.gz",
-        "sha256": "5247f99662036d39a9160511693df5919fa91f5e3258eddce26faac5d9502559"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tabby-1.0.7.tar.gz",
+        "sha256": "d85729aa7ce8c5be5c159bea6aeff60f97b20bbe6b0734a36fec8f19c2076193"
       }
     },
     {
       "id": "progressive-payments.tbank",
       "dir": "extensions/progressive-payments-tbank",
-      "version": "1.0.4",
-      "content_sha256": "9547ae5a56ce5e7c6ade0cd11a73d303d2aeca848cc801b33775231f0cdd5be9",
+      "version": "1.0.9",
+      "content_sha256": "430da1d53326a9ae4e3fedfd5e4103ced03a63967362e138c74e57ad3879d599",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tbank-1.0.4.tar.gz",
-        "sha256": "80ccb805eed3873b90ba6230d6a4f1745687194ce41844060b82bee1c3a36bc2"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-tbank-1.0.9.tar.gz",
+        "sha256": "92a2c312cc3c10e45ad98f59e53b162a24cbff187e7b3f14c40b9bd3252a2f66"
       }
     },
     {
       "id": "progressive-payments.yookassa",
       "dir": "extensions/progressive-payments-yookassa",
-      "version": "1.0.4",
-      "content_sha256": "076d71caf6e8e50e3d98a03db881bbf052bf8e48e6f7cc9c087fffd1993b589c",
+      "version": "1.0.9",
+      "content_sha256": "3a64c35cd1858305d49c6aad2386a16bd9d068478cce9d596a8fd127bcc0de2f",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-payments-yookassa-1.0.4.tar.gz",
-        "sha256": "2f47752bb4dd28e4a8dab7d4d0f65700e13a2bd8ed957824cfd61f1e0440d31b"
+        "tarball": "../progressive-cms-extensions/dist/progressive-payments-yookassa-1.0.9.tar.gz",
+        "sha256": "2fc5b73538e97a1e846516fadd37a2916efd2f242dac7d7fd3deccfe3b474484"
       }
     },
     {
@@ -124,11 +124,11 @@
     {
       "id": "progressive.web-research",
       "dir": "extensions/progressive-web-research",
-      "version": "1.0.4",
-      "content_sha256": "e207cc2f6a8ceb2bbb081f72dbb06ca6af865e87d2c4f0344e659a00c0a0c2f7",
+      "version": "1.0.5",
+      "content_sha256": "a680f2bba272d1649bbe5e5a4b6d1376214b217851fe18393d9077ee48aac113",
       "source": {
-        "tarball": "../progressive-cms-extensions/dist/progressive-web-research-1.0.4.tar.gz",
-        "sha256": "8256732798ca00f3c9a853a9e5f57c45f28a110d97e38f010adc9e8e09481fba"
+        "tarball": "../progressive-cms-extensions/dist/progressive-web-research-1.0.5.tar.gz",
+        "sha256": "ed3a3ccbc9c0cab05bbb2868208b067b9401f8a56737f25310311b6d01eeac24"
       }
     }
   ]

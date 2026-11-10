@@ -83,7 +83,7 @@ The complete fixed registry follows below. Enabled extensions can additionally c
 HTTP routes outside `/api/v1` are listed after the registry. They include health, signed preview, public files/site rendering, Admin assets and extension dispatch. They are not all REST JSON endpoints. Fastify also supplies HEAD handling for GET routes; this is not a separate application operation.
 
 <!-- interface-map:start -->
-## Fixed REST registry: 327 operations
+## Fixed REST registry: 329 operations
 
 | Area | Operations | Purpose |
 |---|---:|---|
@@ -97,7 +97,7 @@ HTTP routes outside `/api/v1` are listed after the registry. They include health
 | [integrations](#rest-integrations) | 25 | Configure connectors, notifications and delivery reliability; secret slots are write-only. |
 | [interactions](#rest-interactions) | 13 | Read/moderate/export submissions, quiz runs and leads with separate scopes. |
 | [media](#rest-media) | 33 | Manage assets, folders, providers and acquisition. Import/accept before referencing managed media ids. |
-| [payments](#rest-payments) | 17 | Provider discovery, payment lifecycle, refunds and verified callbacks; mutations can move real money. |
+| [payments](#rest-payments) | 19 | Provider discovery, payment lifecycle, refunds and verified callbacks; mutations can move real money. |
 | [publication](#rest-publication) | 23 | Coordinate sealed revisions, routes, changesets, plans and public visibility. |
 | [search](#rest-search) | 7 | Query public/admin search, inspect index health and explicitly run reindexing. |
 | [server](#rest-server) | 3 | Identify the target and diagnose the running instance. |
@@ -8205,13 +8205,20 @@ JSON body schema:
     {
       "required": [
         "manifest"
-      ]
+      ],
+      "properties": {
+        "manifest": {}
+      }
     },
     {
       "required": [
         "product_id",
         "version"
-      ]
+      ],
+      "properties": {
+        "product_id": {},
+        "version": {}
+      }
     }
   ],
   "properties": {
@@ -14189,6 +14196,8 @@ Provider discovery, payment lifecycle, refunds and verified callbacks; mutations
 | `POST /api/v1/payments/providers/instances` | [create_payment_provider_instance](#create_payment_provider_instance) | Configure a provider instance (secret references only — no credential values). |
 | `DELETE /api/v1/payments/providers/instances/{instanceId}` | [delete_payment_provider_instance](#delete_payment_provider_instance) | Decommission an instance; refused while payment history references it (disable instead). |
 | `PATCH /api/v1/payments/providers/instances/{instanceId}` | [update_payment_provider_instance](#update_payment_provider_instance) | Update name/config/secret refs/enabled. Disabling refuses NEW payments; callbacks for existing payments keep processing. |
+| `GET /api/v1/payments/providers/instances/{instanceId}/settings` | [get_payment_provider_instance_settings](#get_payment_provider_instance_settings) | Safe settings view of one connection: schema, ordinary values, generation, slot presence, readiness, callback URL. Never a credential value. |
+| `PUT /api/v1/payments/providers/instances/{instanceId}/settings` | [save_payment_provider_instance_settings](#save_payment_provider_instance_settings) | Atomic save: name/config/enabled + explicit credential set/clear, guarded by expected_generation. Enabling requires complete credentials. |
 | `POST /api/v1/payments/providers/instances/{instanceId}/test` | [test_payment_provider_instance](#test_payment_provider_instance) | Offline configuration check (schema + secret resolvability + composition state); no live provider call. |
 
 <a id="list_payments"></a>
@@ -14647,12 +14656,14 @@ Response construction:
 ```javascript
 const params = request.params;
 const instance = await app.payments.instances.get(params.providerInstanceId);
+const headers = {};
 const record = await app.integrations.inbound.receiveOrphan({
   sourceType: "payment_provider",
   sourceId: instance.id,
   rawBody,
   reason: `provider type "${instance.providerType}" is not composed (extension disabled or absent)`
 });
+const ack = app.payments.registry.get(instance.providerType)?.callbackAck;
 const parsed = outcome.normalized;
 const applied = await app.payments.service.processCallback({
   providerInstanceId: instance.id,
@@ -14669,11 +14680,12 @@ return {
 };
 return {
   status: 200,
-  body: { received: true, duplicate: true, event_id: outcome.record.id }
+  body: { received: true, duplicate: false, applied: false, event_id: outcome.record.id }
 };
 return {
   status: 200,
-  body: { received: true, duplicate: false, applied: false, event_id: outcome.record.id }
+  body: ack,
+  headers: { "content-type": "text/plain; charset=utf-8" }
 };
 return {
   status: 200,
@@ -14714,12 +14726,14 @@ Response construction:
 ```javascript
 const params = request.params;
 const instance = await app.payments.instances.get(params.providerInstanceId);
+const headers = {};
 const record = await app.integrations.inbound.receiveOrphan({
   sourceType: "payment_provider",
   sourceId: instance.id,
   rawBody,
   reason: `provider type "${instance.providerType}" is not composed (extension disabled or absent)`
 });
+const ack = app.payments.registry.get(instance.providerType)?.callbackAck;
 const parsed = outcome.normalized;
 const applied = await app.payments.service.processCallback({
   providerInstanceId: instance.id,
@@ -14736,11 +14750,12 @@ return {
 };
 return {
   status: 200,
-  body: { received: true, duplicate: true, event_id: outcome.record.id }
+  body: { received: true, duplicate: false, applied: false, event_id: outcome.record.id }
 };
 return {
   status: 200,
-  body: { received: true, duplicate: false, applied: false, event_id: outcome.record.id }
+  body: ack,
+  headers: { "content-type": "text/plain; charset=utf-8" }
 };
 return {
   status: 200,
@@ -15057,6 +15072,157 @@ return handle(
     ...jsonBody(request)
   })
 );
+```
+
+<a id="get_payment_provider_instance_settings"></a>
+
+### GET /api/v1/payments/providers/instances/{instanceId}/settings
+
+**get_payment_provider_instance_settings** — Safe settings view of one connection: schema, ordinary values, generation, slot presence, readiness, callback URL. Never a credential value.
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `payments.read` |
+| Session CSRF | Not required by this route; anonymous/provider-origin checks can still apply. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/payments.ts` |
+
+Path parameters: `instanceId`.
+
+Explicit path schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "instanceId"
+  ],
+  "properties": {
+    "instanceId": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}
+```
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const params = request.params;
+const result = await getProviderInstanceSettings(app, ctx, {
+  instance_id: String(params.instanceId)
+});
+return { status: 200, body: result, headers: { "cache-control": "no-store" } };
+```
+
+<a id="save_payment_provider_instance_settings"></a>
+
+### PUT /api/v1/payments/providers/instances/{instanceId}/settings
+
+**save_payment_provider_instance_settings** — Atomic save: name/config/enabled + explicit credential set/clear, guarded by expected_generation. Enabling requires complete credentials.
+
+| Contract | Value |
+|---|---|
+| Authentication | authenticated |
+| Declared permission | `payments.configure` |
+| Session CSRF | Required for session-authenticated mutations; bearer exempt. |
+| Registry idempotency | Not annotated; do not assume durable header replay. |
+| Body limit | 1048576 bytes |
+| Source | `packages/api/src/http/routes/payments.ts` |
+
+Path parameters: `instanceId`.
+
+Explicit path schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "instanceId"
+  ],
+  "properties": {
+    "instanceId": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}
+```
+
+Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+JSON body schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "expected_generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "config": {
+      "type": "object"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "secret_updates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "set",
+              "clear"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  }
+}
+```
+
+Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+
+Response construction:
+```javascript
+const params = request.params;
+const body = typeof request.body === "object" && request.body !== null ? request.body : {};
+const result = await saveProviderInstanceSettings(app, ctx, {
+  instance_id: String(params.instanceId),
+  body
+});
+return {
+  status: 200,
+  body: result,
+  // A response derived from credential writes is never cached and
+  // never replayed from durable idempotency storage.
+  headers: { "cache-control": "no-store" }
+};
 ```
 
 <a id="test_payment_provider_instance"></a>

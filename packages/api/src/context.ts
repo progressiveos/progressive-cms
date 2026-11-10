@@ -185,6 +185,7 @@ import { resolveReleaseIdentity } from "@pcms/operations";
 import {
   createPaymentProviderInstanceService,
   createPaymentService,
+  createPaymentSettingsService,
   FakePaymentProvider,
   PaymentError,
   type PaymentProvider,
@@ -522,8 +523,10 @@ export interface PaymentsServices {
   readonly registry: PaymentProviderRegistry;
   readonly instances: ReturnType<typeof createPaymentProviderInstanceService>;
   readonly service: ReturnType<typeof createPaymentService>;
-  /** Resolves a process secret BY NAME (S6 diagnostics report resolvability
-   * only); undefined when the deployment configures no secret channel. */
+  /** CORE-PAYMENTS-ADMIN-CONFIG-01: atomic Admin save of one connection
+   * (config + encrypted credentials + generation) and its safe view. */
+  readonly settings: ReturnType<typeof createPaymentSettingsService>;
+  /** Resolves a process secret BY NAME (legacy refs pending import only). */
   readonly secretResolver?: (name: string) => string | undefined;
   /**
    * R3/S5: recomposes the provider registry when the extension lifecycle
@@ -2913,26 +2916,11 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     inboundContracts.register(`payment_provider:${provider.providerType}`, {
       payloadLimitBytes: 262_144,
       verify: async (request, context) => {
-        const instance = await paymentInstances.get(context.sourceId);
-        if (instance === null) {
-          throw new PaymentError(
-            "PAYMENT_PROVIDER_INSTANCE_NOT_FOUND",
-            `provider instance ${context.sourceId} not found`,
-          );
-        }
-        const values: Record<string, string> = {};
-        for (const requirement of provider.secretRequirements) {
-          const refName = instance.secretRefs[requirement];
-          const value = refName === undefined ? undefined : integrationSecretResolver(refName);
-          if (refName === undefined || value === undefined) {
-            throw new PaymentError(
-              "PAYMENT_REQUEST_INVALID",
-              `secret "${requirement}" is not configured for provider instance "${instance.name}"`,
-            );
-          }
-          values[requirement] = value;
-        }
-        await provider.verifyCallback(request, { values });
+        // The SAME instance resolver as every money path: the adapter carries
+        // THIS connection's config and its credentials come from the encrypted
+        // instance store (legacy refs only while the import is pending).
+        const wiring = await activePaymentsService().resolveInstanceWiring(context.sourceId);
+        await wiring.provider.verifyCallback(request, wiring.secrets);
       },
       // Malformed bodies must not crash the pipeline before verification
       // records a FAILED event — treat them as "no provider event id".
@@ -3003,14 +2991,28 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     clock,
     providers: paymentsRegistry,
     instances: paymentInstances,
-    secretResolver: integrationSecretResolver,
+    // No process-secret fallback: credentials come from the encrypted
+    // instance store only (review R1). The legacy channel is used by the
+    // importer alone.
+    secretBox: () => input.runtimeSecretBox,
+  });
+  // Inbound contracts are registered during provider composition, which runs
+  // after this const is initialised; the closure defers the read.
+  const activePaymentsService = (): typeof paymentsService => paymentsService;
+  const paymentSettings = createPaymentSettingsService({
+    pool,
+    clock,
+    instances: paymentInstances,
+    providerFor: (providerType) => paymentsRegistry.get(providerType),
+    box: () => input.runtimeSecretBox,
   });
   const payments: PaymentsServices = {
     registry: paymentsRegistry,
     instances: paymentInstances,
     service: paymentsService,
-    /** Process-channel secret resolution by NAME (S6 config check uses it to
-     * report resolvability; values never leave the process). */
+    settings: paymentSettings,
+    /** Process-channel secret resolution by NAME (legacy import/diagnostics
+     * only; values never leave the process). */
     secretResolver: integrationSecretResolver,
     // Payment-operation entries call this (R3): a lifecycle revision change —
     // here or in another process — rebuilds the provider registry before the

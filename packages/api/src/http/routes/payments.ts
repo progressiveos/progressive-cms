@@ -14,6 +14,7 @@ import {
   deleteProviderInstance,
   getPayment,
   getPaymentProviderCapabilities,
+  getProviderInstanceSettings,
   listPaymentEvents,
   listPaymentInboundEvents,
   listPaymentProviderInstances,
@@ -21,6 +22,7 @@ import {
   listPaymentRefunds,
   listPayments,
   refundPayment,
+  saveProviderInstanceSettings,
   testProviderInstance,
   updateProviderInstance,
 } from "../../payments-ops.js";
@@ -425,6 +427,90 @@ export function makePaymentsRoutes(): ApiRoute[] {
     {
       spec: {
         method: "GET",
+        url: "/payments/providers/instances/:instanceId/settings",
+        operationId: "get_payment_provider_instance_settings",
+        summary:
+          "Safe settings view of one connection: schema, ordinary values, generation, slot presence, readiness, callback URL. Never a credential value.",
+        tag: "payments",
+        auth: "authenticated",
+        permission: "payments.read",
+        paramsSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["instanceId"],
+          properties: { instanceId: { type: "string", maxLength: 64 } },
+        },
+      },
+      async handle(app, ctx, request) {
+        const params = request.params as Record<string, unknown>;
+        const result = await getProviderInstanceSettings(app, ctx, {
+          instance_id: String(params.instanceId),
+        });
+        return { status: 200, body: result, headers: { "cache-control": "no-store" } };
+      },
+    },
+    {
+      spec: {
+        method: "PUT",
+        url: "/payments/providers/instances/:instanceId/settings",
+        operationId: "save_payment_provider_instance_settings",
+        summary:
+          "Atomic save: name/config/enabled + explicit credential set/clear, guarded by expected_generation. Enabling requires complete credentials.",
+        tag: "payments",
+        auth: "authenticated",
+        permission: "payments.configure",
+        csrf: true,
+        paramsSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["instanceId"],
+          properties: { instanceId: { type: "string", maxLength: 64 } },
+        },
+        bodySchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            expected_generation: { type: "integer", minimum: 0 },
+            name: { type: "string", minLength: 1, maxLength: 120 },
+            config: { type: "object" },
+            enabled: { type: "boolean" },
+            // Slot names are open (they come from the provider adapter), the
+            // operation shape is closed; the application validates the
+            // set/clear semantics and rejects unknown slots.
+            secret_updates: {
+              type: "object",
+              additionalProperties: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  action: { enum: ["set", "clear"] },
+                  value: { type: "string", maxLength: 20000 },
+                },
+                required: ["action"],
+              },
+            },
+          },
+        },
+      },
+      async handle(app, ctx, request) {
+        const params = request.params as Record<string, unknown>;
+        const body = typeof request.body === "object" && request.body !== null ? request.body : {};
+        const result = await saveProviderInstanceSettings(app, ctx, {
+          instance_id: String(params.instanceId),
+          body,
+        });
+        return {
+          status: 200,
+          body: result,
+          // A response derived from credential writes is never cached and
+          // never replayed from durable idempotency storage.
+          headers: { "cache-control": "no-store" },
+        };
+      },
+    },
+    {
+      spec: {
+        method: "GET",
         url: "/payments/callback/:providerInstanceId",
         operationId: "receive_payment_callback",
         summary:
@@ -518,12 +604,19 @@ export function makePaymentsRoutes(): ApiRoute[] {
           }
           throw error;
         }
+        // T5: a provider that requires a plain acknowledgement body (T-Bank
+        // answers "OK") gets it after the event was reliably accepted — a
+        // duplicate included. Unverified events keep the JSON body below and
+        // are never acknowledged as accepted.
+        const ack = app.payments.registry.get(instance.providerType)?.callbackAck;
         if (outcome.duplicate) {
           // Duplicate callback: acknowledged, business state untouched.
-          return {
-            status: 200,
-            body: { received: true, duplicate: true, event_id: outcome.record.id },
-          };
+          return ack === undefined
+            ? {
+                status: 200,
+                body: { received: true, duplicate: true, event_id: outcome.record.id },
+              }
+            : { status: 200, body: ack, headers: { "content-type": "text/plain; charset=utf-8" } };
         }
         if (outcome.record.status === "FAILED" || outcome.normalized === null) {
           return {
@@ -546,6 +639,13 @@ export function makePaymentsRoutes(): ApiRoute[] {
             inboundEventId: outcome.record.id,
           });
           await app.integrations.inbound.markProcessed(outcome.record.id);
+          if (ack !== undefined) {
+            return {
+              status: 200,
+              body: ack,
+              headers: { "content-type": "text/plain; charset=utf-8" },
+            };
+          }
           return {
             status: 200,
             body: {

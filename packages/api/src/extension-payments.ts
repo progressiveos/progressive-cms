@@ -118,7 +118,14 @@ export function extensionPaymentsPort(
         },
         { type: "extension", id: extensionId },
       );
-      return { id: result.payment.id, status: result.payment.status, replayed: result.replayed };
+      return {
+        id: result.payment.id,
+        status: result.payment.status,
+        replayed: result.replayed,
+        // T3: the storefront needs the bank's form; a replay returns the same
+        // one because it is stored with the payment.
+        paymentUrl: result.payment.paymentUrl,
+      };
     },
     async get(input) {
       const payment = await app.payments.service.get(input.paymentId);
@@ -142,7 +149,7 @@ export function extensionPaymentsPort(
             status: 403,
           });
       });
-      return { id: payment.id, status: payment.status };
+      return { id: payment.id, status: payment.status, paymentUrl: payment.paymentUrl };
     },
   };
 }

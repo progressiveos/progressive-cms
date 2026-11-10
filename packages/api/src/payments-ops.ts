@@ -11,11 +11,28 @@ import { ApiError } from "./errors.js";
 export async function listPaymentProviders(app: ApplicationServices, ctx: OperationContext) {
   await app.payments.ensureComposed();
   requirePermission(app, ctx, "payments.read");
+  // The human name of a provider comes from the trusted extension artifact
+  // that supplies it (registration title) — "yookassa" alone is not a label.
+  const titles = new Map<string, { title: string; extension_id: string }>();
+  for (const artifact of app.extensionCatalog.list()) {
+    for (const registration of artifact.manifest.registrations.providers) {
+      if (registration.registry !== "payment_provider") continue;
+      titles.set(registration.provider_id, {
+        title: registration.title ?? registration.provider_id,
+        extension_id: artifact.manifest.id,
+      });
+    }
+  }
   return {
     items: app.payments.registry.list().map((provider) => ({
       provider_type: provider.providerType,
+      display_name: titles.get(provider.providerType)?.title ?? provider.providerType,
+      extension_id: titles.get(provider.providerType)?.extension_id ?? null,
       secret_requirements: provider.secretRequirements,
       config_schema: provider.configSchema,
+      // Whether this package can receive per-connection settings: the Admin
+      // must say "update the add-on" instead of hiding a real field.
+      accepts_instance_config: provider.withConfig !== undefined,
     })),
   };
 }
@@ -33,7 +50,9 @@ export async function listPaymentProviderInstances(
       name: instance.name,
       enabled: instance.enabled,
       config: instance.config,
+      // Legacy reference NAMES (pre-0008 import); never a value.
       secret_refs: instance.secretRefs,
+      settings_generation: instance.settingsGeneration,
       created_at: instance.createdAt.toISOString(),
       updated_at: instance.updatedAt.toISOString(),
     })),
@@ -75,6 +94,9 @@ function paymentView(
     status: payment.status,
     description: payment.description,
     metadata: payment.metadata,
+    // T3: the provider-hosted form the payer must be sent to (null when the
+    // provider returns none). Never derived from client input.
+    payment_url: payment.paymentUrl,
     refunded_amount: payment.refundedAmount,
     created_at: payment.createdAt.toISOString(),
     updated_at: payment.updatedAt.toISOString(),
@@ -202,6 +224,34 @@ function providerInstanceView(instance: ProviderInstance) {
 function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   const code = (error as { code?: unknown } | null)?.code;
+  // CORE-PAYMENTS-ADMIN-CONFIG-01: settings/credential failures are states of
+  // the connection (conflict / not configured / key absent), not malformed
+  // requests — 409 lets the Admin offer "reload" and "enter the missing key".
+  if (code === "PAYMENT_SETTINGS_CONFLICT") {
+    return new ApiError("PAYMENT_SETTINGS_CONFLICT", String((error as Error).message), {
+      status: 409,
+    });
+  }
+  if (code === "PAYMENT_CREDENTIALS_INCOMPLETE") {
+    return new ApiError("PAYMENT_CREDENTIALS_INCOMPLETE", String((error as Error).message), {
+      status: 409,
+    });
+  }
+  if (code === "PAYMENT_CREDENTIALS_UNREADABLE") {
+    return new ApiError("PAYMENT_CREDENTIALS_UNREADABLE", String((error as Error).message), {
+      status: 409,
+    });
+  }
+  if (code === "PAYMENT_CREDENTIALS_KEY_MISSING") {
+    return new ApiError("PAYMENT_CREDENTIALS_KEY_MISSING", String((error as Error).message), {
+      status: 409,
+    });
+  }
+  if (code === "PAYMENT_PROVIDER_CONFIG_UNSUPPORTED") {
+    return new ApiError("PAYMENT_PROVIDER_CONFIG_UNSUPPORTED", String((error as Error).message), {
+      status: 422,
+    });
+  }
   if (code === "PAYMENT_PROVIDER_INSTANCE_NOT_FOUND") {
     return new ApiError("PAYMENT_PROVIDER_INSTANCE_NOT_FOUND", String((error as Error).message), {
       status: 404,
@@ -258,12 +308,31 @@ export async function createProviderInstance(
       { status: 404 },
     );
   }
+  if (input.secret_refs !== undefined) {
+    // CORE-PAYMENTS-ADMIN-CONFIG-01: process-secret names are no longer a
+    // second, competing way to store merchant credentials.
+    throw new ApiError(
+      "PAYMENT_SECRET_REFS_DEPRECATED",
+      "secret_refs is no longer accepted — save credentials through the settings contract (PUT …/settings, secret_updates); legacy references stay readable only for the import",
+      { status: 422 },
+    );
+  }
+  // Review R8: a new connection is ALWAYS a disabled draft. Accepting
+  // `enabled: true` here would let an API/MCP consumer create a payment
+  // connection with no credentials, bypassing the server-side sufficiency
+  // check that the settings save performs.
+  if (input.enabled === true) {
+    throw new ApiError(
+      "PAYMENT_REQUEST_INVALID",
+      "a new connection is created disabled — create it, save its settings (PUT …/settings with enabled:true), and the server will enable it only when complete",
+      { status: 422 },
+    );
+  }
   const instance = await app.payments.instances.create({
     providerType: input.provider_type,
     name: input.name,
-    ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+    enabled: false,
     config: input.config ?? {},
-    ...(input.secret_refs === undefined ? {} : { secretRefs: input.secret_refs }),
   });
   await recordSecurityEvent(app.pool, null, {
     type: "PAYMENT_PROVIDER_INSTANCE_CREATED",
@@ -287,24 +356,60 @@ export async function updateProviderInstance(
   },
 ) {
   requirePermission(app, ctx, "payments.configure");
-  const instance = await app.payments.instances.update(input.instance_id, {
-    ...(input.name === undefined ? {} : { name: input.name }),
-    ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-    ...(input.config === undefined ? {} : { config: input.config }),
-    ...(input.secret_refs === undefined ? {} : { secretRefs: input.secret_refs }),
-  });
-  await recordSecurityEvent(app.pool, null, {
-    type: "PAYMENT_PROVIDER_INSTANCE_UPDATED",
-    ...auditBase(ctx),
-    subjectType: "payment_provider_instance",
-    subjectId: instance.id,
-    metadata: {
-      provider_type: instance.providerType,
+  if (input.secret_refs !== undefined) {
+    throw new ApiError(
+      "PAYMENT_SECRET_REFS_DEPRECATED",
+      "secret_refs is no longer accepted — save credentials through the settings contract (PUT …/settings, secret_updates)",
+      { status: 422 },
+    );
+  }
+  // The same atomic save as PUT …/settings (without the CAS token): one write
+  // path, so a PATCH can never bypass readiness or the merchant-identity rule.
+  await app.payments.ensureComposed();
+  // Review R7: the audit row is written by the SAME transaction as the
+  // settings. A failing audit insert aborts the save instead of reporting
+  // success after an unaudited change.
+  const result = await app.payments.settings
+    .save(
+      input.instance_id,
+      {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+        ...(input.config === undefined ? {} : { config: input.config }),
+      },
+      {
+        actor: `${ctx.actor.type}:${ctx.actor.id}`,
+        audit: async (tx) => {
+          await recordSecurityEvent(tx, null, {
+            type: "PAYMENT_PROVIDER_INSTANCE_UPDATED",
+            ...auditBase(ctx),
+            subjectType: "payment_provider_instance",
+            subjectId: input.instance_id,
+            metadata: {
+              fields: [
+                ...(input.name === undefined ? [] : ["name"]),
+                ...(input.enabled === undefined ? [] : ["enabled"]),
+                ...(input.config === undefined ? [] : ["config"]),
+              ],
+            },
+          });
+        },
+      },
+    )
+    .catch((error: unknown) => {
+      throw toApiError(error);
+    });
+  const instance = result.view.instance;
+  return {
+    instance: {
+      id: instance.id,
+      provider_type: instance.provider_type,
       name: instance.name,
       enabled: instance.enabled,
+      config: instance.config,
+      settings_generation: instance.settings_generation,
     },
-  });
-  return { instance: providerInstanceView(instance) };
+  };
 }
 
 export async function deleteProviderInstance(
@@ -354,6 +459,16 @@ export async function testProviderInstance(
     );
   }
   const provider = app.payments.registry.get(instance.providerType);
+  // CORE-PAYMENTS-ADMIN-CONFIG-01: the check evaluates EVERY required slot of
+  // the adapter's declared requirements (one resolvable key out of two is
+  // NOT ready), the stored config against the adapter schema, whether the
+  // adapter can receive that config, and whether the master key is present.
+  const readiness = await app.payments.settings.get(instance.id);
+  const secretBoxOk = readiness.secret_box.available;
+  const configSupported =
+    provider === undefined
+      ? false
+      : provider.withConfig !== undefined || readiness.config_supported;
   const checks: { readonly check: string; readonly ok: boolean; readonly detail: string }[] = [
     {
       check: "provider_registered",
@@ -370,35 +485,57 @@ export async function testProviderInstance(
         ? "accepts new payments"
         : "disabled — new payments refused; callbacks for existing payments still processed",
     },
+    {
+      check: "encryption_key_present",
+      ok: secretBoxOk,
+      detail: secretBoxOk
+        ? "master encryption key is configured for this deployment"
+        : "master encryption key is missing — stored credentials cannot be read; an operator restores integrations.runtimeSecretsEncryptionKeySecretRef (never entered in the Admin form)",
+    },
+    {
+      check: "config_schema",
+      ok: readiness.readiness.configIssues.length === 0 && configSupported,
+      detail: !configSupported
+        ? "this provider package cannot receive instance settings — update the payment extension"
+        : readiness.readiness.configIssues.length === 0
+          ? "saved settings match the provider schema"
+          : `settings do not match the provider schema: ${readiness.readiness.configIssues.join("; ")}`,
+    },
+    {
+      check: "secret_slots_complete",
+      ok: readiness.readiness.missing.length === 0 && readiness.readiness.unreadable.length === 0,
+      detail:
+        readiness.secret_requirements.length === 0
+          ? "this provider declares no credential slots"
+          : readiness.readiness.missing.length > 0
+            ? `missing: ${readiness.readiness.missing.join(", ")}`
+            : readiness.readiness.unreadable.length > 0
+              ? `cannot be decrypted with the current key: ${readiness.readiness.unreadable.join(", ")}`
+              : `all required slots configured (${readiness.secret_requirements.join(", ")})`,
+    },
+    {
+      check: "legacy_secret_refs",
+      ok: readiness.readiness.legacyRefs.length === 0,
+      detail:
+        readiness.readiness.legacyRefs.length === 0
+          ? "no legacy deployment-secret references remain"
+          : `${readiness.readiness.legacyRefs.length} legacy reference(s) still in use — run the payment credentials import`,
+    },
+    {
+      check: "live_provider_check",
+      ok: false,
+      detail:
+        "unavailable: a safe diagnostic does not exist for this provider (a live check would create a real payment); configuration validated offline",
+    },
   ];
-  // Secret-slot resolution (names only — values never leave the process).
-  let secretsOk = true;
-  const secretDetails: string[] = [];
-  for (const [requirement, refName] of Object.entries(instance.secretRefs)) {
-    const resolved = app.payments.secretResolver?.(refName);
-    const ok = typeof resolved === "string" && resolved.length > 0;
-    secretsOk = secretsOk && ok;
-    secretDetails.push(`${requirement} → ${ok ? "resolvable" : "MISSING"} (${refName})`);
-  }
-  checks.push({
-    check: "secret_refs_resolvable",
-    ok: secretsOk && Object.keys(instance.secretRefs).length > 0,
-    detail:
-      Object.keys(instance.secretRefs).length === 0
-        ? "no secret references configured"
-        : secretDetails.join("; "),
-  });
-  checks.push({
-    check: "live_provider_check",
-    ok: false,
-    detail:
-      "unavailable: a safe diagnostic does not exist for this provider (a live check would create a real payment); configuration validated offline",
-  });
   const ok =
     provider !== undefined &&
     instance.enabled &&
-    secretsOk &&
-    Object.keys(instance.secretRefs).length > 0;
+    secretBoxOk &&
+    configSupported &&
+    readiness.readiness.configIssues.length === 0 &&
+    readiness.readiness.missing.length === 0 &&
+    readiness.readiness.unreadable.length === 0;
   await recordSecurityEvent(app.pool, null, {
     type: "PAYMENT_PROVIDER_INSTANCE_TESTED",
     ...auditBase(ctx),
@@ -406,7 +543,16 @@ export async function testProviderInstance(
     subjectId: instance.id,
     metadata: { ok },
   });
-  return { ok, checks };
+  return {
+    ok,
+    checks,
+    // The Admin shows a sentence ("Настроено для приёма платежей"), not a
+    // claim about the bank or a real payment.
+    readiness: {
+      code: readiness.readiness.code,
+      detail: readiness.readiness.detail,
+    },
+  };
 }
 
 export async function listPaymentInboundEvents(
@@ -528,5 +674,83 @@ export async function listPaymentEvents(
       payload: event.payload,
       created_at: event.createdAt.toISOString(),
     })),
+  };
+}
+// ---- CORE-PAYMENTS-ADMIN-CONFIG-01: human settings of one connection ------
+// GET/PUT are the canonical Admin contract: schema-driven ordinary fields,
+// write-only credentials (set/clear), one atomic save guarded by
+// settings_generation. Credential VALUES never appear in a response, an error,
+// an audit record or a log line — only slot NAMES and presence.
+
+async function settingsPayload(
+  app: ApplicationServices,
+  instanceId: string,
+  view: Awaited<ReturnType<ApplicationServices["payments"]["settings"]["get"]>>,
+) {
+  // The callback address is built from the configured primary origin (the
+  // same source sitemap/canonical use) — never from a request Host header.
+  const origin = await app.primaryOrigin().catch(() => null);
+  const callbackPath = `/api/v1/payments/callback/${instanceId}`;
+  return {
+    ...view,
+    callback: {
+      url: origin === null ? null : `${origin}${callbackPath}`,
+      path: callbackPath,
+      hint:
+        origin === null
+          ? "site public origin is not configured — set the primary domain first; do not paste a localhost address into the provider cabinet"
+          : "add this address to the provider cabinet for notifications; a disabled connection still receives callbacks for existing payments",
+    },
+  };
+}
+
+export async function getProviderInstanceSettings(
+  app: ApplicationServices,
+  ctx: OperationContext,
+  input: { readonly instance_id: string },
+) {
+  requirePermission(app, ctx, "payments.read");
+  await app.payments.ensureComposed();
+  const view = await app.payments.settings.get(input.instance_id).catch((error: unknown) => {
+    throw toApiError(error);
+  });
+  return settingsPayload(app, view.instance.id, view);
+}
+
+export async function saveProviderInstanceSettings(
+  app: ApplicationServices,
+  ctx: OperationContext,
+  input: { readonly instance_id: string; readonly body: unknown },
+) {
+  requirePermission(app, ctx, "payments.configure");
+  await app.payments.ensureComposed();
+  // The audit event is part of the settings transaction (review R7): it
+  // carries slot NAMES only — never a value, ciphertext or fragment.
+  const result = await app.payments.settings
+    .save(input.instance_id, input.body, {
+      actor: `${ctx.actor.type}:${ctx.actor.id}`,
+      audit: async (tx, summary) => {
+        await recordSecurityEvent(tx, null, {
+          type: "PAYMENT_PROVIDER_INSTANCE_SETTINGS_SAVED",
+          ...auditBase(ctx),
+          subjectType: "payment_provider_instance",
+          subjectId: input.instance_id,
+          metadata: {
+            name: summary.name,
+            enabled: summary.enabled,
+            settings_generation: summary.settings_generation,
+            changed_slots: summary.changed_slots,
+            cleared_slots: summary.cleared_slots,
+          },
+        });
+      },
+    })
+    .catch((error: unknown) => {
+      throw toApiError(error);
+    });
+  return {
+    ...(await settingsPayload(app, result.view.instance.id, result.view)),
+    changed_slots: result.changedSlots,
+    cleared_slots: result.clearedSlots,
   };
 }

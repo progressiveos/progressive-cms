@@ -35,6 +35,7 @@ import type {
   UpdateOrchestrationPorts,
 } from "@pcms/extensions/internal";
 import { readMaintenanceState, updateMaintenanceState } from "@pcms/operations";
+import { createAuditedImporter } from "./payment-credential-upgrade.js";
 
 const exec = promisify(execFile);
 
@@ -63,6 +64,19 @@ export interface UpdateAdapterOptions {
    * (ENABLED/DISABLED) and config never change.
    */
   readonly lifecycle: ExtensionLifecycleService;
+  /**
+   * CORE-PAYMENTS-ADMIN-CONFIG-01: the deployment master key (structural box)
+   * and the process secret channel. The legacy payment-credential import runs
+   * at the migration boundary of the SAME update, BEFORE the new release
+   * serves traffic — a connection with an unresolvable legacy reference stops
+   * the update instead of silently losing its credentials.
+   */
+  readonly runtimeSecretBox?: { encrypt(plaintext: string): Buffer; decrypt(blob: Buffer): string };
+  readonly secretResolver?: (name: string) => string | undefined;
+  /** Structured log sink for the import (names/counts only, never values). */
+  readonly logger?: {
+    info(event: string, fields?: Readonly<Record<string, unknown>>): void;
+  };
 }
 
 interface DeployState {
@@ -298,6 +312,46 @@ export function createProductionUpdatePorts(
         }
         // M17-T006: the actual applied set flows back into update history.
         const result = await migrateDatabase(options.pool, migrations, undefined);
+        // CORE-PAYMENTS-ADMIN-CONFIG-01 §10.1 / review R1.
+        //
+        // This hook runs only when the update orchestrator is ALREADY this
+        // implementation (a later upgrade); the FIRST upgrade from an older
+        // release executes the OLD adapter and the step instead happens at
+        // boot of the new release (apps/web/src/main.ts
+        // applyPaymentCredentialUpgrade). Both are idempotent.
+        //
+        // The condition is "is there anything left to import", NOT "was 0008
+        // applied by this run": a failed import after an already-applied
+        // migration must still be retried by the next update.
+        {
+          // Review R7 (second pass): the update path is a real importer caller
+          // too, so it uses the SAME audited factory as boot — the audit row
+          // belongs to the import transaction and a failing audit insert rolls
+          // the instance import back.
+          const importer = createAuditedImporter({
+            pool: options.pool,
+            box: options.runtimeSecretBox,
+            legacyResolver: options.secretResolver ?? (() => undefined),
+            source: "update",
+          });
+          const plan = await importer.preflight();
+          if (plan.importable > 0 || plan.blocked > 0) {
+            if (options.runtimeSecretBox === undefined) {
+              throw new Error(
+                "payment credential import requires the deployment master key (integrations.runtimeSecretsEncryptionKeySecretRef) — restore it and re-run the update; no payment connection was changed",
+              );
+            }
+            // Throws (and therefore aborts the update before the restart) when
+            // any connection still references an unresolvable deployment
+            // secret — no half-migrated connection, no silently disabled live
+            // payments.
+            const imported = await importer.run();
+            options.logger?.info?.("update.payments.credentials_imported", {
+              instances: imported.imported_instances.length,
+              stale_refs: imported.stale_refs,
+            });
+          }
+        }
         return result.applied;
       },
       async applyExtensionMigrations(planned) {

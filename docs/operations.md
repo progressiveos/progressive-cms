@@ -2,6 +2,14 @@
 
 Contract owner: Core operations and deployment scripts.
 
+## Payment provider credentials and upgrade recovery
+
+For each connection, use **Payments → Providers** to save provider settings and credentials, run the local readiness check, register the displayed callback URL in the provider cabinet, and then enable it. The check does not contact the provider. Keep each merchant and environment in its own connection. Connections with payment history cannot be redirected to a different endpoint or merchant identity.
+
+An upgrade imports credentials from legacy process-secret references into the encrypted per-connection store. Resolve any missing reference reported by the target release's preflight before completing the upgrade. The target release also provides `cms payments credentials status --json` to inventory references and `cms payments credentials import --json` as an idempotent operator recovery path after restoring a missing secret or saving the credential in Admin. These commands report names and presence, never credential values. Remove an old process secret only after checking that no other service uses it.
+
+After a successful import, the previous release cannot read the new credential store. A rollback across that point requires the matching backup restore procedure under the release's rollback policy; switching the release pointer alone is not sufficient. Resolve an unresolved import before completing the upgrade, and verify the connection's readiness and callback configuration afterward. See [Payments](payments.md) and [configuration](configuration-reference.md#payment-provider-credential-encryption).
+
 ## Creator credentials
 
 After creating the initial human OWNER, use `cms token bootstrap --json` to issue the fixed operational `Site-Creator` credential. Use `--rotate` to replace it and optionally `--ttl-hours 1..8760` to set its lifetime. Bootstrap is idempotent; the credential is shown once and installation stores it in `/root/agent-bootstrap.json` mode `0600`. Securely transfer it, then remove the bootstrap file. The fixed profile excludes access management and reserved PII, refund, privacy and Skills permissions.

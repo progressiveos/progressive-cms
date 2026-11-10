@@ -378,6 +378,16 @@ export interface McpOperations {
     ctx: OperationContextLike,
     input: { extension_id: string; operation_id: string; input: unknown },
   ): Promise<unknown>;
+  // CORE-PAYMENTS-ADMIN-CONFIG-01: narrow settings surface. Secrets travel
+  // IN only; responses carry slot presence, never values.
+  getProviderInstanceSettings(
+    ctx: OperationContextLike,
+    input: { instance_id: string },
+  ): Promise<unknown>;
+  saveProviderInstanceSettings(
+    ctx: OperationContextLike,
+    input: { instance_id: string; settings: unknown },
+  ): Promise<unknown>;
   listPaymentProviders(ctx: OperationContextLike): unknown;
   listPaymentProviderInstances(ctx: OperationContextLike): Promise<unknown>;
   getPaymentProviderCapabilities(

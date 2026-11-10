@@ -15,6 +15,7 @@ import { media } from "./dom/media.js";
 import { navigation } from "./dom/navigation.js";
 import { notifications } from "./dom/notifications.js";
 import { permissions } from "./dom/permissions.js";
+import { paymentsSettings } from "./dom/payments-settings.js";
 import { privacy } from "./dom/privacy.js";
 import { publication } from "./dom/publication.js";
 import { search } from "./dom/search.js";
@@ -45,6 +46,7 @@ const fragments: readonly CatalogFragment[] = [
   extensions,
   navigation,
   media,
+  paymentsSettings,
   tabs,
   blocks,
   integrations,

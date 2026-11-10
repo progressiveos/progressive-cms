@@ -183,6 +183,8 @@ The owner chooses whether to use these tools; ordinary CMS work does not require
 | `cms payments list [status]` | Payment list with optional status filter. | API read. |
 | `cms payments get <payment-id>` | One payment's normalized/provider state. | API read. |
 | `cms payments events <payment-id>` | Append-only timeline. | API read. |
+| `cms payments credentials status [--json] [--instance <id>]` | Inventory legacy payment credential references without printing values. | Local operator command. |
+| `cms payments credentials import [--json] [--instance <id>]` | Import resolvable legacy credentials into the encrypted per-connection store; idempotent. | Local operator command; see [upgrade recovery](operations.md#payment-provider-credentials-and-upgrade-recovery). |
 | `cms payments cancel <payment-id>` | Cancels an eligible payment; requires `payments.cancel`. | API financial mutation, no CLI confirmation gate. |
 | `cms payments refund <payment-id> [amount]` | Omitted amount means full refund. Supplied amount must be finite and positive; invalid/nonfinite/nonpositive values return typed PAYMENT_REQUEST_INVALID with zero HTTP requests. | API financial mutation, payments.refund, no CLI confirmation gate. |
 
@@ -257,7 +259,7 @@ These commands operate on the configured DB, outside the HTTP surface. Restrict 
 The following appendix records selectors, literal flags, environment keys and HTTP calls from every imported command implementation and shared dispatcher/client. It is an audit aid, not an instruction to use every flag in every command. Conditions and call expressions are reproduced completely, without shortening. The explanations above describe operand ordering, effective behavior and known gaps that a literal help string cannot establish.
 
 <!-- interface-map:start -->
-Audited implementation files: **40**. Paths are relative to the supplied source tree; consumers do not need that tree to use the commands.
+Audited implementation files: **41**. Paths are relative to the supplied source tree; consumers do not need that tree to use the commands.
 
 ### packages/cli/src/api-client.ts
 
@@ -882,6 +884,19 @@ subcommand === "clear"
 subcommand === "show"
 ```
 
+### packages/cli/src/commands/payments-credentials.ts
+
+Literal parsed flags: `--instance`, `--json`.
+
+Environment keys read directly: none; shared loaders may read configuration/environment.
+
+Command/operand selection conditions:
+```javascript
+subcommand !== "import"
+subcommand !== "status"
+subcommand === "status"
+```
+
 ### packages/cli/src/commands/payments.ts
 
 Literal parsed flags: none.
@@ -1379,6 +1394,7 @@ command === "update"
 command === "user"
 subcommand === "active"
 subcommand === "cleanup"
+subcommand === "credentials"
 subcommand === "export"
 subcommand === "install"
 subcommand === "list"

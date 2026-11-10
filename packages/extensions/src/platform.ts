@@ -102,11 +102,21 @@ export interface ExtensionPaymentsPort {
     readonly providerInstanceId: string;
     readonly idempotencyKey: string;
     readonly proof?: unknown;
-  }): Promise<{ readonly id: string; readonly status: string; readonly replayed: boolean }>;
+  }): Promise<{
+    readonly id: string;
+    readonly status: string;
+    readonly replayed: boolean;
+    /** Provider-hosted form to send the payer to; null when there is none. */
+    readonly paymentUrl: string | null;
+  }>;
   get(input: {
     readonly paymentId: string;
     readonly proof?: unknown;
-  }): Promise<{ readonly id: string; readonly status: string } | null>;
+  }): Promise<{
+    readonly id: string;
+    readonly status: string;
+    readonly paymentUrl: string | null;
+  } | null>;
 }
 
 export interface ExtensionPlatformServices {

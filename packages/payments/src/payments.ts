@@ -7,16 +7,25 @@
 // the unchanged payment. Provider network calls NEVER run inside a DB
 // transaction.
 import { type Clock, type DbClient, type DbPool, newStableId, type StableId } from "@pcms/core";
+import { assertTrustedEndpoints } from "./endpoint-policy.js";
 import { PaymentError } from "./errors.js";
 import { amountLt, isSupportedCurrency, toMinorUnits } from "./money.js";
-import type { PaymentProviderInstanceService } from "./provider-instances.js";
-import type {
-  NormalizedProviderOutcome,
-  ParsedCallback,
-  PaymentProvider,
-  PaymentProviderRegistry,
-  PaymentSecrets,
+import {
+  type PaymentProviderInstanceService,
+  type ProviderInstanceRow,
+  rowToInstance,
+} from "./provider-instances.js";
+import { validateAgainstSchema } from "./schema.js";
+import {
+  configureProvider,
+  type NormalizedProviderOutcome,
+  type ParsedCallback,
+  type PaymentProvider,
+  type PaymentProviderRegistry,
+  type PaymentSecrets,
 } from "./providers.js";
+import { loadInstanceCredentialSnapshot, resolveRequiredCredentials } from "./readiness.js";
+import type { PaymentSecretBox } from "./runtime-secrets.js";
 import {
   assertTransition,
   canTransition,
@@ -38,6 +47,18 @@ export interface Payment {
   readonly description: string | null;
   readonly idempotencyKey: string;
   readonly metadata: Record<string, unknown>;
+  /** Provider-hosted payment form for the payer, when the provider returned one. */
+  readonly paymentUrl: string | null;
+  /** First external create attempt, if one was ever started (durable). */
+  readonly providerAttemptAt: Date | null;
+  /**
+   * What the stored row can PROVE about an external attempt:
+   * - "attempted": a durable attempt marker or a held claim token;
+   * - "never_attempted": a fresh intent, positively not submitted yet;
+   * - "unknown_legacy": neither trace — the shape an older release left after
+   *   releasing the claim of a request whose answer was lost (B4).
+   */
+  readonly providerAttemptState: "attempted" | "never_attempted" | "unknown_legacy";
   readonly refundedAmount: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -76,6 +97,7 @@ interface PaymentRow {
   description: string | null;
   idempotency_key: string;
   metadata: unknown;
+  payment_url: string | null;
   refunded_amount: string;
   created_at: Date;
   updated_at: Date;
@@ -101,11 +123,26 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-const CREATE_CLAIM_KEY = "__pcms_provider_create_submitted";
+/**
+ * Metadata marker written BEFORE the provider create call. Its presence means
+ * "an external attempt happened (outcome possibly unknown)" — the settings
+ * guard uses it to tell a never-submitted payment from an unknown one.
+ */
+export const CREATE_CLAIM_KEY = "__pcms_provider_create_submitted";
+/**
+ * Durable record of the FIRST external create attempt (ISO timestamp). The
+ * claim above is a lease and is released on a retryable failure, but a released
+ * claim is NOT proof that nothing was sent: a lost response looks exactly like
+ * that. This marker is written with the claim and never removed, so
+ * "was the provider ever contacted" and "how old is that unknown attempt" stay
+ * answerable after the lease is gone (review M1 / Y6).
+ */
+export const PROVIDER_ATTEMPT_KEY = "__pcms_provider_first_attempt_at";
 
 function rowToPayment(row: PaymentRow): Payment {
   const metadata = { ...((row.metadata ?? {}) as Record<string, unknown>) };
   delete metadata[CREATE_CLAIM_KEY];
+  delete metadata[PROVIDER_ATTEMPT_KEY];
   return {
     id: row.id as StableId,
     providerInstanceId: row.provider_instance_id,
@@ -118,6 +155,24 @@ function rowToPayment(row: PaymentRow): Payment {
     description: row.description,
     idempotencyKey: row.idempotency_key,
     metadata,
+    paymentUrl: row.payment_url ?? null,
+    providerAttemptAt: (() => {
+      const raw = (row.metadata as Record<string, unknown> | null)?.[PROVIDER_ATTEMPT_KEY];
+      if (typeof raw !== "string") return null;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    })(),
+    providerAttemptState: (() => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      if (typeof meta[PROVIDER_ATTEMPT_KEY] === "string") return "attempted" as const;
+      const claim = meta[CREATE_CLAIM_KEY];
+      if (typeof claim === "object" && claim !== null) {
+        const record = claim as Record<string, unknown>;
+        if (typeof record["token"] === "string") return "attempted" as const;
+        if (record["ready"] === true) return "never_attempted" as const;
+      }
+      return "unknown_legacy" as const;
+    })(),
     refundedAmount: Number(row.refunded_amount),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -142,33 +197,141 @@ function rowToEvent(row: EventRow): PaymentEvent {
 }
 
 const MAX_METADATA_JSON = 4096;
+/**
+ * How many times the executor may ASK the provider about a refund whose
+ * outcome is not final yet, before escalating to a human. One confirmation per
+ * worker sweep (~60s), so this is about an hour — long enough for an
+ * asynchronous bank refund, short enough to surface a stuck one (F1).
+ */
+const MAX_REFUND_CONFIRMATIONS = 60;
 
 export function createPaymentService(deps: {
   pool: DbPool;
   clock: Clock;
   providers: PaymentProviderRegistry;
   instances: PaymentProviderInstanceService;
-  secretResolver: (secretName: string) => string | undefined;
+  /** Deployment master key (integrations.runtimeSecretsEncryptionKeySecret-
+   * Ref); undefined when the deployment has none — then stored credentials
+   * are reported missing/unreadable instead of guessed. */
+  secretBox?: () => PaymentSecretBox | undefined;
 }) {
-  const { pool, clock, providers, instances, secretResolver } = deps;
+  const { pool, clock, providers, instances, secretBox } = deps;
 
-  function resolveProviderSecrets(
-    instance: PaymentProviderInstanceLike,
-    secretRequirements: readonly string[],
-  ): PaymentSecrets {
-    const values: Record<string, string> = {};
-    for (const requirement of secretRequirements) {
-      const refName = instance.secretRefs[requirement];
-      const value = refName === undefined ? undefined : secretResolver(refName);
-      if (refName === undefined || value === undefined || value === "") {
+  /**
+   * The ONE resolution path for every money/inbound operation.
+   *
+   * Review R5: the connection row and its encrypted slots must come from ONE
+   * snapshot — otherwise a concurrent save could hand the old adapter config
+   * to the new credentials. The read runs in a short REPEATABLE READ
+   * transaction (no lock is held over the provider HTTP call), so both
+   * statements observe the same committed state; the adapter, the decryption
+   * and the call then belong to that snapshot.
+   */
+  async function wiringFor(instance: PaymentProviderInstanceLike): Promise<{
+    readonly provider: PaymentProvider;
+    readonly instance: PaymentProviderInstanceLike;
+    readonly secrets: PaymentSecrets;
+  }> {
+    const registered = providers.get(instance.providerType);
+    if (registered === undefined) {
+      throw new PaymentError(
+        "PAYMENT_PROVIDER_UNKNOWN",
+        `provider type "${instance.providerType}" is not registered`,
+      );
+    }
+    const snapshot = await pool.withTransaction(
+      async (tx) => {
+        const fresh = await tx.query<ProviderInstanceRow>(
+          "SELECT * FROM payment_provider_instance WHERE id = $1",
+          [instance.id],
+        );
+        const row = fresh.rows[0];
+        if (row === undefined) {
+          throw new PaymentError(
+            "PAYMENT_PROVIDER_INSTANCE_NOT_FOUND",
+            "provider instance deleted",
+          );
+        }
+        const current = rowToInstance(row);
+        const credentialSnapshot = await loadInstanceCredentialSnapshot(tx, secretBox?.(), current);
+        return { current, credentialSnapshot };
+      },
+      { isolation: "repeatable read" },
+    );
+    const current = snapshot.current;
+    // A stored config that no longer matches the adapter's schema must not be
+    // silently applied to a money call.
+    const issues = validateAgainstSchema(registered.configSchema, current.config, "config");
+    if (issues.length > 0) {
+      throw new PaymentError(
+        "PAYMENT_PROVIDER_CONFIG_UNSUPPORTED",
+        `stored settings of provider instance "${current.name}" do not match the provider schema: ${issues.join("; ")}`,
+      );
+    }
+    // Review R3 (second pass): the endpoint policy is enforced HERE too, not
+    // only in the settings form. A legacy document with an arbitrary apiBase
+    // must not become authoritative just because the import moved its
+    // credentials — otherwise the saved secret travels to that host.
+    assertTrustedEndpoints(registered, current.config, current.name);
+    const provider = configureProvider(registered, current.config);
+    const { values } = resolveRequiredCredentials(provider, current, snapshot.credentialSnapshot);
+    return { provider, instance: current, secrets: { values } };
+  }
+
+  /**
+   * Applies a provider-CONFIRMED refund: the amount is booked once, the intent
+   * becomes SUCCEEDED, the payment advances and the outbox is written — all in
+   * one transaction. Callers that merely re-read a known refund object share
+   * this, so "confirm twice" cannot book twice.
+   */
+  async function applyConfirmedRefund(input: {
+    readonly intentId: string;
+    readonly paymentId: string;
+    readonly amount: number;
+    readonly providerRefundId: string | null | undefined;
+  }): Promise<void> {
+    const { intentId, paymentId, amount, providerRefundId } = input;
+    await pool.withTransaction(async (tx) => {
+      const locked = await getWithinTx(tx, paymentId, true);
+      const current = await tx.query<{ status: string }>(
+        "SELECT status FROM payment_refund WHERE id = $1 FOR UPDATE",
+        [intentId],
+      );
+      if (current.rows[0]?.status === "SUCCEEDED") return;
+      if (!["SUBMITTED", "NEEDS_REVIEW"].includes(current.rows[0]?.status ?? "")) {
+        throw new PaymentError("PAYMENT_REQUEST_INVALID", "refund intent is no longer executable");
+      }
+      if (locked === null) throw new PaymentError("PAYMENT_NOT_FOUND", "payment vanished");
+      const nextRemainder = round2(locked.amount - locked.refundedAmount - amount);
+      if (nextRemainder < 0) {
         throw new PaymentError(
-          "PAYMENT_REQUEST_INVALID",
-          `secret "${requirement}" is not configured for provider instance "${instance.name}"`,
+          "PAYMENT_REFUND_EXCEEDS_AMOUNT",
+          "concurrent refund exhausted the amount",
         );
       }
-      values[requirement] = value;
-    }
-    return { values };
+      const target: PaymentStatus = nextRemainder === 0 ? "REFUNDED" : "PARTIALLY_REFUNDED";
+      assertTransition(locked.status, target);
+      const clean = await tx.query<PaymentRow>(
+        `UPDATE payment
+         SET refunded_amount = ROUND((refunded_amount + $2)::numeric, 2),
+             status = $3, updated_at = $4
+         WHERE id = $1 RETURNING *`,
+        [paymentId, amount, target, clock.now()],
+      );
+      const next = rowToPayment(clean.rows[0]!);
+      await tx.query(
+        `UPDATE payment_refund SET status = 'SUCCEEDED', provider_refund_id = COALESCE($2, provider_refund_id),
+           updated_at = $3
+         WHERE id = $1`,
+        [intentId, providerRefundId ?? null, clock.now()],
+      );
+      await appendEvent(tx, paymentId, {
+        eventType: target,
+        source: "system",
+        payload: { amount, refunded_amount: next.refundedAmount, refund_intent_id: intentId },
+      });
+      await writeOutbox(tx, next, locked.status);
+    });
   }
 
   async function appendEvent(
@@ -292,7 +455,10 @@ export function createPaymentService(deps: {
       throw new PaymentError("PAYMENT_REQUEST_INVALID", "description exceeds 500 chars");
     }
     if (input.metadata !== undefined) {
-      if (Object.hasOwn(input.metadata, CREATE_CLAIM_KEY)) {
+      if (
+        Object.hasOwn(input.metadata, CREATE_CLAIM_KEY) ||
+        Object.hasOwn(input.metadata, PROVIDER_ATTEMPT_KEY)
+      ) {
         throw new PaymentError("PAYMENT_REQUEST_INVALID", "reserved payment metadata key");
       }
       const keys = Object.keys(input.metadata);
@@ -311,6 +477,7 @@ export function createPaymentService(deps: {
       readonly status: NormalizedProviderOutcome;
       readonly externalId?: string;
       readonly providerStatus?: string;
+      readonly paymentUrl?: string;
     },
     event: {
       readonly source: "operator" | "provider" | "system";
@@ -352,8 +519,10 @@ export function createPaymentService(deps: {
         // A callback may settle first; retain its status and attach the later reference.
         if (locked.externalPaymentId === null && outcome.externalId !== undefined) {
           const attached = await tx.query<PaymentRow>(
-            "UPDATE payment SET external_payment_id=$2, updated_at=$3 WHERE id=$1 RETURNING *",
-            [payment.id, outcome.externalId, clock.now()],
+            `UPDATE payment SET external_payment_id=$2,
+               payment_url = COALESCE($4, payment_url), updated_at=$3
+             WHERE id=$1 RETURNING *`,
+            [payment.id, outcome.externalId, clock.now(), outcome.paymentUrl ?? null],
           );
           return rowToPayment(attached.rows[0]!);
         }
@@ -364,9 +533,10 @@ export function createPaymentService(deps: {
       const updated = await tx.query<PaymentRow>(
         `UPDATE payment SET status = $2, updated_at = $3,
            external_payment_id = COALESCE($4, external_payment_id),
+           payment_url = COALESCE($5, payment_url),
            paid_at = CASE WHEN $2 = 'SUCCEEDED' THEN COALESCE(paid_at, $3) ELSE paid_at END
          WHERE id = $1 RETURNING *`,
-        [payment.id, target, now, outcome.externalId ?? null],
+        [payment.id, target, now, outcome.externalId ?? null, outcome.paymentUrl ?? null],
       );
       const next = rowToPayment(updated.rows[0]!);
       await appendEvent(tx, payment.id, {
@@ -587,15 +757,56 @@ export function createPaymentService(deps: {
       payment: Payment,
       actor?: PaymentActor,
     ): Promise<{ readonly payment: Payment; readonly replayed: boolean }> {
-      const secrets = resolveProviderSecrets(instance, provider.secretRequirements);
-      const retryable = provider.capabilities().providerIdempotency;
+      // Credentials and the configured adapter are resolved HERE, per call:
+      // a settings change is visible to the next action without a restart.
+      const wiring = await wiringFor(instance);
+      const secrets = wiring.secrets;
+      const configured = wiring.provider;
+      const capabilities = configured.capabilities();
+      const retryable = capabilities.providerIdempotency;
+      // Review Y6: the provider's idempotency key expires. Re-sending an
+      // UNKNOWN outcome after that window is a brand-new operation at the
+      // provider, not a retry, so it is refused before any I/O and left for
+      // reconciliation. A payment that was never submitted has no marker and
+      // is unaffected.
+      // B4: a legacy row with NO trace of an attempt is not "never sent" — the
+      // previous release also removed the claim after a lost response, and it
+      // wrote no durable marker. Treat it as an unknown outcome instead of
+      // starting a fresh operation under the same key.
+      if (payment.providerAttemptState === "unknown_legacy") {
+        throw new PaymentError(
+          "PAYMENT_RECONCILIATION_REQUIRED",
+          `payment "${payment.id}" has no record of whether an external create was sent (written by an older release) — reconcile it with the provider before retrying; no provider call was made`,
+          { details: { payment_id: payment.id, reason: "unknown_legacy" } },
+        );
+      }
+      const windowSeconds = capabilities.providerIdempotencyWindowSeconds;
+      if (payment.providerAttemptAt !== null && windowSeconds !== undefined) {
+        const ageMs = clock.now().getTime() - payment.providerAttemptAt.getTime();
+        if (ageMs > windowSeconds * 1000) {
+          throw new PaymentError(
+            "PAYMENT_RECONCILIATION_REQUIRED",
+            `the first provider attempt for payment "${payment.id}" is older than the provider's ${windowSeconds}s idempotency window — re-sending would create a NEW operation; reconcile the payment with the provider before retrying`,
+            {
+              details: {
+                payment_id: payment.id,
+                first_attempt_at: payment.providerAttemptAt.toISOString(),
+                window_seconds: windowSeconds,
+              },
+            },
+          );
+        }
+      }
       const claim = newStableId();
       // A short committed CAS, not a connection or transaction held over I/O.
       // Missing legacy markers are unknown outcomes for non-idempotent providers.
       // Only an idempotent provider can reclaim an expired idempotent lease.
       const acquired = await pool.query<{ id: string }>(
-        `UPDATE payment SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), ARRAY[$2],
-           jsonb_build_object('token', $3::text, 'at', clock_timestamp(), 'retryable', $4::boolean))
+        `UPDATE payment SET metadata =
+           jsonb_set(
+             jsonb_set(COALESCE(metadata, '{}'::jsonb), ARRAY[$2],
+               jsonb_build_object('token', $3::text, 'at', clock_timestamp(), 'retryable', $4::boolean)),
+             ARRAY[$5], to_jsonb(COALESCE(metadata #>> ARRAY[$5], clock_timestamp()::text)), true)
          WHERE id=$1 AND status='CREATED' AND external_payment_id IS NULL AND (
            metadata #> ARRAY[$2, 'ready'] = 'true'::jsonb OR
            ($4::boolean AND NOT COALESCE(metadata ? $2, false)) OR (
@@ -603,7 +814,7 @@ export function createPaymentService(deps: {
              (metadata #>> ARRAY[$2, 'at'])::timestamptz < clock_timestamp() - interval '5 minutes'
            )
          ) RETURNING id`,
-        [payment.id, CREATE_CLAIM_KEY, claim, retryable],
+        [payment.id, CREATE_CLAIM_KEY, claim, retryable, PROVIDER_ATTEMPT_KEY],
       );
       if (acquired.rows.length === 0) {
         const current = await getWithinTx(pool, payment.id, false);
@@ -626,7 +837,7 @@ export function createPaymentService(deps: {
       };
       let result: import("./providers.js").ProviderCreateResult;
       try {
-        result = await provider.createPayment(
+        result = await configured.createPayment(
           {
             paymentId: payment.id,
             amount: payment.amount,
@@ -655,6 +866,7 @@ export function createPaymentService(deps: {
             ...(result.providerStatus === undefined
               ? {}
               : { providerStatus: result.providerStatus }),
+            ...(result.paymentUrl === undefined ? {} : { paymentUrl: result.paymentUrl }),
           },
           { source: "provider", ...(actor === undefined ? {} : { actor }) },
           claim,
@@ -863,7 +1075,11 @@ export function createPaymentService(deps: {
         // unique index backs the guarantee at the DB level.
         await getWithinTx(tx, paymentId, true);
         const active = await tx.query(
-          `SELECT 1 FROM payment_refund WHERE payment_id = $1 AND status IN ('REQUESTED','SUBMITTED') FOR UPDATE`,
+          // B3: NEEDS_REVIEW is an UNKNOWN outcome — it still reserves the
+          // amount, so a new refund key cannot start a second movement while
+          // the first one is unproven.
+          `SELECT 1 FROM payment_refund WHERE payment_id = $1
+             AND status IN ('REQUESTED','SUBMITTED','NEEDS_REVIEW') FOR UPDATE`,
           [paymentId],
         );
         if (active.rows.length > 0) {
@@ -987,8 +1203,13 @@ export function createPaymentService(deps: {
         status: string;
         idempotency_key: string;
         attempts: number;
+        first_submitted_at: Date | null;
+        first_submitted_proven: boolean;
+        provider_refund_id: string | null;
+        confirmations: number;
       }>(
-        `SELECT id, payment_id, amount::text AS amount, currency, status, idempotency_key, attempts
+        `SELECT id, payment_id, amount::text AS amount, currency, status, idempotency_key, attempts,
+                first_submitted_at, first_submitted_proven, provider_refund_id, confirmations
          FROM payment_refund WHERE id = $1`,
         [intentId],
       );
@@ -1002,9 +1223,43 @@ export function createPaymentService(deps: {
       const payment = await this.getForUpdate(intent.payment_id);
       const { provider, secrets } = await this.wiring(payment);
       const amount = Number(intent.amount);
+      // F1: a refund that keeps answering "not final" must not stay SUBMITTED
+      // forever. The counter is bounded, so the escalation is visible instead
+      // of an endless poll.
+      if (intent.status === "SUBMITTED" && intent.confirmations >= MAX_REFUND_CONFIRMATIONS) {
+        await pool.query(
+          `UPDATE payment_refund SET status = 'NEEDS_REVIEW', last_error = $2, updated_at = $3
+           WHERE id = $1 AND status = 'SUBMITTED'`,
+          [
+            intentId,
+            `provider did not confirm the refund after ${intent.confirmations} checks; reconcile with the provider`,
+            clock.now(),
+          ],
+        );
+        return { status: "NEEDS_REVIEW" };
+      }
+      // B1: a previous answer already named the provider's refund object, and
+      // it was not final. Confirm THAT object — a lookup, not a second money
+      // POST.
+      if (intent.status === "SUBMITTED" && intent.provider_refund_id !== null) {
+        const remote =
+          provider.getRefund === undefined
+            ? null
+            : await provider.getRefund(intent.provider_refund_id, secrets);
+        if (remote !== null) {
+          return this.settleRefundFromProvider(
+            intentId,
+            intent.payment_id,
+            amount,
+            remote.status,
+            intent.provider_refund_id,
+          );
+        }
+      }
       // SUBMITTED survives a process crash. Without provider idempotency an
       // automatic replay could move money twice, so require reconciliation.
-      if (intent.status === "SUBMITTED" && !provider.capabilities().providerIdempotency) {
+      const capabilities = provider.capabilities();
+      if (intent.status === "SUBMITTED" && !capabilities.providerIdempotency) {
         await pool.query(
           `UPDATE payment_refund SET status = 'NEEDS_REVIEW',
           last_error = 'interrupted submission without provider idempotency', updated_at = $2
@@ -1013,11 +1268,66 @@ export function createPaymentService(deps: {
         );
         return { status: "NEEDS_REVIEW" };
       }
-      const claim = await pool.query(
-        `UPDATE payment_refund SET status = 'SUBMITTED', attempts = attempts + 1, updated_at = $2
-         WHERE id = $1 AND status = $3 AND attempts = $4 RETURNING id`,
-        [intentId, clock.now(), intent.status, intent.attempts],
-      );
+      // Review Y6 (same boundary for refunds): after the provider's key
+      // expires, re-sending the intent is a NEW refund at the provider.
+      // B2: the age is measured from the FIRST submission, which retries,
+      // errors and pending answers never move.
+      const refundWindow = capabilities.providerIdempotencyWindowSeconds;
+      if (intent.status === "SUBMITTED" && refundWindow !== undefined) {
+        // F4: a time without recorded provenance may be the retired 0009
+        // backfill (updated_at, moved by every retry). It cannot bound the
+        // window, so the intent goes to reconciliation instead of a repeat.
+        const firstSent =
+          intent.first_submitted_at === null || intent.first_submitted_proven !== true
+            ? null
+            : new Date(intent.first_submitted_at);
+        if (firstSent === null) {
+          await pool.query(
+            `UPDATE payment_refund SET status = 'NEEDS_REVIEW', last_error = $2, updated_at = $3
+             WHERE id = $1 AND status = 'SUBMITTED'`,
+            [
+              intentId,
+              "submitted without a recorded first-attempt time; the provider's idempotency window cannot be proven — reconcile with the provider",
+              clock.now(),
+            ],
+          );
+          return { status: "NEEDS_REVIEW" };
+        }
+        const ageMs = clock.now().getTime() - firstSent.getTime();
+        if (ageMs > refundWindow * 1000) {
+          await pool.query(
+            `UPDATE payment_refund SET status = 'NEEDS_REVIEW', last_error = $2, updated_at = $3
+             WHERE id = $1 AND status = 'SUBMITTED'`,
+            [
+              intentId,
+              `unknown refund outcome older than the provider's ${refundWindow}s idempotency window; reconcile with the provider`,
+              clock.now(),
+            ],
+          );
+          return { status: "NEEDS_REVIEW" };
+        }
+      }
+      // F1: for a SUBMITTED intent this is a CONFIRMATION, not a new attempt.
+      // The provider deduplicates on the intent's stable key, so the same
+      // operation is re-read; a separate counter keeps the stale-attempt
+      // escalation from firing after five minutes.
+      const claim =
+        intent.status === "SUBMITTED"
+          ? await pool.query(
+              `UPDATE payment_refund SET confirmations = confirmations + 1, updated_at = $2
+               WHERE id = $1 AND status = 'SUBMITTED' AND confirmations = $3 RETURNING id`,
+              [intentId, clock.now(), intent.confirmations],
+            )
+          : await pool.query(
+              // first_submitted_at is written once, on the first claim, and
+              // never moved by a retry (B2: it bounds the provider's
+              // idempotency window). Provenance is recorded so a later
+              // migration never has to guess (F4).
+              `UPDATE payment_refund SET status = 'SUBMITTED', attempts = attempts + 1, updated_at = $2,
+                 first_submitted_at = COALESCE(first_submitted_at, $2), first_submitted_proven = true
+               WHERE id = $1 AND status = 'REQUESTED' AND attempts = $3 RETURNING id`,
+              [intentId, clock.now(), intent.attempts],
+            );
       if (claim.rows.length === 0) {
         throw new PaymentError(
           "PAYMENT_REFUND_IN_PROGRESS",
@@ -1041,6 +1351,7 @@ export function createPaymentService(deps: {
         return { status: "FAILED" };
       }
       let providerRefundId: string | undefined;
+      let providerRefundStatus: NormalizedProviderOutcome | undefined;
       try {
         const result = await provider.refundPayment(
           payment.externalPaymentId,
@@ -1050,6 +1361,7 @@ export function createPaymentService(deps: {
           intent.idempotency_key,
         );
         providerRefundId = result.providerRefundId;
+        providerRefundStatus = result.status;
       } catch (error) {
         const message = error instanceof Error ? error.message.slice(0, 200) : String(error);
         const code = (error as { code?: string }).code ?? "";
@@ -1094,67 +1406,140 @@ export function createPaymentService(deps: {
         );
         throw error; // job retry machinery re-schedules with backoff
       }
+      // Review Y2: a provider answer is not automatically a returned refund.
+      // A definitive refusal must not book money, and a non-final state must
+      // stay unresolved instead of being reported as success.
+      if (providerRefundStatus === "FAILED") {
+        await pool.query(
+          `UPDATE payment_refund SET status = 'FAILED',
+             provider_refund_id = COALESCE($4, provider_refund_id),
+             last_error = $2, updated_at = $3
+           WHERE id = $1 AND status IN ('SUBMITTED','NEEDS_REVIEW')`,
+          [
+            intentId,
+            "provider reported the refund as canceled",
+            clock.now(),
+            providerRefundId ?? null,
+          ],
+        );
+        await appendEvent(pool, intent.payment_id, {
+          eventType: "REFUND_REQUESTED",
+          source: "provider",
+          payload: {
+            refund_intent_id: intentId,
+            outcome: "FAILED",
+            provider_refund_id: providerRefundId ?? null,
+          },
+        });
+        return { status: "FAILED" };
+      }
+      if (providerRefundStatus === "PENDING") {
+        // Not confirmed yet: keep the intent SUBMITTED with the same key so the
+        // next execution re-reads the provider, and never touch the amount.
+        // B1: keep the provider's refund id — it is the handle the worker
+        // uses to CONFIRM the outcome later without a second money POST.
+        await pool.query(
+          `UPDATE payment_refund SET provider_refund_id = COALESCE($2, provider_refund_id),
+             last_error = $3, updated_at = $4
+           WHERE id = $1 AND status = 'SUBMITTED'`,
+          [
+            intentId,
+            providerRefundId ?? null,
+            "provider reported the refund as not final; awaiting confirmation",
+            clock.now(),
+          ],
+        );
+        return { status: "SUBMITTED" };
+      }
       // Provider confirmed the refund: apply it to the payment in ONE tx
       // (crash here = SUBMITTED + same key → the next execute reconciles).
-      await pool.withTransaction(async (tx) => {
-        const locked = await getWithinTx(tx, intent.payment_id, true);
-        const current = await tx.query<{ status: string }>(
-          "SELECT status FROM payment_refund WHERE id = $1 FOR UPDATE",
-          [intentId],
-        );
-        if (current.rows[0]?.status === "SUCCEEDED") return;
-        if (!["SUBMITTED", "NEEDS_REVIEW"].includes(current.rows[0]?.status ?? "")) {
-          throw new PaymentError(
-            "PAYMENT_REQUEST_INVALID",
-            "refund intent is no longer executable",
-          );
-        }
-        if (locked === null) throw new PaymentError("PAYMENT_NOT_FOUND", "payment vanished");
-        const nextRemainder = round2(locked.amount - locked.refundedAmount - amount);
-        if (nextRemainder < 0) {
-          throw new PaymentError(
-            "PAYMENT_REFUND_EXCEEDS_AMOUNT",
-            "concurrent refund exhausted the amount",
-          );
-        }
-        const target: PaymentStatus = nextRemainder === 0 ? "REFUNDED" : "PARTIALLY_REFUNDED";
-        assertTransition(locked.status, target);
-        const clean = await tx.query<PaymentRow>(
-          `UPDATE payment
-           SET refunded_amount = ROUND((refunded_amount + $2)::numeric, 2),
-               status = $3, updated_at = $4
-           WHERE id = $1 RETURNING *`,
-          [intent.payment_id, amount, target, clock.now()],
-        );
-        const next = rowToPayment(clean.rows[0]!);
-        await tx.query(
-          `UPDATE payment_refund SET status = 'SUCCEEDED', provider_refund_id = $2, updated_at = $3
-           WHERE id = $1`,
-          [intentId, providerRefundId ?? null, clock.now()],
-        );
-        await appendEvent(tx, intent.payment_id, {
-          eventType: target,
-          source: "system",
-          payload: { amount, refunded_amount: next.refundedAmount, refund_intent_id: intentId },
-        });
-        await writeOutbox(tx, next, locked.status);
+      await applyConfirmedRefund({
+        intentId,
+        paymentId: intent.payment_id,
+        amount,
+        providerRefundId,
       });
       return { status: "SUCCEEDED" };
     },
 
+    /**
+     * B1: apply a refund state the provider reported for an ALREADY known
+     * refund object (pending poll or inbound reconciliation). No money POST.
+     */
+    async settleRefundFromProvider(
+      intentId: string,
+      paymentId: string,
+      amount: number,
+      status: NormalizedProviderOutcome,
+      providerRefundId: string | null,
+    ): Promise<{ readonly status: string }> {
+      if (status === "SUCCEEDED") {
+        await applyConfirmedRefund({ intentId, paymentId, amount, providerRefundId });
+        return { status: "SUCCEEDED" };
+      }
+      if (status === "FAILED") {
+        await pool.query(
+          `UPDATE payment_refund SET status = 'FAILED', provider_refund_id = COALESCE($2, provider_refund_id),
+             last_error = $3, updated_at = $4
+           WHERE id = $1 AND status IN ('SUBMITTED','NEEDS_REVIEW')`,
+          [intentId, providerRefundId, "provider reported the refund as canceled", clock.now()],
+        );
+        await appendEvent(pool, paymentId, {
+          eventType: "REFUND_REQUESTED",
+          source: "provider",
+          payload: {
+            refund_intent_id: intentId,
+            outcome: "FAILED",
+            provider_refund_id: providerRefundId,
+          },
+        });
+        return { status: "FAILED" };
+      }
+      const pending = await pool.query<{ confirmations: number }>(
+        `UPDATE payment_refund SET provider_refund_id = COALESCE($2, provider_refund_id),
+           confirmations = confirmations + 1,
+           last_error = $3, updated_at = $4
+         WHERE id = $1 AND status IN ('SUBMITTED','NEEDS_REVIEW')
+         RETURNING confirmations`,
+        [intentId, providerRefundId, "provider still reports the refund as not final", clock.now()],
+      );
+      if ((pending.rows[0]?.confirmations ?? 0) >= MAX_REFUND_CONFIRMATIONS) {
+        await pool.query(
+          `UPDATE payment_refund SET status = 'NEEDS_REVIEW', last_error = $2, updated_at = $3
+           WHERE id = $1 AND status = 'SUBMITTED'`,
+          [
+            intentId,
+            "provider did not confirm the refund after repeated checks; reconcile with the provider",
+            clock.now(),
+          ],
+        );
+        return { status: "NEEDS_REVIEW" };
+      }
+      return { status: "SUBMITTED" };
+    },
+
     /** Refund intents whose SUBMITTED state exceeded max attempts — the
      * worker flips them to NEEDS_REVIEW (manual reconciliation; the provider
-     * may have processed the refund). */
+     * may have processed the refund) and records an event, so the escalation
+     * is visible instead of a silent status change (B1). */
     async reconcileStaleRefundIntents(maxAttempts: number): Promise<number> {
-      const result = await pool.query(
+      const stale = await pool.query<{ id: string; payment_id: string; last_error: string | null }>(
         `UPDATE payment_refund
          SET status = 'NEEDS_REVIEW',
              last_error = COALESCE(last_error, 'max execution attempts exceeded; outcome unknown'),
              updated_at = $2
-         WHERE status = 'SUBMITTED' AND attempts >= $1`,
+         WHERE status = 'SUBMITTED' AND attempts >= $1
+         RETURNING id, payment_id, last_error`,
         [maxAttempts, clock.now()],
       );
-      return result.rowCount ?? 0;
+      for (const row of stale.rows) {
+        await appendEvent(pool, row.payment_id, {
+          eventType: "REFUND_REQUESTED",
+          source: "system",
+          payload: { refund_intent_id: row.id, outcome: "NEEDS_REVIEW", error: row.last_error },
+        });
+      }
+      return stale.rows.length;
     },
 
     // ---- S7: inbound recovery (worker-side) --------------------------------
@@ -1206,23 +1591,20 @@ export function createPaymentService(deps: {
         // operator (it is visible in diagnostics).
         return { applied: false, status: row.status };
       }
-      const provider = providers.get(instance.providerType);
-      if (provider === undefined) {
+      if (providers.get(instance.providerType) === undefined) {
         return { applied: false, status: row.status }; // still absent — retry later
       }
-      // Re-verify under the CURRENT secret set before any state change.
-      const requirements = provider.secretRequirements;
-      const values: Record<string, string> = {};
-      for (const requirement of requirements) {
-        const refName = instance.secretRefs[requirement];
-        const value = refName === undefined ? undefined : secretResolver(refName);
-        if (refName === undefined || value === undefined) {
-          // Secrets unavailable — cannot authenticate the event: leave it
-          // queued (retry later), never apply unverified.
-          return { applied: false, status: row.status };
-        }
-        values[requirement] = value;
+      // Re-verify under the CURRENT credentials and config (the same resolver
+      // as live inbound, never a process-env copy of an old key). Unavailable
+      // credentials leave the event queued, never applied unverified.
+      let wiring: Awaited<ReturnType<typeof wiringFor>>;
+      try {
+        wiring = await wiringFor(instance);
+      } catch {
+        return { applied: false, status: row.status };
       }
+      const provider = wiring.provider;
+      const values = { ...wiring.secrets.values };
       let parsed: ReturnType<typeof provider.parseCallback>;
       try {
         const storedHeaders = (recordHeaders ?? {}) as Record<string, string>;
@@ -1252,17 +1634,40 @@ export function createPaymentService(deps: {
       return { applied: applied.applied, status: applied.applied ? "PROCESSED" : row.status };
     },
 
-    /** Worker claim: refund intents ready for (re)execution. REQUESTED =
-     * never attempted; SUBMITTED rows with last_error are re-driven by their
-     * JOB retry schedule (maxAttempts), so this query only surfaces
-     * REQUESTED — single-flight per payment is enforced by the DB. */
-    async claimDueRefundIntents(limit: number) {
+    /**
+     * Worker claim. REQUESTED = never attempted (a money POST is due).
+     *
+     * SUBMITTED rows are selected by the ACTION the executor will take, not by
+     * one blanket time predicate (review L1):
+     *  - a known provider refund id means the next step is a READ of that
+     *    object — always safe, so it needs no window and works with an unknown
+     *    first-send time (the 0011 backfill retirement sets it to NULL);
+     *  - without an id the executor replays the same key, which is paced by the
+     *    record's own update time, never by an unproven first-send time.
+     * Single-flight per payment is enforced by the DB.
+     */
+    async claimDueRefundIntents(limit: number, options?: { readonly dueBefore?: Date }) {
+      const dueBefore = options?.dueBefore ?? null;
       const result = await pool.query<{ id: string }>(
         `SELECT r.id FROM payment_refund r
-         WHERE r.status = 'REQUESTED'
-           AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.idempotency_key = 'refund-intent-' || r.id::text)
+         WHERE (
+             r.status = 'REQUESTED'
+             OR (
+               r.status = 'SUBMITTED'
+               AND (
+                 r.provider_refund_id IS NOT NULL
+                 OR $2::timestamptz IS NULL
+                 OR r.updated_at <= $2::timestamptz
+               )
+             )
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM jobs j
+             WHERE j.idempotency_key = 'refund-intent-' || r.id::text
+               AND j.state <> 'SUCCEEDED'
+           )
          ORDER BY r.created_at, r.id LIMIT $1`,
-        [limit],
+        [limit, dueBefore],
       );
       return result.rows.map((row) => row.id);
     },
@@ -1382,15 +1787,22 @@ export function createPaymentService(deps: {
       if (instance === null) {
         throw new PaymentError("PAYMENT_PROVIDER_INSTANCE_NOT_FOUND", "provider instance deleted");
       }
-      const provider = providers.get(instance.providerType);
-      if (provider === undefined) {
-        throw new PaymentError("PAYMENT_PROVIDER_UNKNOWN", "provider not registered");
+      // Same resolver as create/refund/sync/callback: config applied, one
+      // credential read, no process-env fallback for imported slots.
+      return wiringFor(instance);
+    },
+
+    /** Exposed for the composition's callback verifier and the offline check:
+     * the configured adapter plus this connection's resolved credentials. */
+    async resolveInstanceWiring(instanceId: string) {
+      const instance = await instances.get(instanceId);
+      if (instance === null) {
+        throw new PaymentError(
+          "PAYMENT_PROVIDER_INSTANCE_NOT_FOUND",
+          "provider instance not found",
+        );
       }
-      return {
-        provider,
-        instance,
-        secrets: resolveProviderSecrets(instance, provider.secretRequirements),
-      };
+      return wiringFor(instance);
     },
   };
 }
@@ -1398,7 +1810,9 @@ export function createPaymentService(deps: {
 interface PaymentProviderInstanceLike {
   readonly id: string;
   readonly name: string;
+  readonly providerType: string;
   readonly enabled: boolean;
+  readonly config?: Record<string, unknown>;
   readonly secretRefs: Record<string, string>;
 }
 

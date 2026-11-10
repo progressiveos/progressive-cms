@@ -128,6 +128,12 @@ export async function listExtensions(app: ApplicationServices, ctx: OperationCon
         event_subscriptions: artifact.manifest.registrations.event_subscriptions.length,
         validators: artifact.manifest.registrations.validators.length,
         providers: artifact.manifest.registrations.providers.length,
+        // CORE-PAYMENTS-ADMIN-CONFIG-01: payment providers have their OWN
+        // connection surface, so the Admin must distinguish them from media
+        // providers instead of guessing from a combined count.
+        payment_providers: artifact.manifest.registrations.providers.filter(
+          (entry) => entry.registry === "payment_provider",
+        ).length,
         operations: artifact.manifest.registrations.operations.length,
       },
     };
@@ -169,6 +175,7 @@ export async function listExtensions(app: ApplicationServices, ctx: OperationCon
         event_subscriptions: 0,
         validators: 0,
         providers: 0,
+        payment_providers: 0,
         operations: 0,
       },
     });

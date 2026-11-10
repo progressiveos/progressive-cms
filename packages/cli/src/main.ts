@@ -19,6 +19,7 @@ import { mediaCommand, publicationCommand } from "./commands/media-publication.j
 import { migrateCommand } from "./commands/migrate.js";
 import { navCommand, routeCommand } from "./commands/nav-route.js";
 import { observationsCommand } from "./commands/observations.js";
+import { paymentsCredentialsCommand } from "./commands/payments-credentials.js";
 import { paymentsCommand } from "./commands/payments.js";
 import { redirectsCommand } from "./commands/redirects.js";
 import { registryCommand } from "./commands/registry.js";
@@ -233,6 +234,15 @@ export async function runCli(argv: readonly string[]): Promise<CliResult> {
       });
     }
     if (command === "payments") {
+      // The credential import is a LOCAL operator step (process secret channel
+      // + database), not a remote API call (CORE-PAYMENTS-ADMIN-CONFIG-01).
+      if (subcommand === "credentials") {
+        return paymentsCredentialsCommand({
+          args: [rest[0] ?? "", ...rest.slice(1)],
+          ...(options.config === undefined ? {} : { file: options.config }),
+          env: process.env,
+        });
+      }
       return paymentsCommand({
         args: [subcommand ?? "", ...rest],
         options,

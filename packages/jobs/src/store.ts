@@ -138,6 +138,13 @@ export interface JobsService {
   }): Promise<readonly JobRecord[]>;
   complete(jobId: StableId): Promise<void>;
   /**
+   * Re-opens a SUCCEEDED job whose work turned out to be unfinished (a later
+   * step discovered a continuing state). Returns false when the job is not in
+   * a terminal-success state, so a caller can never resurrect a running or
+   * failed job through this path.
+   */
+  reopen(jobId: StableId): Promise<boolean>;
+  /**
    * Heartbeat for running jobs (spec §63): pushes this worker's claim lease
    * forward so a job that legitimately runs longer than one lease window is
    * not recovered as dead and double-claimed by another worker. Only rows
@@ -388,6 +395,21 @@ export function createJobsService(
           [jobId, message, new Date(now.getTime() + delay), now],
         );
       });
+    },
+
+    async reopen(jobId) {
+      const now = deps.clock.now();
+      // The unique active-idempotency index allows one PENDING/RUNNING row per
+      // key, so a terminal row is flipped in place instead of re-inserted.
+      const result = await pool.query(
+        `UPDATE jobs
+         SET state = 'PENDING', run_at = $2, attempts = 0, completed_at = NULL,
+             claimed_by = NULL, claim_expires_at = NULL, last_error = NULL,
+             error_kind = NULL, updated_at = $2
+         WHERE id = $1 AND state = 'SUCCEEDED'`,
+        [jobId, now],
+      );
+      return (result.rowCount ?? 0) > 0;
     },
 
     async park(jobId, options) {

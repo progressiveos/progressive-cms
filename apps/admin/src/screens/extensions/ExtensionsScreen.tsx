@@ -9,6 +9,8 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../../api/client.js";
 import { useAuth } from "../../auth/AuthContext.js";
 import { ConfirmDialog, Dialog } from "../../design/dialog.js";
 import { adminIcons } from "../../design/icons.js";
+import { SchemaField } from "../../design/schema-form.js";
+import { fromConfig, isSecretRefSlot, mergeStructuredConfig } from "../../design/schema-model.js";
 import { Tooltip } from "../../design/tooltip.js";
 import {
   type AdminIconName,
@@ -28,6 +30,7 @@ import {
 } from "../../design/ui.js";
 import { t } from "../../i18n/index.js";
 import { getLocale } from "../../i18n/locale.js";
+import { navigate } from "../../layout/router.js";
 import { acquisitionErrorText, useMediaProviders } from "../media/acquisition.js";
 
 interface IssueWire {
@@ -270,6 +273,10 @@ function ExtensionSettingsDialog(props: {
 }) {
   const [detail, setDetail] = useState<SettingsDetailWire | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  // Structured fields (string lists / named objects) are edited as real
+  // controls, never as raw JSON (CORE-PAYMENTS-ADMIN-CONFIG-01 §9.4).
+  const [lists, setLists] = useState<Record<string, readonly string[]>>({});
+  const [nested, setNested] = useState<Record<string, Readonly<Record<string, string>>>>({});
   const [network, setNetwork] = useState<Record<string, string | boolean>>({});
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -291,6 +298,20 @@ function ExtensionSettingsDialog(props: {
           void schema;
         }
         setValues(initial);
+        const structured = fromConfig(
+          Object.fromEntries(
+            Object.entries(result.config_schema?.properties ?? {}).filter(
+              ([key, schema]) =>
+                key !== "network" &&
+                !isSecretRefSlot(schema as { format?: string }) &&
+                ((schema as { type?: string }).type === "object" ||
+                  (schema as { type?: string }).type === "array"),
+            ),
+          ),
+          result.config,
+        );
+        setLists(structured.lists);
+        setNested(structured.nested);
         const net = result.config["network"];
         setNetwork(
           typeof net === "object" && net !== null
@@ -390,6 +411,8 @@ function ExtensionSettingsDialog(props: {
       if (hiddenKeys.includes(key)) config[key] = value;
     }
     for (const key of configKeys) {
+      const schema = schemaOf(key);
+      if (schema.type === "object" || schema.type === "array") continue; // structured below
       const parsed = parseValue(key);
       if (!parsed.ok) {
         setBusy(false);
@@ -398,6 +421,32 @@ function ExtensionSettingsDialog(props: {
       }
       if (parsed.value !== undefined) config[key] = parsed.value;
     }
+    // Shared renderer's model converts structured fields with the schema's
+    // semantics (blank → omitted, never NaN/0/empty-string defaults).
+    const structuredProps = Object.fromEntries(
+      configKeys
+        .filter((key) => {
+          const type = schemaOf(key).type;
+          return type === "object" || type === "array";
+        })
+        .map((key) => [key, schemaOf(key)]),
+    );
+    // Review R9 (second pass): preservation is scoped to the structured
+    // fields this renderer owns, and the scalars parsed above always win — a
+    // stored "search.engine: yandex" must not overwrite a freshly chosen
+    // "google".
+    const structured = mergeStructuredConfig(
+      structuredProps as never,
+      { scalars: values, lists, nested },
+      detail.config,
+      config,
+    );
+    if (!structured.ok) {
+      setBusy(false);
+      setMessage(structured.errors.map((error) => `${error.path}: ${t(error.message)}`).join("; "));
+      return;
+    }
+    for (const [key, value] of Object.entries(structured.config)) config[key] = value;
     const net: Record<string, unknown> = {};
     if (mode !== "direct") {
       net["mode"] = mode;
@@ -510,18 +559,20 @@ function ExtensionSettingsDialog(props: {
         </Field>
       );
     }
-    if (schema.type === "array") {
+    if (schema.type === "array" || schema.type === "object") {
       return (
-        <Field key={key} label={fieldLabel(key)} {...hintProps}>
-          <textarea
-            className="pcms-input"
-            rows={2}
-            spellCheck={false}
-            placeholder={t("extensions.field_array_hint")}
-            value={values[key] ?? ""}
-            onChange={(event) => setValues({ ...values, [key]: event.target.value })}
-          />
-        </Field>
+        <SchemaField
+          key={key}
+          propertyKey={key}
+          schema={schema as never}
+          meta={{ label: fieldLabel(key), ...(hint === undefined ? {} : { hint }) }}
+          state={{ scalars: values, lists, nested }}
+          onChange={(next) => {
+            setValues({ ...next.scalars });
+            setLists({ ...next.lists });
+            setNested({ ...next.nested });
+          }}
+        />
       );
     }
     if (schema.enum !== undefined) {
@@ -539,19 +590,6 @@ function ExtensionSettingsDialog(props: {
               </option>
             ))}
           </select>
-        </Field>
-      );
-    }
-    if (schema.type === "object") {
-      return (
-        <Field key={key} label={fieldLabel(key)} {...hintProps}>
-          <textarea
-            className="pcms-input"
-            rows={4}
-            spellCheck={false}
-            value={values[key] ?? ""}
-            onChange={(event) => setValues({ ...values, [key]: event.target.value })}
-          />
         </Field>
       );
     }
@@ -1534,6 +1572,23 @@ function ExtensionsTab({
                 extensionId={extension.id}
                 canConfigure={can("media.providers.manage")}
               />
+              {/* CORE-PAYMENTS-ADMIN-CONFIG-01 §5.3: a payment provider's
+                  "Configure" opens the SAME connection form in Payments —
+                  merchant credentials are not edited in two places. */}
+              {(extension.registrations["payment_providers"] ?? 0) > 0 ? (
+                <p style={{ margin: "8px 0 0" }}>
+                  <Button
+                    variant="ghost"
+                    data-testid={`extension-payment-settings-${extension.id}`}
+                    onClick={() => navigate("/payments?tab=providers")}
+                  >
+                    {t("extensions.payment_settings_open")}
+                  </Button>
+                  <span className="pcms-field__hint" style={{ marginLeft: 8 }}>
+                    {t("extensions.payment_settings_hint")}
+                  </span>
+                </p>
+              ) : null}
               {extension.installed &&
               extension.has_config_schema === true &&
               !providerExtensionIds.has(extension.id) ? (

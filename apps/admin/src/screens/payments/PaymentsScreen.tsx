@@ -9,6 +9,7 @@
 // controls are deliberately absent until the S7 financial safety gates pass.
 import { useCallback, useEffect, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost, describeApiError } from "../../api/client.js";
+import { useRoute } from "../../layout/router.js";
 import { useAuth } from "../../auth/AuthContext.js";
 import {
   Badge,
@@ -23,6 +24,7 @@ import {
   Tabs,
 } from "../../design/ui.js";
 import { t } from "../../i18n/index.js";
+import { ProviderSettingsDialog } from "./ProviderSettingsDialog.js";
 
 interface PaymentWire {
   readonly id: string;
@@ -46,12 +48,15 @@ interface ProviderInstanceWire {
   readonly name: string;
   readonly enabled: boolean;
   readonly config: Record<string, unknown>;
-  readonly secret_refs: Record<string, string>;
+  readonly settings_generation?: number;
 }
 interface ProviderTypeWire {
   readonly provider_type: string;
+  readonly display_name: string;
+  readonly extension_id: string | null;
   readonly secret_requirements: readonly string[];
   readonly config_schema: Record<string, unknown>;
+  readonly accepts_instance_config: boolean;
 }
 interface EventWire {
   readonly id: string;
@@ -478,7 +483,7 @@ function PaymentsTab() {
 
 // ---- Providers (trusted catalog types + instance configuration) ------------
 
-function ProvidersTab() {
+function ProvidersTab(props: { readonly openInstanceId?: string | null }) {
   const auth = useAuth();
   const canConfigure = auth.can("payments.configure");
   const [types, setTypes] = useState<ProviderTypeWire[] | null>(null);
@@ -486,11 +491,8 @@ function ProvidersTab() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, TestCheck[] | undefined>>({});
-  const [editing, setEditing] = useState<
-    | { readonly mode: "create"; readonly providerType: string }
-    | { readonly mode: "edit"; readonly instance: ProviderInstanceWire }
-    | null
-  >(null);
+  const [settingsFor, setSettingsFor] = useState<string | null>(props.openInstanceId ?? null);
+  const [creating, setCreating] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -524,6 +526,24 @@ function ProvidersTab() {
       .catch((cause: unknown) => setError(describeApiError(cause)));
   };
 
+  /** A connection is born as a DISABLED draft; the dialog then configures and
+   * enables it in one save. A failed first save leaves a visible draft, never
+   * a false success. */
+  const connect = (type: ProviderTypeWire) => {
+    setCreating(type.provider_type);
+    setError(null);
+    apiPost<{ instance: ProviderInstanceWire }>("/payments/providers/instances", {
+      provider_type: type.provider_type,
+      name: `${type.display_name} — ${new Date().toLocaleDateString()}`,
+    })
+      .then((result) => {
+        load();
+        setSettingsFor(result.instance.id);
+      })
+      .catch((cause: unknown) => setError(describeApiError(cause)))
+      .finally(() => setCreating(null));
+  };
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       {error !== null ? <ErrorPanel message={error} /> : null}
@@ -537,17 +557,13 @@ function ProvidersTab() {
             types.map((type) => (
               <div
                 key={type.provider_type}
-                style={{ display: "flex", gap: 8, alignItems: "center" }}
+                style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
               >
-                <code>{type.provider_type}</code>
-                <span style={{ opacity: 0.7 }}>
-                  {t("payments.secret_requirements")}: {type.secret_requirements.join(", ") || "—"}
-                </span>
+                <strong>{type.display_name}</strong>
+                <code style={{ opacity: 0.7 }}>{type.provider_type}</code>
                 {canConfigure ? (
-                  <Button
-                    onClick={() => setEditing({ mode: "create", providerType: type.provider_type })}
-                  >
-                    {t("payments.configure_instance")}
+                  <Button disabled={creating !== null} onClick={() => connect(type)}>
+                    {t("payments.connect")}
                   </Button>
                 ) : null}
               </div>
@@ -576,7 +592,7 @@ function ProvidersTab() {
                 </div>
                 {canConfigure ? (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <Button variant="ghost" onClick={() => setEditing({ mode: "edit", instance })}>
+                    <Button variant="ghost" onClick={() => setSettingsFor(instance.id)}>
                       {t("payments.edit")}
                     </Button>
                     <Button
@@ -655,145 +671,14 @@ function ProvidersTab() {
           </div>
         )}
       </Card>
-      {editing !== null ? (
-        <InstanceConfigDialog
-          editing={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            setNote(t("payments.note_saved"));
-            load();
-          }}
+      {settingsFor !== null ? (
+        <ProviderSettingsDialog
+          instanceId={settingsFor}
+          onClose={() => setSettingsFor(null)}
+          onSaved={() => load()}
         />
       ) : null}
     </div>
-  );
-}
-
-/** Config dialog driven by the provider's declared config schema: string
- * fields from schema properties, secret requirements as secret-REFERENCE
- * inputs (the host secret name — never a credential value). */
-function InstanceConfigDialog(props: {
-  readonly editing:
-    | { readonly mode: "create"; readonly providerType: string }
-    | { readonly mode: "edit"; readonly instance: ProviderInstanceWire };
-  readonly onClose: () => void;
-  readonly onSaved: () => void;
-}) {
-  const [types, setTypes] = useState<ProviderTypeWire[] | null>(null);
-  const [name, setName] = useState(
-    props.editing.mode === "edit" ? props.editing.instance.name : "",
-  );
-  const [enabled, setEnabled] = useState(
-    props.editing.mode === "edit" ? props.editing.instance.enabled : true,
-  );
-  const [configText, setConfigText] = useState(
-    props.editing.mode === "edit" ? JSON.stringify(props.editing.instance.config, null, 2) : "{}",
-  );
-  const isCreate = props.editing.mode === "create";
-  const providerType = isCreate ? props.editing.providerType : props.editing.instance.provider_type;
-  const [secretRefs, setSecretRefs] = useState<Record<string, string>>(
-    props.editing.mode === "edit" ? { ...props.editing.instance.secret_refs } : {},
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    apiGet<{ items: ProviderTypeWire[] }>("/payments/providers")
-      .then((result) => setTypes(result.items))
-      .catch((cause: unknown) => setError(describeApiError(cause)));
-  }, []);
-
-  const type = types?.find((entry) => entry.provider_type === providerType);
-  const requirements = type?.secret_requirements ?? [];
-
-  const save = () => {
-    setBusy(true);
-    setError(null);
-    let config: Record<string, unknown>;
-    try {
-      config = JSON.parse(configText) as Record<string, unknown>;
-    } catch {
-      setError(t("payments.config_invalid_json"));
-      setBusy(false);
-      return;
-    }
-    const refs: Record<string, string> = {};
-    for (const requirement of requirements) {
-      const value = secretRefs[requirement];
-      if (value !== undefined && value.trim() !== "") refs[requirement] = value.trim();
-    }
-    const request = isCreate
-      ? apiPost("/payments/providers/instances", {
-          provider_type: providerType,
-          name,
-          enabled,
-          config,
-          ...(Object.keys(refs).length > 0 ? { secret_refs: refs } : {}),
-        })
-      : apiPatch(`/payments/providers/instances/${props.editing.instance.id}`, {
-          name,
-          enabled,
-          config,
-          ...(Object.keys(refs).length > 0 ? { secret_refs: refs } : {}),
-        });
-    request.then(props.onSaved).catch((cause: unknown) => {
-      setError(describeApiError(cause));
-      setBusy(false);
-    });
-  };
-
-  return (
-    <Card title={isCreate ? t("payments.configure_instance") : t("payments.edit_instance")}>
-      <div style={{ display: "grid", gap: 10 }}>
-        <div>
-          <code>{providerType}</code>
-        </div>
-        <Field label={t("payments.instance_name")}>
-          <Input value={name} onChange={(event) => setName(event.currentTarget.value)} />
-        </Field>
-        {requirements.map((requirement) => (
-          <Field key={requirement} label={`${t("payments.secret_ref")}: ${requirement}`}>
-            <Input
-              value={secretRefs[requirement] ?? ""}
-              onChange={(event) =>
-                setSecretRefs((current) => ({
-                  ...current,
-                  [requirement]: event.currentTarget.value,
-                }))
-              }
-              placeholder={t("payments.secret_ref_placeholder")}
-            />
-          </Field>
-        ))}
-        <Field label={t("payments.config_json")}>
-          <textarea
-            style={{ minHeight: 120, fontFamily: "monospace" }}
-            value={configText}
-            onChange={(event) => setConfigText(event.currentTarget.value)}
-          />
-        </Field>
-        <Field label={t("payments.instance_enabled")}>
-          <Select
-            value={enabled ? "1" : "0"}
-            onChange={(event) => setEnabled(event.currentTarget.value === "1")}
-          >
-            <option value="1">{t("payments.instance_enabled")}</option>
-            <option value="0">{t("payments.instance_disabled")}</option>
-          </Select>
-        </Field>
-        <p style={{ opacity: 0.7, margin: 0 }}>{t("payments.config_hint")}</p>
-        {error !== null ? <ErrorPanel message={error} /> : null}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={props.onClose}>
-            {t("core.cancel")}
-          </Button>
-          <Button disabled={busy || name.trim() === ""} onClick={save}>
-            {t("core.save")}
-          </Button>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -881,7 +766,18 @@ function EventsTab() {
 }
 
 export function PaymentsScreen() {
-  const [tab, setTab] = useState("payments");
+  // Deep link contract (CORE-PAYMENTS-ADMIN-CONFIG-01 §5.3): the Extensions
+  // screen's "Configure" for a payment provider lands here, on the SAME
+  // instance form — merchant credentials are never edited in two places.
+  const route = useRoute();
+  const requestedTab = route.query.get("tab");
+  const [tab, setTab] = useState(
+    requestedTab === "providers" || requestedTab === "events" ? requestedTab : "payments",
+  );
+  const openInstance = route.query.get("instance");
+  useEffect(() => {
+    if (requestedTab === "providers" || requestedTab === "events") setTab(requestedTab);
+  }, [requestedTab]);
   return (
     <div data-testid="payments-screen">
       <h1>{t("payments.title")}</h1>
@@ -896,7 +792,7 @@ export function PaymentsScreen() {
         onSelect={setTab}
       />
       {tab === "payments" ? <PaymentsTab /> : null}
-      {tab === "providers" ? <ProvidersTab /> : null}
+      {tab === "providers" ? <ProvidersTab openInstanceId={openInstance} /> : null}
       {tab === "events" ? <EventsTab /> : null}
     </div>
   );

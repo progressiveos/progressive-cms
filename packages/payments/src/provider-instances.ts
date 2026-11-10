@@ -1,6 +1,8 @@
 // PaymentProviderInstance store (PCMS-PAY-T003; Payments spec §32).
-// Secret-safe configuration like IntegrationInstance: names only, schema-
-// validated config, no credential values ever persisted.
+// Schema-validated business configuration (payment_provider_instance.config).
+// Credential VALUES do not live here: they are encrypted in
+// payment_provider_runtime_secret (runtime-secrets.ts, migration 0008) and
+// legacy process-secret NAMES stay in secret_refs only as an import source.
 import { type Clock, type DbPool, newStableId, type StableId } from "@pcms/core";
 import { PaymentError } from "./errors.js";
 import { validateAgainstSchema } from "./schema.js";
@@ -11,12 +13,16 @@ export interface PaymentProviderInstance {
   readonly name: string;
   readonly enabled: boolean;
   readonly config: Record<string, unknown>;
+  /** LEGACY process-secret names (migration 0008 imports them into the
+   * encrypted instance store; a configured runtime slot wins over its ref). */
   readonly secretRefs: Record<string, string>;
+  /** Optimistic-concurrency token: every settings write bumps it. */
+  readonly settingsGeneration: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
 
-interface ProviderInstanceRow {
+export interface ProviderInstanceRow {
   [column: string]: unknown;
   id: string;
   provider_type: string;
@@ -24,11 +30,12 @@ interface ProviderInstanceRow {
   enabled: boolean;
   config: unknown;
   secret_refs: unknown;
+  settings_generation: number;
   created_at: Date;
   updated_at: Date;
 }
 
-function rowToInstance(row: ProviderInstanceRow): PaymentProviderInstance {
+export function rowToInstance(row: ProviderInstanceRow): PaymentProviderInstance {
   return {
     id: row.id as StableId,
     providerType: row.provider_type,
@@ -36,6 +43,7 @@ function rowToInstance(row: ProviderInstanceRow): PaymentProviderInstance {
     enabled: row.enabled,
     config: (row.config ?? {}) as Record<string, unknown>,
     secretRefs: (row.secret_refs ?? {}) as Record<string, string>,
+    settingsGeneration: Number(row.settings_generation ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -109,6 +117,13 @@ export function createPaymentProviderInstanceService(deps: {
       return rowToInstance(result.rows[0]!);
     },
 
+    /**
+     * Legacy patch path (PATCH /payments/providers/instances/:id). It keeps
+     * working for names/flags, but the full settings save of
+     * CORE-PAYMENTS-ADMIN-CONFIG-01 (settings.ts) is the canonical way to
+     * change config and credentials: config edits move the same generation
+     * and cannot clear a live credential behind the readiness checks.
+     */
     async update(
       id: string,
       patch: {
@@ -133,7 +148,8 @@ export function createPaymentProviderInstanceService(deps: {
       validate(existing.providerType, config);
       const result = await pool.query<ProviderInstanceRow>(
         `UPDATE payment_provider_instance
-         SET name = $2, enabled = $3, config = $4, secret_refs = $5, updated_at = $6
+         SET name = $2, enabled = $3, config = $4, secret_refs = $5, updated_at = $6,
+             settings_generation = settings_generation + 1
          WHERE id = $1 RETURNING *`,
         [
           id,
@@ -145,6 +161,26 @@ export function createPaymentProviderInstanceService(deps: {
         ],
       );
       return rowToInstance(result.rows[0]!);
+    },
+
+    /** Throwing validation used by the atomic settings save (create/update and legacy import share it). */
+    validate(providerType: string, config: Record<string, unknown>): void {
+      validate(providerType, config);
+    },
+
+    /** Readiness needs schema validation of the STORED config (a config
+     * written before the adapter tightened its schema must not be reported
+     * as ready). Read-only: never throws on an invalid stored config. */
+    schemaIssues(providerType: string, config: Record<string, unknown>): readonly string[] {
+      const schema = configSchemaFor(providerType);
+      if (schema === undefined) return [];
+      return validateAgainstSchema(schema, config, "config");
+    },
+
+    /** The provider type is composed right now (else config validation
+     * cannot be judged). */
+    knownProviderType(providerType: string): boolean {
+      return configSchemaFor(providerType) !== undefined;
     },
 
     async get(id: string): Promise<PaymentProviderInstance | null> {

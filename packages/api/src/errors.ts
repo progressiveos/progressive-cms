@@ -73,6 +73,9 @@ export function httpStatusForError(error: unknown): number {
   // already documents 409 — HTTP 400 here contradicted it and made the two
   // dependency sites indistinguishable from a bad payload.
   if (/_BOUND$/.test(code)) return 409;
+  // A stored configuration state that refuses to act (untrusted provider
+  // endpoint) is a conflict with the current configuration, not a bad payload.
+  if (/_UNTRUSTED$/.test(code)) return 409;
   if (/_TOO_LARGE$/.test(code)) return 413;
   if (/_RATE_LIMITED$|_THROTTLED$/.test(code)) return 429;
   // Expired handles (stock candidate references): the reference WAS valid —

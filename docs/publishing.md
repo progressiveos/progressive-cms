@@ -86,6 +86,6 @@ Use the actual target site id and approved unoccupied path; resolve locale/conte
 
 After publication, inspect the public route, body, breadcrumbs, head metadata, media and eventual search projection. A successful response is not an indexing guarantee. `POST /publications/rollback` is a publication operation with its own schema and generation checks; choose the accepted prior target and verify the same surfaces again. Content rollback is separate from restoring a database after a Core upgrade.
 
-Never delete the current published revision during cleanup. `cms revisions cleanup` deletes other eligible SEALED history; inventory revisions and current pointers before requesting it. Do not use cleanup as part of an ordinary editing workflow.
+Never delete the current published revision during cleanup. `cms revisions cleanup` keeps the current published revision and any WORKING revision, and removes the other SEALED history; it refuses an entry without a live published revision. When a removed revision is the parent of a surviving revision, Core clears that ancestry link. The surviving revision's SEALED payload and hash remain unchanged, but `parent_revision_id` no longer identifies the deleted source. Inventory revisions and current pointers before requesting cleanup; deletion and lost ancestry cannot be undone. Do not use cleanup as part of an ordinary editing workflow.
 
 [Documentation index](index.md)

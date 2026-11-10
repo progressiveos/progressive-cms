@@ -12,6 +12,12 @@ After the human OWNER is created, installation provisions the fixed `Site-Creato
 
 Only this primary creator can request the fixed `Shop-Creator` account, after the trusted `progressive.shop` extension is enabled. It receives the declared Shop permissions and the fixed operational Core permissions. The caller cannot choose account names, scopes or arbitrary targets; site and environment are explicitly bound and clamped to the parent credential. The child cannot delegate. Revoking, expiring or rotating the parent invalidates its child credentials. Disabling Shop removes its handlers and invalidates Shop access, but does not revoke the child's separately granted Core permissions. Repeating a successful issuance does not reveal the secret again; rotate to obtain a replacement.
 
+## Payment provider settings
+
+An operator with `payments.configure` manages connections under **Payments → Providers**. Connecting creates a disabled draft. Enter the provider's ordinary settings and credentials in the form, save, then run **Check settings**. This is a local readiness check; it does not contact the bank or test a payment. Copy the callback URL from the connection card to the provider cabinet before enabling payments.
+
+Saved credential values are never shown again. An empty credential field leaves the saved value unchanged; use the explicit clear action to remove a slot. Settings, credentials and audit details save atomically, with a generation check to prevent overwriting another editor's changes. A stale form must be reloaded and reconciled. Disabling a connection stops new payments but keeps callbacks, history and refunds for existing payments available. See [Payments](payments.md) for the credential store and refund lifecycle.
+
 ## Editor account
 
 The human editor signs in with an ordinary Admin user account, not a Service Account token. An operator provisions that user under **Users & Access → Users** and grants the role and site-scoped permissions needed to read/edit content, preview, seal and (if intended) publish, plus media read/write for image replacement. Site configuration, system recovery and reading/exporting form submissions are separate privileges. A login page or a 200 response is not authenticated acceptance.

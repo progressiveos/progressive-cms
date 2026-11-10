@@ -17,5 +17,8 @@ Read these files from the installed `docs/` folder; no private Core workspace is
 - [seo](../../../seo.md)
 - [search](../../../search.md)
 - [admin](../../../admin.md)
+- [payments and payment-copy boundaries](../../../payments.md)
+
+For payment copy, only describe a method after the owner confirms the corresponding provider connection is enabled. Use a payment URL returned by Core; never invent or hardcode one. Do not promise that a provider or bank has approved the merchant, that sandbox/live payments passed, or that refunds are customer self-service. See [Payments](../../../payments.md).
 
 Examples: [Content Type definitions](../../../reference/examples/content-types.json), [RichText table](../../../reference/examples/richtext-v2-table.json), [Block Document](../../../reference/examples/block-document-v1.json), [create news](../../../reference/examples/create-news.json), [contact form](../../../reference/examples/contact-form.json).

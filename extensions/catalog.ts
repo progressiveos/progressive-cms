@@ -81,7 +81,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createAlipayProvider: progressivePaymentsAlipay_createAlipayProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-alipay",
-      contentSha256: "187813ee414380b7d8550439552b382811474d59650802b70994a72c0765b094",
+      contentSha256: "1e17bd895cd89f38b955113d1627a8393a8c0fa04c813e03776b6b21676bf0fa",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -89,7 +89,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createPayPalProvider: progressivePaymentsPaypal_createPayPalProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-paypal",
-      contentSha256: "7a212677ccfcba4e17d0862aa8bfffd32376a184fe5f8fbcdc6d4ea58700b785",
+      contentSha256: "95c013251854eb67c58814cf4992fac69d138cc2c6466eb1b0fb04ba96bb3f4a",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -97,7 +97,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createStripeProvider: progressivePaymentsStripe_createStripeProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-stripe",
-      contentSha256: "bb3a7880c578e75532ec30500a5dbdf1f7bb86c50f0c670707daace34ac29def",
+      contentSha256: "068a5395bc9aa879ec425872811acd94be6afeba469d8f420c4fc3795802bd2a",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -105,7 +105,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createTabbyProvider: progressivePaymentsTabby_createTabbyProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-tabby",
-      contentSha256: "63592b22c31d81a40a1dd4792a13a5cb408fe007963acc6b45db615a23ebce18",
+      contentSha256: "1a91eeae6248d03da0a1645b08845423fc81f3d0f98a8b4e586ae850ea71d7ed",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -113,7 +113,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createTBankProvider: progressivePaymentsTbank_createTBankProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-tbank",
-      contentSha256: "9547ae5a56ce5e7c6ade0cd11a73d303d2aeca848cc801b33775231f0cdd5be9",
+      contentSha256: "430da1d53326a9ae4e3fedfd5e4103ced03a63967362e138c74e57ad3879d599",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -121,7 +121,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { createYooKassaProvider: progressivePaymentsYookassa_createYooKassaProvider } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-payments-yookassa",
-      contentSha256: "076d71caf6e8e50e3d98a03db881bbf052bf8e48e6f7cc9c087fffd1993b589c",
+      contentSha256: "3a64c35cd1858305d49c6aad2386a16bd9d068478cce9d596a8fd127bcc0de2f",
     }),
     defineExtensionArtifact({
       manifest: JSON.parse(
@@ -145,7 +145,7 @@ export function defineFirstPartyExtensionArtifacts(
       ) as unknown,
       module: { search: progressiveWebResearch_search, fetchPage: progressiveWebResearch_fetchPage } as unknown as Record<string, unknown>,
       extensionsDir: "extensions/progressive-web-research",
-      contentSha256: "e207cc2f6a8ceb2bbb081f72dbb06ca6af865e87d2c4f0344e659a00c0a0c2f7",
+      contentSha256: "a680f2bba272d1649bbe5e5a4b6d1376214b217851fe18393d9077ee48aac113",
     }),
   ];
 }

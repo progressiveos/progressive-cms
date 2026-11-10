@@ -128,8 +128,10 @@ import {
   listPaymentEvents as listPaymentEventsOp,
   listPaymentProviderInstances as listPaymentProviderInstancesOp,
   listPaymentProviders as listPaymentProvidersOp,
+  getProviderInstanceSettings as getProviderInstanceSettingsOp,
   listPayments as listPaymentsOp,
   refundPayment as refundPaymentOp,
+  saveProviderInstanceSettings as saveProviderInstanceSettingsOp,
 } from "./payments-ops.js";
 import { applyRedirectImportOp, validateRedirectImportOp } from "./redirect-import-ops.js";
 import { registryExtensionPlan } from "./registry-extension-ops.js";
@@ -821,5 +823,18 @@ export function bindOperations(app: ApplicationServices) {
     ) => refundPaymentOp(app, ctx, input),
     listPaymentEvents: (ctx: OperationContext, input: { payment_id: string }) =>
       listPaymentEventsOp(app, ctx, input),
+    // CORE-PAYMENTS-ADMIN-CONFIG-01: the agent path is the SAME app operation
+    // as REST (payments.read / payments.configure), with the same redaction:
+    // the caller passes credential values but never receives them back.
+    getProviderInstanceSettings: (ctx: OperationContext, input: { instance_id: string }) =>
+      getProviderInstanceSettingsOp(app, ctx, input),
+    saveProviderInstanceSettings: (
+      ctx: OperationContext,
+      input: { instance_id: string; settings: unknown },
+    ) =>
+      saveProviderInstanceSettingsOp(app, ctx, {
+        instance_id: input.instance_id,
+        body: input.settings,
+      }),
   };
 }

@@ -69,7 +69,7 @@ Names are `cms_ext_<sanitized-extension-id>_<sanitized-operation-id>`. Sanitizat
 Only operations from deployed, **enabled** extensions appear. Their title becomes the description; their manifest input schema, permission and mutation flag become the tool contract. Calls use the same typed extension invocation as REST. `tools/list` does not publish the extension output schema, so this map includes it from the shipped manifest for reference. Discover the actual instance again after enable/disable, update or capability changes. Do not hard-code an optional provider id in a generic consumer.
 
 <!-- interface-map:start -->
-## Built-in tools: 141
+## Built-in tools: 143
 
 | Tool | Purpose | Permission | Read-only hint |
 |---|---|---|---|
@@ -189,6 +189,8 @@ Only operations from deployed, **enabled** extensions appear. Their title become
 | [cms_extension_uninstall](#cms_extension_uninstall) | Remove executable extension state; destructive data policies need the confirmation (audited). | `extensions.manage` | false |
 | [cms_list_payment_providers](#cms_list_payment_providers) | Registered payment provider types with secret requirements. | `payments.read` | true |
 | [cms_list_payment_provider_instances](#cms_list_payment_provider_instances) | Configured provider instances (secret refs are names, never values). | `payments.read` | true |
+| [cms_get_payment_provider_settings](#cms_get_payment_provider_settings) | Safe settings of one payment connection: provider schema, ordinary values, credential slot PRESENCE, readiness and the callback URL. Never a credential value. | `payments.read` | true |
+| [cms_save_payment_provider_settings](#cms_save_payment_provider_settings) | Atomically save a payment connection (name/config/enabled and explicit credential set/clear) with expected_generation. Enabling requires complete credentials; credential values are write-only. | `payments.configure` | false |
 | [cms_get_payment_provider_capabilities](#cms_get_payment_provider_capabilities) | Capability report: cancel/refund/provider idempotency/status sync. | `payments.read` | true |
 | [cms_create_payment](#cms_create_payment) | Create a payment; idempotency_key is the retry identity (payments.create). | `payments.create` | false |
 | [cms_list_payments](#cms_list_payments) | Payment list with bounded filters. | `payments.read` | true |
@@ -4544,6 +4546,78 @@ Complete argument schema:
 Adapter input/result mapping:
 ```javascript
 return operations.listPaymentProviderInstances(ctx);
+```
+
+<a id="cms_get_payment_provider_settings"></a>
+
+### cms_get_payment_provider_settings
+
+Safe settings of one payment connection: provider schema, ordinary values, credential slot PRESENCE, readiness and the callback URL. Never a credential value.
+
+Permission annotation: `payments.read`. Mutation: **false**. Read-only hint: **true**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "instance_id"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.getProviderInstanceSettings(ctx, {
+  instance_id: args["instance_id"]
+});
+```
+
+<a id="cms_save_payment_provider_settings"></a>
+
+### cms_save_payment_provider_settings
+
+Atomically save a payment connection (name/config/enabled and explicit credential set/clear) with expected_generation. Enabling requires complete credentials; credential values are write-only.
+
+Permission annotation: `payments.configure`. Mutation: **true**. Read-only hint: **false**. Source: `packages/mcp/src/tools.ts`; application binding: `packages/api/src/mcp-surface.ts`.
+
+Explicit Core site selector: **false**; other payload site fields are domain input, not a tenant override.
+
+Complete argument schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": {
+      "type": "string"
+    },
+    "settings": {
+      "type": "object",
+      "description": "{expected_generation?, name?, config?, enabled?, secret_updates?: {slot: {action: 'set', value} | {action: 'clear'}}}"
+    }
+  },
+  "required": [
+    "instance_id",
+    "settings"
+  ]
+}
+```
+
+Adapter input/result mapping:
+```javascript
+return operations.saveProviderInstanceSettings(ctx, {
+  instance_id: args["instance_id"],
+  settings: args["settings"]
+});
 ```
 
 <a id="cms_get_payment_provider_capabilities"></a>
