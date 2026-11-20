@@ -36,6 +36,14 @@ export interface SitemapCandidate {
     readonly templateKey: string | null;
     readonly isHome: boolean;
   };
+  /** Batch-provided semantic metadata for an eligible extension view. */
+  readonly extensionMarkdown?: {
+    readonly enabled: boolean;
+    readonly title: string;
+    readonly description: string | null;
+    /** Active-theme discovery key; used only for paired-template conservatism. */
+    readonly viewKey: string;
+  };
   /** Reciprocal language alternates (multilingual); empty otherwise. */
   readonly alternates?: readonly { readonly hreflang: string; readonly href: string }[];
   /** Public content modification time, ISO 8601 (Publication subsystem, §17). */

@@ -86,7 +86,7 @@ Both `PUT` requests require `{ "enabled": boolean, "expected_generation": number
 
 ## `/llms.txt` discovery
 
-`GET /llms.txt` lists eligible published CMS entry pages with title, optional description and `.md` link, followed by the XML sitemap link. It starts from canonical entry sitemap candidates, so unpublished, non-public and noindex pages are excluded; extension sitemap contributions are not included. It also checks the active immutable theme revision, publication and locale, both availability switches, route clarity, valid content and whether the selected Markdown output can be proven to contain substantive content.
+`GET /llms.txt` lists eligible published CMS entry pages and eligible public extension views with title, optional description and `.md` link, followed by the XML sitemap link. It starts from canonical sitemap candidates, so unpublished, non-public and noindex content is excluded. It also checks the active immutable theme revision, publication and locale, availability switches, route clarity, valid content and whether the selected Markdown output can be proven to contain substantive content. Extension views without a declared Markdown template or explicit fallback projection are omitted. A paired extension template that the bounded analyzer cannot prove is omitted from discovery even when direct rendering works.
 
 Discovery is intentionally bounded:
 

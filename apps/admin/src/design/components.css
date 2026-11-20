@@ -1143,13 +1143,51 @@
 }
 
 /* --- Rich text editor --- */
+/* CORE-ADMIN-EDITOR-UX-01 §3: bounded, independently scrolling document.
+   The default height is ~384 px on desktop (and never more than 60% of the
+   viewport); the operator can drag the native handle down/up. The toolbar is
+   a sibling of the scroll box, so it never scrolls out of reach. */
+.pcms-richtext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pcms-richtext__toolbars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pcms-admin-space-2);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-block: 0.125rem;
+  background: var(--pcms-admin-bg-canvas, transparent);
+}
+
+.pcms-richtext__scroll {
+  height: min(24rem, 60vh);
+  min-height: 12rem;
+  max-height: 80vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  resize: vertical;
+  overscroll-behavior: contain;
+}
+
 .pcms-richtext__toolbar {
-  margin-bottom: var(--pcms-admin-space-2);
+  margin-bottom: 0;
 }
 
 .pcms-richtext__area {
   font-family: var(--pcms-admin-font-sans);
   min-height: 9rem;
+}
+
+@media (max-width: 720px) {
+  .pcms-richtext__scroll {
+    height: min(18rem, 45vh);
+    max-height: 70vh;
+  }
 }
 
 /* --- Block editor --- */
@@ -1552,6 +1590,28 @@
 
 .pcms-editor__meta {
   font-size: var(--pcms-admin-text-xs);
+  color: var(--pcms-admin-text-secondary);
+}
+
+/* Independent LIVE / WORKING status (CORE-ADMIN-EDITOR-UX-01 §1.4–1.6):
+   one line of independent badges plus the plain-language summary. */
+.pcms-editor__status {
+  display: flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--pcms-admin-space-1);
+  font-size: var(--pcms-admin-text-xs);
+}
+
+.pcms-editor__status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pcms-admin-space-2);
+  flex-wrap: wrap;
+}
+
+.pcms-editor__status-summary {
   color: var(--pcms-admin-text-secondary);
 }
 
@@ -2271,7 +2331,10 @@
 
 /* RichText v2: keep tables usable inside narrow field panels. */
 .pcms-richtext__document {
-  min-height: 12rem;
+  /* Fills the bounded scroll box, so clicking anywhere in the visible area
+     focuses the editor even for a short document. */
+  min-height: 100%;
+  box-sizing: border-box;
   padding: 1rem;
   border: 1px solid var(--pcms-border, #777);
   border-radius: 0.5rem;

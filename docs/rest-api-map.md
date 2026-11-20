@@ -2794,7 +2794,16 @@ Path parameters: `revisionId`.
 
 Query schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 
-JSON body schema: not declared by the registry; inspect the operation-specific notes and response mapping.
+JSON body schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "publish_level": {}
+  }
+}
+```
 
 Declared response schema: not declared by the registry; inspect the operation-specific notes and response mapping.
 

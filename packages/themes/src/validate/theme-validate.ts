@@ -11,6 +11,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { planAssetBuild } from "../assets/assets.js";
 import { validateCspDeclaration, validatePublicJs } from "../assets/csp.js";
+import { createThemeEngine } from "../engine/liquid.js";
 import { createThemeRegistry } from "../manifest/registry.js";
 import { type ManifestIssue, parseThemeManifest, type ThemeManifest } from "../manifest/schema.js";
 import { parseTokensSource, tokenCssName } from "../tokens/tokens.js";
@@ -112,6 +113,22 @@ export function validateThemeDir(
         code: "THEME_FILE_MISSING",
         path: `/${file}`,
         message: `declared file not found: ${file}`,
+      });
+    }
+  }
+
+  const markdownEngine = createThemeEngine({ templates: {}, outputFormat: "markdown" });
+  for (const template of manifest.templates) {
+    if (template.markdown_file === undefined || !existsSync(join(themeDir, template.markdown_file)))
+      continue;
+    try {
+      markdownEngine.parse(readFileSync(join(themeDir, template.markdown_file), "utf8"));
+    } catch {
+      issues.push({
+        check: "templates",
+        code: "THEME_MARKDOWN_TEMPLATE_INVALID",
+        path: `/${template.markdown_file}`,
+        message: "invalid Markdown Liquid template",
       });
     }
   }

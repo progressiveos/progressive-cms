@@ -61,7 +61,7 @@ export function createThemeEngine(options: ThemeEngineOptions): Liquid {
       return formatUtcDate(value, typeof args[0] === "string" ? args[0] : undefined);
     }
     if (typeof value !== "string" || value.trim() === "") return value;
-    const parsed = new Date(value.trim());
+    const parsed = value.trim() === "now" ? new Date() : new Date(value.trim());
     if (Number.isNaN(parsed.getTime())) return value;
     return formatUtcDate(parsed, typeof args[0] === "string" ? args[0] : undefined);
   });
@@ -89,7 +89,19 @@ function formatUtcDate(date: Date, format?: string): string {
     HH: pad(date.getUTCHours()),
     mm: pad(date.getUTCMinutes()),
   };
-  return pattern.replace(/yyyy|yy|MM|dd|HH|mm/g, (token) => tokens[token] ?? token);
+  const strftime: Record<string, string> = {
+    "%Y": tokens.yyyy!,
+    "%y": tokens.yy!,
+    "%m": tokens.MM!,
+    "%d": tokens.dd!,
+    "%H": tokens.HH!,
+    "%M": tokens.mm!,
+    "%%": "%",
+  };
+  return pattern.replace(
+    /%[YymdHM%]|yyyy|yy|MM|dd|HH|mm/g,
+    (token) => strftime[token] ?? tokens[token] ?? token,
+  );
 }
 
 export { isSafeHtml, safeHtml } from "./safe-html.js";

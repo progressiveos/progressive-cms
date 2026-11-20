@@ -33,6 +33,18 @@ export const publication = defineFragment(
     "publication.live_never_published": "Ещё не опубликовано",
     "publication.working_unpublished_changes": "Есть неопубликованные изменения",
     "publication.working_ready_to_publish": "Готово к публикации",
+    // Entry editor: LIVE and WORKING are shown independently
+    // (CORE-ADMIN-EDITOR-UX-01 §1.4–1.6). The summary line replaces the
+    // ambiguous single message "published without a draft".
+    "publication.status_live_published": "Опубликовано",
+    "publication.status_live_never": "Ещё не опубликовано",
+    "publication.status_working_changes": "Есть неопубликованные изменения",
+    "publication.status_working_clean": "Нет неопубликованных изменений",
+    "publication.summary_published_clean": "Опубликован · Нет неопубликованных изменений",
+    "publication.summary_published_changes": "Опубликован · Есть неопубликованные изменения",
+    "publication.summary_unpublished_changes":
+      "Ещё не опубликован · Есть неопубликованные изменения",
+    "publication.summary_unpublished_clean": "Ещё не опубликован · Нет неопубликованных изменений",
     "publication.scheduled_for": "Запланировано на {at}",
     "publication.preview_unavailable": "Предпросмотр пока недоступен",
     "publication.preview_fix_issues": "Чтобы открыть предпросмотр «{title}», исправьте:",
@@ -231,6 +243,14 @@ export const publication = defineFragment(
     "publication.live_never_published": "Not published yet",
     "publication.working_unpublished_changes": "Has unpublished changes",
     "publication.working_ready_to_publish": "Ready to publish",
+    "publication.status_live_published": "Published",
+    "publication.status_live_never": "Not published yet",
+    "publication.status_working_changes": "Has unpublished changes",
+    "publication.status_working_clean": "No unpublished changes",
+    "publication.summary_published_clean": "Published · No unpublished changes",
+    "publication.summary_published_changes": "Published · Has unpublished changes",
+    "publication.summary_unpublished_changes": "Not published yet · Has unpublished changes",
+    "publication.summary_unpublished_clean": "Not published yet · No unpublished changes",
     "publication.scheduled_for": "Scheduled for {at}",
     "publication.preview_unavailable": "Preview is not available yet",
     "publication.preview_fix_issues": "To preview “{title}”, fix the following:",

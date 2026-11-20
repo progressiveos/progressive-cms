@@ -29,8 +29,8 @@ An authoring agent uses a separate Service Account access token with task-specif
 ## Human continuation test
 
 1. Log in over the supported HTTPS origin and open a news entry created by the agent. Verify title/body/media are declared editable fields, not hidden blocks or pre-rendered HTML.
-2. If the entry has a publication but no working draft, confirm Admin shows the published version as read-only. Use **View published version** to inspect the current publication; use **Create draft** to edit it. If a draft already exists, **Return to draft** opens that same draft.
-3. Change a paragraph, use formatting and save. Confirm revision state and edit generation advance. If starting from the published version, verify the new draft uses that version as its base.
+2. If the entry has a publication but no working draft, Admin opens it read-only without creating a draft. Use **View published version** to inspect the current publication; use **Create draft** to edit it. If a draft already exists, **Return to draft** opens that same draft. The workspace labels live and working states separately.
+3. Change a paragraph, use formatting and save. Saves, autosaves and publish wait on the same queued writes; a stale edit generation is shown as a conflict for the editor to reread and reconcile. Confirm revision state and edit generation advance. If starting from the published version, verify the new draft uses that version as its base.
 4. Insert a table, enter header/data cells, add a row and save. The persisted document must be RichText AST v2. Preview must show the table through Core rendering.
 5. Replace the optional principal image with a Media Library asset; preserve meaningful alt text. A missing image remains a valid state where the Content Type allows it.
 6. Preview the exact revision, resolve validation issues, seal and publish using the role’s authorized actions. Verify the actual public page and search projection.

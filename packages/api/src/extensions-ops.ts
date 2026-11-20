@@ -257,10 +257,11 @@ export async function getUpdatePreflight(
   // When the operator supplies a target, it must match the configured one
   // byte-for-byte (same fail-closed comparison as apply) — check and apply
   // can then never disagree about what is being installed.
+  const configuredTarget = app.extensions.releaseManifest;
   if (input.manifest !== undefined) {
     const { parseReleaseManifest } = await import("@pcms/extensions/internal");
     const submitted = parseReleaseManifest(input.manifest);
-    if (JSON.stringify(submitted) !== JSON.stringify(app.extensions.releaseManifest)) {
+    if (JSON.stringify(submitted) !== JSON.stringify(configuredTarget)) {
       throw new ApiError(
         "UPDATE_MANIFEST_INVALID",
         "the submitted manifest does not match the configured target release",
@@ -268,7 +269,10 @@ export async function getUpdatePreflight(
       );
     }
   }
-  const preflight = await app.extensions.updatePreflight();
+  const preflight =
+    configuredTarget === null
+      ? await app.extensions.updatePreflight()
+      : await app.extensions.updatePreflightAgainst(configuredTarget);
   return {
     outcome: preflight.outcome,
     current: preflight.current,
@@ -423,21 +427,22 @@ export async function applyUpdate(
     input.confirmed_from_registry === true
       ? await app.extensions.updatePreflightAgainst(target)
       : await (async () => {
-          if (app.extensions.releaseManifest === null) {
+          const configuredTarget = app.extensions.releaseManifest;
+          if (configuredTarget === null) {
             throw new ApiError(
               "UPDATE_MANIFEST_INVALID",
               "no target release manifest is configured for this environment",
               { status: 409 },
             );
           }
-          if (JSON.stringify(target) !== JSON.stringify(app.extensions.releaseManifest)) {
+          if (JSON.stringify(target) !== JSON.stringify(configuredTarget)) {
             throw new ApiError(
               "UPDATE_MANIFEST_INVALID",
               "the submitted manifest does not match the configured target release",
               { status: 409 },
             );
           }
-          return app.extensions.updatePreflight();
+          return app.extensions.updatePreflightAgainst(target);
         })();
   // Production adapters (PCMS-OPS-T114) when the deployment provides them;
   // otherwise the orchestrator records the attempt and fails closed before

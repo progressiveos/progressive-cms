@@ -24,4 +24,6 @@ Core validates `payload.blocks` under `block_document`; a `block_document`-typed
 
 Markdown is a second representation of the selected published revision. Core supplies a fallback if a template has no paired Markdown file; new themes should add `markdown_file` to the HTML template manifest entry. A paired file can use `entry.title`, `entry.fields.<field>_markdown`, `body_markdown`, `blocks_markdown` and `fallback_markdown`; use `blocks_markdown` for Block Document content and `body_markdown` for RichText bodies.
 
+Public extension page views have a separate opt-in: declare `markdown_template` in the view or set `markdown_fallback: true` and return its explicit `view.markdown` projection. Core never infers extension Markdown from HTML.
+
 The optional `markdown_contract` uses `version: 1` and unique `dependencies` with the dotted paths actually read by the Liquid template and its partials. This declaration is statically checked; it does not turn availability on. Keep the paired template within the analyzer's bounded Liquid subset and preserve Markdown projections when they are meant to prove substantive content. A title or H1 alone is not content. The starter contains a page and article example.

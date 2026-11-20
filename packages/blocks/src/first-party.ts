@@ -53,14 +53,32 @@ export const ACTION_PROP_SCHEMA = {
   },
   required: ["type"],
   allOf: [
-    { if: { properties: { type: { const: "internal_entry" } } }, then: { required: ["entry_id"] } },
-    { if: { properties: { type: { const: "external_url" } } }, then: { required: ["url"] } },
-    { if: { properties: { type: { const: "anchor" } } }, then: { required: ["anchor"] } },
-    { if: { properties: { type: { const: "form" } } }, then: { required: ["form_definition_id"] } },
-    { if: { properties: { type: { const: "phone" } } }, then: { required: ["phone"] } },
-    { if: { properties: { type: { const: "email" } } }, then: { required: ["email"] } },
     {
-      if: { properties: { type: { const: "media_download" } } },
+      if: { required: ["type"], properties: { type: { const: "internal_entry" } } },
+      then: { required: ["entry_id"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "external_url" } } },
+      then: { required: ["url"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "anchor" } } },
+      then: { required: ["anchor"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "form" } } },
+      then: { required: ["form_definition_id"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "phone" } } },
+      then: { required: ["phone"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "email" } } },
+      then: { required: ["email"] },
+    },
+    {
+      if: { required: ["type"], properties: { type: { const: "media_download" } } },
       then: { required: ["media_asset_id"] },
     },
   ],

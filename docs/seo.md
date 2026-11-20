@@ -32,7 +32,7 @@ Use `GET /api/v1/discovery/seo/preview` and `/discovery/seo/structured-data` wit
 
 ## Markdown representation and discovery
 
-Published pages can also respond to `Accept: text/markdown` or an explicit `.md` URL. The explicit Markdown URL is noindex and points back to the HTML canonical; negotiated Markdown keeps the HTML page's effective robots and canonical policy. This does not make the canonical HTML page noindex. `GET /llms.txt` is a bounded inventory of public sitemap pages whose Markdown output can be proven; it may omit a page that still renders directly. See [Markdown representations](markdown.md) for negotiation, headers, availability controls and the discovery limits.
+Published pages and eligible public extension views can also respond to `Accept: text/markdown` or an explicit `.md` URL. The explicit Markdown URL is noindex and points back to the HTML canonical; negotiated Markdown keeps the HTML page's effective robots and canonical policy. This does not make the canonical HTML page noindex. `GET /llms.txt` is a bounded inventory of public sitemap candidates whose Markdown output can be proven; it may omit a page or extension view that still renders directly. See [Markdown representations](markdown.md) for negotiation, headers, availability controls and the discovery limits.
 
 ## Search-provider ownership verification
 

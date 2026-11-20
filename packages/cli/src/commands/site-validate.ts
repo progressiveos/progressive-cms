@@ -87,6 +87,9 @@ export async function siteValidate(options: SiteValidateOptions): Promise<CliRes
       stderr: `cannot read theme manifest: ${(error as Error).message}\n`,
     };
   }
+  if (!manifest.ok) {
+    return { exitCode: 1, stdout: "", stderr: `invalid theme manifest in "${themeDir}"\n` };
+  }
   // Default corpus is release-shipped; a deployment without it (corpus not
   // explicitly passed) skips the content-compat pass with a hint instead of
   // a hard failure (theme developer report 0.1.119→0.123).
@@ -94,15 +97,13 @@ export async function siteValidate(options: SiteValidateOptions): Promise<CliRes
     return {
       exitCode: 0,
       stdout:
-        `site validate: skipped content-compatibility pass\n` +
-        `(default corpus ${contentFile} is absent; pass --content <corpus.json> to run it)\n`,
+        parsed.json === true
+          ? `${JSON.stringify({ ok: true, skipped: true, reason: `default corpus ${contentFile} is absent` })}\n`
+          : `site validate: skipped content-compatibility pass\n` +
+            `(default corpus ${contentFile} is absent; pass --content <corpus.json> to run it)\n`,
       stderr: "",
     };
   }
-  if (!manifest.ok) {
-    return { exitCode: 1, stdout: "", stderr: `invalid theme manifest in "${themeDir}"\n` };
-  }
-
   let definitions: DefinitionsFile;
   try {
     definitions = JSON.parse(readFileSync(contentFile, "utf8")) as DefinitionsFile;

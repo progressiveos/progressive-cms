@@ -132,10 +132,15 @@ export const ru = {
   entry_no_revisions: "У материала нет ревизий",
   needs_draft_title: "У материала нет рабочего черновика",
   published_content_readonly: "Опубликованная версия · только просмотр",
+  published_content_sealed_readonly: "Запечатанная версия · только просмотр",
   published_content_show: "Посмотреть публикацию",
+  published_content_preview_changes: "Предпросмотр изменений",
   published_content_return_draft: "Вернуться к черновику",
   published_content_missing: "У материала нет опубликованной версии",
   published_content_changed: "Публикация изменилась. Обновите материал и сравните версии.",
+  draft_created: "Черновик создан — можно вносить изменения",
+  published_content_sealed_dirty:
+    "Запечатанная версия изменена локально. Опубликуйте её или создайте черновик — просмотр не сохраняет правки.",
   legacy_base_title: "Проверьте основу черновика",
   changed_base_warning:
     "Опубликованная версия изменилась после создания черновика. Сравните версии: публикация может заменить более новые изменения.",

@@ -65,6 +65,10 @@ Source handlers return mount-relative paths and real BCP-47 locales. Core builds
 
 Idempotency for public extension mutations is opt-in through `Idempotency-Key`. A replay is scoped to the site, extension and Core-issued `pcms_guest` cookie, with the route, path, locale and body bound to the request. Client IP is not part of replay identity: the same guest cookie retains its replay scope after an IP change, while different guests behind one NAT remain separate. Existing Origin/CSRF checks and per-IP rate limits still apply. Transport response caching is not atomic with an extension's domain transaction and does not promise exactly-once execution; irreversible operations need an owner-bound receipt stored with the domain change.
 
+## Markdown page views
+
+Public `GET`/`HEAD` view routes can serve Markdown by `.md` suffix or `Accept: text/markdown`. Declare `views[].markdown_template` for a content-only Liquid template inside the signed package, or explicitly set `views[].markdown_fallback: true` and return `view.markdown` with a plain-text title/body projection and optional image references drawn from that view's declared media ids. Core does not infer Markdown from HTML or another view model. The paired template takes precedence; API routes and mutation methods do not use this representation. HTML advertises the alternate while global agent Markdown is enabled; the explicit Markdown response points to the HTML canonical. See [Markdown representations](markdown.md) for response rules and conservative discovery behavior.
+
 ## Trusted Admin HTTP client
 
 Admin contributions receive `AdminContributionApi` from the root `@pcms/extensions` SDK. Its `request` method uses the host's existing HTTP client and the current Admin session and CSRF handling; it does not expose authentication state or secrets.

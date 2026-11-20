@@ -51,6 +51,61 @@ export type RichTextNodeType = (typeof RICHTEXT_NODE_TYPES)[number];
 const HREF_ALLOWED_RE = /^(https:\/\/|http:\/\/|mailto:|\/|#)/i;
 const HREF_BLOCKED_RE = /(javascript|data|vbscript):/i;
 
+/**
+ * Optional link presentation properties (additive in v2 — no version bump).
+ * `_new` is a named browsing context: the browser decides tab vs window, so
+ * the contract never promises a separate window.
+ */
+export const RICHTEXT_LINK_TARGETS = ["_self", "_blank", "_new"] as const;
+export type RichTextLinkTarget = (typeof RICHTEXT_LINK_TARGETS)[number];
+
+/**
+ * `rel` token allowlist. Canonical serialization order is exactly this array
+ * order; the validator accepts any order but rejects unknown and duplicate
+ * tokens (stable code RICHTEXT_LINK_REL_INVALID).
+ */
+export const RICHTEXT_LINK_RELS = [
+  "nofollow",
+  "sponsored",
+  "ugc",
+  "noopener",
+  "noreferrer",
+] as const;
+export type RichTextLinkRel = (typeof RICHTEXT_LINK_RELS)[number];
+
+export const RICHTEXT_LINK_TITLE_MAX = 500;
+
+/** Link title: trimmed length 1..500 and no C0/DEL control characters. */
+export function isRichTextLinkTitle(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (trimmed.length < 1 || trimmed.length > RICHTEXT_LINK_TITLE_MAX) return false;
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 31 || code === 127) return false;
+  }
+  return true;
+}
+
+/**
+ * Allowlists, dedupes and orders link `rel` tokens. Accepts the canonical
+ * array and the editor-private space-separated string; anything unknown is
+ * dropped (serializers must never emit a token outside the allowlist).
+ */
+export function normalizeRichTextLinkRel(value: unknown): RichTextLinkRel[] {
+  const tokens = new Set<RichTextLinkRel>();
+  const candidates = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/\s+/)
+      : [];
+  for (const token of candidates) {
+    if (typeof token === "string" && RICHTEXT_LINK_RELS.includes(token as RichTextLinkRel))
+      tokens.add(token as RichTextLinkRel);
+  }
+  return RICHTEXT_LINK_RELS.filter((token) => tokens.has(token));
+}
+
 export type RichTextValidationResult =
   | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly issues: ReferenceIssue[] };
@@ -346,6 +401,68 @@ function validateNode(
         ),
       );
     }
+    // Optional additive properties. Absent = old document shape: rendering
+    // and export must stay byte-identical, so these are never defaulted.
+    if (
+      node.target !== undefined &&
+      !RICHTEXT_LINK_TARGETS.includes(node.target as RichTextLinkTarget)
+    ) {
+      issues.push(
+        issue(
+          `${path}/target`,
+          "RICHTEXT_LINK_TARGET_INVALID",
+          'target must be "_self", "_blank" or "_new"',
+        ),
+      );
+    }
+    if (node.rel !== undefined) {
+      if (!Array.isArray(node.rel)) {
+        issues.push(
+          issue(`${path}/rel`, "RICHTEXT_LINK_REL_INVALID", "rel must be an array of tokens"),
+        );
+      } else {
+        if (node.rel.length > RICHTEXT_LINK_RELS.length)
+          issues.push(
+            issue(
+              `${path}/rel`,
+              "RICHTEXT_LINK_REL_INVALID",
+              `rel has too many tokens (max ${RICHTEXT_LINK_RELS.length})`,
+            ),
+          );
+        const seen = new Set<string>();
+        for (const [index, token] of node.rel.entries()) {
+          if (typeof token !== "string" || !RICHTEXT_LINK_RELS.includes(token as RichTextLinkRel)) {
+            issues.push(
+              issue(
+                `${path}/rel/${index}`,
+                "RICHTEXT_LINK_REL_INVALID",
+                `unknown rel token "${String(token)}"`,
+              ),
+            );
+            continue;
+          }
+          if (seen.has(token)) {
+            issues.push(
+              issue(
+                `${path}/rel/${index}`,
+                "RICHTEXT_LINK_REL_INVALID",
+                `duplicate rel token "${token}"`,
+              ),
+            );
+          }
+          seen.add(token);
+        }
+      }
+    }
+    if (node.title !== undefined && !isRichTextLinkTitle(node.title)) {
+      issues.push(
+        issue(
+          `${path}/title`,
+          "RICHTEXT_LINK_TITLE_INVALID",
+          `link title must be 1–${RICHTEXT_LINK_TITLE_MAX} characters after trimming, without control characters`,
+        ),
+      );
+    }
     validateContent(node.content, `${path}/content`, depth + 1, budget, issues, INLINE_TEXT_BREAK);
     return;
   }
@@ -405,7 +522,7 @@ function allowedKeysFor(type: RichTextNodeType): readonly string[] {
     case "image":
       return ["type", "src", "media_id", "alt", "title", "caption"];
     case "link":
-      return ["type", "href", "content"];
+      return ["type", "href", "content", "target", "rel", "title"];
   }
 }
 

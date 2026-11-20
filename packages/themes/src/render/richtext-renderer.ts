@@ -19,6 +19,10 @@ const MAX_DEPTH = 32;
 const HREF_ALLOWED_RE = /^(https:\/\/|http:\/\/|mailto:|\/|#)/i;
 /** Blocked URL schemes (mirrors the Content subsystem allowlist). */
 const HREF_BLOCKED_RE = /(javascript|data|vbscript):/i;
+/** Mirrors Content RICHTEXT_LINK_TARGETS / RICHTEXT_LINK_RELS / title bound. */
+const LINK_TARGETS: ReadonlySet<string> = new Set(["_self", "_blank", "_new"]);
+const LINK_RELS = ["nofollow", "sponsored", "ugc", "noopener", "noreferrer"] as const;
+const LINK_TITLE_MAX = 500;
 const NODE_TYPES: ReadonlySet<string> = new Set([
   "document",
   "paragraph",
@@ -88,6 +92,43 @@ function renderLinkHref(node: Record<string, unknown>): string | null {
   if (typeof href !== "string") return null;
   if (!HREF_ALLOWED_RE.test(href) || HREF_BLOCKED_RE.test(href)) return null;
   return href;
+}
+
+/**
+ * Optional link attributes, re-validated against the same allowlists as the
+ * Content validator (defense in depth for pre-existing documents): an
+ * unknown target is dropped, unknown/duplicate rel tokens are dropped,
+ * canonical order is enforced and a non-conforming title is omitted.
+ *
+ * Safety rule at render time, never stored: a `_blank`/`_new` link always
+ * carries `noopener`, and `noreferrer` implies `noopener`.
+ */
+function renderLinkAttributes(node: Record<string, unknown>): string {
+  const target =
+    typeof node.target === "string" && LINK_TARGETS.has(node.target) ? node.target : null;
+  const tokens = new Set<string>();
+  if (Array.isArray(node.rel)) {
+    for (const token of node.rel) {
+      if (typeof token === "string" && (LINK_RELS as readonly string[]).includes(token))
+        tokens.add(token);
+    }
+  }
+  if (target === "_blank" || target === "_new" || tokens.has("noreferrer")) tokens.add("noopener");
+  const rel = LINK_RELS.filter((token) => tokens.has(token));
+  const targetAttribute = target === null ? "" : ` target="${target}"`;
+  const relAttribute = rel.length === 0 ? "" : ` rel="${rel.join(" ")}"`;
+  let titleAttribute = "";
+  const title = node.title;
+  if (typeof title === "string") {
+    const trimmed = title.trim();
+    let valid = trimmed.length >= 1 && trimmed.length <= LINK_TITLE_MAX;
+    for (const character of title) {
+      const code = character.charCodeAt(0);
+      if (code <= 31 || code === 127) valid = false;
+    }
+    if (valid) titleAttribute = ` title="${escapeHtmlString(title)}"`;
+  }
+  return `${targetAttribute}${relAttribute}${titleAttribute}`;
 }
 
 function renderNode(node: RichTextNodeViewModel, depth: number, budget: Budget): string {
@@ -199,7 +240,9 @@ function renderNode(node: RichTextNodeViewModel, depth: number, budget: Budget):
     case "link": {
       const href = renderLinkHref(node);
       const inner = children();
-      return href === null ? inner : `<a href="${escapeHtmlString(href)}">${inner}</a>`;
+      return href === null
+        ? inner
+        : `<a href="${escapeHtmlString(href)}"${renderLinkAttributes(node)}>${inner}</a>`;
     }
     case "text": {
       const text = typeof node.text === "string" ? node.text : "";

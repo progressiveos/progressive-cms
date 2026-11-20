@@ -30,9 +30,12 @@ function unrepresentable(path: string, reason: string): never {
 export function markdownToRichText(markdown: string): RichTextValidationResult {
   if (markdown.length > MAX_MARKDOWN_LENGTH)
     throw new ContentError("MARKDOWN_TOO_LARGE", `markdown exceeds ${MAX_MARKDOWN_LENGTH} chars`);
+  const extensions = gfmFromMarkdown();
+  // The post-processing autolinker ignores escapes and changes literal text into links.
+  extensions[0] = { ...extensions[0], transforms: [] };
   const root = fromMarkdown(markdown, {
     extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
+    mdastExtensions: [extensions],
   });
   let nodes = 0;
   const convert = (
@@ -73,10 +76,14 @@ export function markdownToRichText(markdown: string): RichTextValidationResult {
         );
       case "break":
         return [{ type: "hard_break" }];
-      case "link":
-        if (node.title !== null && node.title !== undefined)
-          unrepresentable(path, "Link titles are not supported by the canonical contract");
-        return [{ type: "link", href: node.url, content: children() }];
+      case "link": {
+        // GFM carries the link title (`[text](url "title")`) but has no
+        // representation for target/rel; those stay canonical-only and throw
+        // on export (see below) instead of being silently dropped.
+        const link: RichTextNode = { type: "link", href: node.url, content: children() };
+        if (node.title !== null && node.title !== undefined) link.title = node.title;
+        return [link];
+      }
       case "image":
         return [
           {
@@ -222,7 +229,16 @@ export function richTextToMarkdown(document: unknown): string {
         return text;
       }
       case "link":
-        return { type: "link", url: node.href, children: children() };
+        if (node.target !== undefined)
+          unrepresentable(`${path}/target`, "GFM cannot represent a link target");
+        if (node.rel !== undefined)
+          unrepresentable(`${path}/rel`, "GFM cannot represent link rel tokens");
+        return {
+          type: "link",
+          url: node.href,
+          title: node.title ?? null,
+          children: children(),
+        };
       case "image":
         if (node.media_id !== undefined)
           unrepresentable(`${path}/media_id`, "GFM cannot preserve MediaAsset identity");
@@ -294,6 +310,8 @@ export function richTextToMarkdown(document: unknown): string {
   try {
     markdown = toMarkdown(convert(document as RichTextNode, "") as unknown as Root, {
       extensions: [gfmToMarkdown()],
+      // Escape literal prose, without re-encoding @ inside explicit links or URLs.
+      unsafe: [{ character: "@", inConstruct: "phrasing", notInConstruct: ["link", "image"] }],
       bullet: "-",
       emphasis: "*",
       strong: "*",

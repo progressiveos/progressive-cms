@@ -280,6 +280,7 @@ import { ApiError } from "./errors.js";
 import {
   createExtensionHttpRouter,
   extensionCanonicalPath,
+  extensionMarkdownFallbackViewKey,
   isExtensionPublicPage,
 } from "./extension-http.js";
 import {
@@ -478,6 +479,8 @@ export interface ApplicationServicesInput {
   readonly cmsVersion?: string;
   /** M14: target release manifest document for `update check` surfaces. */
   readonly updateManifest?: unknown;
+  /** Trusted deployment target, reloaded for each check/apply. */
+  readonly loadUpdateManifest?: () => unknown;
   /** M14: core migrations directory (bounded snapshot input). */
   readonly migrationsDir?: string;
   /**
@@ -2346,6 +2349,11 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
                   lastmod: string | null;
                   noindex: boolean;
                   locale?: string;
+                  markdown?: {
+                    title: string;
+                    description?: string | null;
+                    has_content: boolean;
+                  };
                 }[];
                 cursor: string | null;
               }>;
@@ -2386,12 +2394,27 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
                     locale,
                     defaultLocale: localization.defaultLocale,
                   });
+                  const markdownViewKey =
+                    item.markdown?.has_content === true
+                      ? extensionMarkdownFallbackViewKey(artifact, item.path)
+                      : null;
                   candidates.push({
                     entryId: `${artifact.manifest.id}/${source.source_id}:${canonicalPath}`,
                     path: canonicalPath,
+                    locale,
                     lastmod: item.lastmod,
                     noindex: item.noindex === true,
                     eligibility: { public: true, http200: true },
+                    ...(item.markdown !== undefined && markdownViewKey !== null
+                      ? {
+                          extensionMarkdown: {
+                            enabled: item.noindex !== true,
+                            title: item.markdown.title,
+                            description: item.markdown.description ?? null,
+                            viewKey: markdownViewKey,
+                          },
+                        }
+                      : {}),
                   });
                 }
                 cursor = page.cursor;
@@ -3092,8 +3115,10 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
             getExtensionRuntimeSecret(pool, input.runtimeSecretBox, extensionId, refName),
         }),
   });
-  const releaseManifest =
-    input.updateManifest === undefined ? null : parseReleaseManifest(input.updateManifest);
+  const readReleaseManifest = () => {
+    const document = input.loadUpdateManifest?.() ?? input.updateManifest;
+    return document === undefined ? null : parseReleaseManifest(document);
+  };
 
   const effectiveCapabilities = async () => {
     const installations = await extensionLifecycle.listInstallations();
@@ -3254,10 +3279,13 @@ export function createApplicationServices(input: ApplicationServicesInput): Appl
     paymentSubjectGrants:
       input.extensionPaymentSubjectGrants ??
       parseExtensionPaymentGrants(process.env.PCMS_EXTENSION_PAYMENT_GRANTS),
-    releaseManifest,
+    get releaseManifest() {
+      return readReleaseManifest();
+    },
     capabilities: effectiveCapabilities,
     scanCompatibility: scanExtensionsCompatibility,
     async updatePreflight() {
+      const releaseManifest = readReleaseManifest();
       if (releaseManifest === null) {
         throw new ApiError(
           "UPDATE_MANIFEST_INVALID",

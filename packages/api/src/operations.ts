@@ -2054,7 +2054,7 @@ export async function createNavigationSet(
   app: ApplicationServices,
   ctx: OperationContext,
   input: { readonly key: string; readonly title: string; readonly derived_from_set_id?: string },
-): Promise<{ set_id: string }> {
+): Promise<{ id: string; set_id: string }> {
   requirePermission(app, ctx, "navigation.edit");
   const set = await app.navigation.createSet({
     key: input.key,
@@ -2063,7 +2063,7 @@ export async function createNavigationSet(
       ? {}
       : { derivedFromSetId: input.derived_from_set_id as never }),
   });
-  return { set_id: set.id };
+  return { id: set.id, set_id: set.id };
 }
 
 export async function deleteNavigationSet(

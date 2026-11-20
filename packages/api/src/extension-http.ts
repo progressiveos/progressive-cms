@@ -47,6 +47,8 @@ export interface ExtensionHttpFacts {
    * transport); handlers must not treat absence as a shared bucket.
    */
   readonly sourceKey?: string;
+  /** Preferred public representation, resolved by the HTTP composition root. */
+  readonly representation?: "html" | "markdown";
 }
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -129,10 +131,16 @@ export interface ExtensionViewResponse {
     readonly json_ld?: readonly unknown[];
   };
   readonly media_ids?: readonly string[];
+  readonly markdown?: {
+    readonly title?: string;
+    readonly body: string;
+    readonly images?: readonly { readonly media_id: string; readonly alt: string }[];
+  };
 }
 
 export type ExtensionDispatchResult =
   | { readonly kind: "miss" }
+  | { readonly kind: "not-found"; readonly setCookie?: string }
   | {
       readonly kind: "view";
       readonly setCookie?: string;
@@ -148,6 +156,11 @@ export type ExtensionDispatchResult =
         readonly canonicalUrl: string | null;
         /** Resolved request locale used by the active theme layout. */
         readonly locale: string;
+        readonly markdownTemplate?: string;
+        readonly markdownFallback: boolean;
+        readonly markdownEligible: boolean;
+        readonly requestedMarkdown: boolean;
+        readonly explicitMarkdown: boolean;
       };
     }
   | {
@@ -191,6 +204,8 @@ interface CompiledRoute {
   readonly handler: string;
   readonly responseSchema: Record<string, unknown> | undefined;
   readonly view: string | undefined;
+  readonly markdownTemplate: string | undefined;
+  readonly markdownFallback: boolean;
 }
 
 /** THE extension canonical path builder (PREPUBLIC §3 URL contract): every
@@ -227,24 +242,18 @@ export function extensionCanonicalPath(route: {
   return `${base}/`;
 }
 
-/** Only declared public GET views may contribute search/sitemap pages.
- * Sources own entity-level availability and noindex; Core owns route eligibility. */
-export function isExtensionPublicPage(
-  artifact: {
-    readonly manifest: {
-      readonly registrations: {
-        readonly http_routes: readonly {
-          readonly method: string;
-          readonly path: string;
-          readonly visibility: string;
-          readonly view?: string;
-        }[];
-      };
-    };
-  },
+type ExtensionPageRoute = {
+  readonly method: string;
+  readonly path: string;
+  readonly visibility: string;
+  readonly view?: string;
+};
+
+function matchingExtensionPageRoute(
+  routes: readonly ExtensionPageRoute[],
   path: string,
-): boolean {
-  if (!path.startsWith("/") || /[?#\\]/.test(path) || path.includes("//")) return false;
+): ExtensionPageRoute | null {
+  if (!path.startsWith("/") || /[?#\\]/.test(path) || path.includes("//")) return null;
   const segments = parseSegments(path);
   if (
     segments.some((segment) => {
@@ -258,8 +267,8 @@ export function isExtensionPublicPage(
       }
     })
   )
-    return false;
-  for (const route of artifact.manifest.registrations.http_routes) {
+    return null;
+  for (const route of routes) {
     // Respect declaration order: a private/json route can shadow a view.
     if (route.method !== "GET") continue;
     const pattern = parseSegments(route.path);
@@ -271,10 +280,56 @@ export function isExtensionPublicPage(
       ) &&
       (pattern.at(-1)?.startsWith("*") || pattern.length === segments.length)
     ) {
-      return route.visibility === "public" && route.view !== undefined;
+      return route;
     }
   }
-  return false;
+  return null;
+}
+
+/** Only the first matching public GET view may contribute discovery pages. */
+export function isExtensionPublicPage(
+  artifact: {
+    readonly manifest: {
+      readonly registrations: { readonly http_routes: readonly ExtensionPageRoute[] };
+    };
+  },
+  path: string,
+): boolean {
+  const route = matchingExtensionPageRoute(artifact.manifest.registrations.http_routes, path);
+  return route?.visibility === "public" && route.view !== undefined;
+}
+
+/** Markdown support belongs to the exact first matching public view. */
+export function extensionMarkdownFallbackViewKey(
+  artifact: {
+    readonly manifest: {
+      readonly id: string;
+      readonly registrations: {
+        readonly http_routes: readonly ExtensionPageRoute[];
+        readonly views: readonly {
+          readonly view_id: string;
+          readonly view_model_schema_version: string;
+          readonly markdown_template?: string;
+          readonly markdown_fallback?: boolean;
+        }[];
+      };
+    };
+  },
+  path: string,
+): string | null {
+  const route = matchingExtensionPageRoute(artifact.manifest.registrations.http_routes, path);
+  if (route?.visibility !== "public" || route.view === undefined) return null;
+  const view = artifact.manifest.registrations.views.find((item) => item.view_id === route.view);
+  if (view?.markdown_fallback !== true || view.markdown_template !== undefined) return null;
+  const major = view.view_model_schema_version.split(".")[0] ?? "1";
+  return `${artifact.manifest.id}/${view.view_id}@${major}`;
+}
+
+export function isExtensionMarkdownPage(
+  artifact: Parameters<typeof extensionMarkdownFallbackViewKey>[0],
+  path: string,
+): boolean {
+  return extensionMarkdownFallbackViewKey(artifact, path) !== null;
 }
 
 function canonicalJoin(mount: string, rest: string, locale?: string): string {
@@ -288,6 +343,25 @@ function canonicalJoin(mount: string, rest: string, locale?: string): string {
 
 function parseSegments(path: string): readonly string[] {
   return path.split("/").filter((segment) => segment !== "");
+}
+
+function isMarkdownProjection(value: unknown): value is ExtensionViewResponse["markdown"] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const projection = value as Record<string, unknown>;
+  return (
+    typeof projection.body === "string" &&
+    (projection.title === undefined || typeof projection.title === "string") &&
+    (projection.images === undefined ||
+      (Array.isArray(projection.images) &&
+        projection.images.every(
+          (image) =>
+            typeof image === "object" &&
+            image !== null &&
+            !Array.isArray(image) &&
+            typeof (image as Record<string, unknown>).media_id === "string" &&
+            typeof (image as Record<string, unknown>).alt === "string",
+        )))
+  );
 }
 
 function matchRoute(
@@ -369,6 +443,15 @@ export function createExtensionHttpRouter(deps: {
           handler: route.handler,
           responseSchema: route.response_schema,
           view: route.view,
+          markdownTemplate:
+            route.view === undefined
+              ? undefined
+              : artifact.manifest.registrations.views.find((view) => view.view_id === route.view)
+                  ?.markdown_template,
+          markdownFallback:
+            route.view !== undefined &&
+            artifact.manifest.registrations.views.find((view) => view.view_id === route.view)
+              ?.markdown_fallback === true,
         });
       }
     }
@@ -379,6 +462,7 @@ export function createExtensionHttpRouter(deps: {
   return {
     async dispatch(app, facts, ctx) {
       const rawPath = facts.path.split("?")[0] || "/";
+      const trailingSlash = rawPath !== "/" && rawPath.endsWith("/");
       const path = rawPath !== "/" && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
       const routes = await ensureComposed();
       // NOTE: no early return on empty routes — the technical /x/<id> space
@@ -405,8 +489,24 @@ export function createExtensionHttpRouter(deps: {
         const restSegments = parseSegments(candidate.rest === "" ? "/" : candidate.rest);
         for (const route of routes) {
           if (route.extensionId !== candidate.extensionId) continue;
-          const params = matchRoute(route, facts.method, restSegments);
+          const markdownSuffix =
+            (facts.method === "GET" || facts.method === "HEAD") &&
+            route.visibility === "public" &&
+            route.view !== undefined &&
+            !trailingSlash &&
+            candidate.rest.endsWith(".md");
+          const markdownRest = markdownSuffix ? candidate.rest.slice(0, -3) || "/" : candidate.rest;
+          const markdownParams = markdownSuffix
+            ? matchRoute(route, facts.method, parseSegments(markdownRest))
+            : null;
+          const params = markdownParams ?? matchRoute(route, facts.method, restSegments);
           if (params === null) continue;
+          const explicitMarkdown = markdownParams !== null;
+          const routeRest = explicitMarkdown ? markdownRest : candidate.rest;
+          const canonicalRest =
+            !explicitMarkdown && trailingSlash && routeRest !== "/"
+              ? `${routeRest}/`
+              : routeRest;
 
           // Canonical URL policy (CORE-SHOP-SEO-01): the technical space
           // never renders public HTML. With an ACTIVE mount — one permanent
@@ -427,10 +527,23 @@ export function createExtensionHttpRouter(deps: {
                 message: `extension "${candidate.extensionId}" has no site-level mount; the technical space serves no public HTML`,
               };
             }
+            const canonical = canonicalJoin(activeMount.mountPath, canonicalRest, facts.locale);
+            const location = explicitMarkdown
+              ? canonical === "/"
+                ? "/index.md"
+                : `${canonical.endsWith("/") ? canonical.slice(0, -1) : canonical}.md`
+              : canonical;
+            const query = new URLSearchParams(
+              Object.entries(facts.query).flatMap(([key, value]) =>
+                Array.isArray(value)
+                  ? value.map((item) => [key, item])
+                  : [[key, value]],
+              ),
+            ).toString();
             return {
               kind: "redirect",
               status: 308,
-              location: canonicalJoin(activeMount.mountPath, candidate.rest, facts.locale),
+              location: query ? `${location}?${query}` : location,
             };
           }
 
@@ -558,7 +671,7 @@ export function createExtensionHttpRouter(deps: {
               : extensionCanonicalPath({
                   mountPath: activeMount.mountPath,
                   extensionId: candidate.extensionId,
-                  path: candidate.rest,
+                  path: canonicalRest,
                   locale: callContext.locale,
                   defaultLocale: callContext.site.defaultLocale,
                 });
@@ -645,6 +758,7 @@ export function createExtensionHttpRouter(deps: {
               model?: unknown;
               head?: ExtensionViewResponse["head"];
               media_ids?: readonly string[];
+              markdown?: ExtensionViewResponse["markdown"];
             };
             json?: unknown;
             location?: string;
@@ -670,6 +784,17 @@ export function createExtensionHttpRouter(deps: {
                 message: `route declares view "${route.view}" but the handler returned "${viewId}"`,
               };
             }
+            if (
+              shape.view.markdown !== undefined &&
+              !isMarkdownProjection(shape.view.markdown)
+            ) {
+              return {
+                kind: "failure",
+                status: 500,
+                code: "EXTENSION_VIEW_INVALID_MARKDOWN",
+                message: `view "${viewId}" returned an invalid Markdown projection`,
+              };
+            }
             return {
               kind: "view",
               ...(guestIdentity?.setCookie === undefined
@@ -681,15 +806,29 @@ export function createExtensionHttpRouter(deps: {
                 model: shape.view.model ?? {},
                 head: shape.view.head ?? {},
                 media_ids: shape.view.media_ids ?? [],
+                ...(shape.view.markdown === undefined ? {} : { markdown: shape.view.markdown }),
               },
               view: {
                 baseTemplate: registered.base_template,
                 schemaVersion: registered.view_model_schema_version,
                 extensionsDir: artifact.extensionsDir ?? `extensions/${candidate.extensionId}`,
                 canonicalPath:
-                  canonicalPath ?? canonicalJoin(candidate.mount, candidate.rest, facts.locale),
+                  canonicalPath ?? canonicalJoin(candidate.mount, canonicalRest, facts.locale),
                 canonicalUrl,
                 locale: callContext.locale,
+                ...(route.markdownTemplate === undefined
+                  ? {}
+                  : { markdownTemplate: route.markdownTemplate }),
+                markdownFallback: route.markdownFallback,
+                markdownEligible:
+                  route.visibility === "public" &&
+                  (facts.method === "GET" || facts.method === "HEAD"),
+                requestedMarkdown:
+                  explicitMarkdown ||
+                  (route.visibility === "public" &&
+                    (facts.method === "GET" || facts.method === "HEAD") &&
+                    facts.representation === "markdown"),
+                explicitMarkdown,
               },
             };
           }
@@ -704,6 +843,20 @@ export function createExtensionHttpRouter(deps: {
             };
           }
           const status = typeof shape.status === "number" ? shape.status : 200;
+          const hasJson = Object.prototype.hasOwnProperty.call(response ?? {}, "json");
+          if (
+            status === 404 &&
+            !hasJson &&
+            route.visibility === "public" &&
+            route.view !== undefined &&
+            (facts.method === "GET" || facts.method === "HEAD")
+          )
+            return {
+              kind: "not-found",
+              ...(guestIdentity?.setCookie === undefined
+                ? {}
+                : { setCookie: guestIdentity.setCookie }),
+            };
           if (route.responseSchema !== undefined) {
             const { default: Ajv } = await import("ajv");
             const validate = new Ajv({ allErrors: false }).compile(route.responseSchema);

@@ -1,7 +1,7 @@
 # Versioning and compatibility
 
 <!-- cms-current:start -->
-Current Progressive CMS release: **RC38** (`1.0.0-rc.38`).
+Current Progressive CMS release: **RC39** (`1.0.0-rc.39`).
 <!-- cms-current:end -->
 
 This guide describes the current product behavior. Historical release introductions below explain provenance; they do not identify the current product or the installed server. Skill versions and minimum compatible CMS ranges are independent of the release label. The authoritative ranges live in the supplied Skill/theme manifests, not copied version numbers in instructions.
@@ -25,8 +25,9 @@ Markdown routes and settings are an optional runtime feature; feature-detect the
 <!-- cms-history:start -->
 | Introduction | Contract / public documentation |
 |---|---|
-| RC37 | Installer-issued Site-Creator access, constrained Shop-Creator provisioning, independent signed extension package delivery, and compatible public CDN CSP default. See [Admin](admin.md), [Extensions](extensions.md), [Operations](operations.md) and [Configuration](configuration-reference.md). |
+| RC39 | Public extension views can opt into Markdown templates or explicit fallback projections; bounded Markdown discovery includes provable extension views. Bootstrap advertises Markdown capability, and Admin/CLI diagnostics clarify editing and validation states. See [Extensions](extensions.md), [Markdown](markdown.md), [Agent workflow](agent-workflow.md), [Admin](admin.md) and [CLI map](cli-map.md). |
 | RC38 | Payment-provider settings and encrypted credential handling, asynchronous refund intents, provider callback handling, and cleanup of superseded SEALED history. See [Payments](payments.md), [Admin](admin.md), [Operations](operations.md) and [Publishing](publishing.md). |
+| RC37 | Installer-issued Site-Creator access, constrained Shop-Creator provisioning, independent signed extension package delivery, and compatible public CDN CSP default. See [Admin](admin.md), [Extensions](extensions.md), [Operations](operations.md) and [Configuration](configuration-reference.md). |
 | RC16 / RC18 | RichText v2 introduced / runtime became v2-only; retained historical compatibility boundary. See [RichText](richtext.md). |
 | RC19 | Content/body-policy corrections, breadcrumbs and social-image inheritance; minimum for the supplied authoring workflows. See [Content Contract](content-contract.md), [Navigation](navigation.md), and [SEO](seo.md). |
 | Extension/Payments delta | Public extension and payment contracts. See [Extensions](extensions.md) and [Payments](payments.md). |

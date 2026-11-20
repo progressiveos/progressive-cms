@@ -29,6 +29,7 @@ import {
   type PcpubDiagnostic,
   type PcpubTargetContracts,
   packWorkspace,
+  PcpubError,
   type RichTextPropsResolver,
   validatePcpub,
   verifyPcpub,
@@ -481,6 +482,21 @@ export async function bundleCommand(invocation: BundleInvocation): Promise<CliCo
     }
     return { exitCode: 2, stdout: "", stderr: usage };
   } catch (error) {
+    if (error instanceof PcpubError && error.diagnostics.length > 0) {
+      if (options.json)
+        return {
+          exitCode: 2,
+          stdout: jsonPayload({ ok: false, issues: error.diagnostics }),
+          stderr: "",
+        };
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: error.diagnostics
+          .map((issue) => `error [${issue.code}] ${issue.path}: ${issue.message}\n`)
+          .join(""),
+      };
+    }
     return failureResult(error, options);
   }
 }

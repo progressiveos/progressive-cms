@@ -246,7 +246,13 @@ async function startWorker(options: {
   });
   // ADR-0013 §71.7: media generation executes in the worker (durable queue,
   // bounded retries); a failed run is recorded as failed — never blocking.
-  const mediaGenerationHandler = createMediaGenerationJobHandler(application);
+  const mediaGenerationHandler = createMediaGenerationJobHandler(application, (runId, code) => {
+    logger.warn("worker.media.generation_failed", {
+      operation: "worker.media.generation",
+      run_id: runId,
+      code,
+    });
+  });
   // The preset set must follow the ACTIVE theme (admin_theme_state), not the
   // boot seed in themes.renderDir: theme activation does not restart workers,
   // and .pcpub ingest stages media here — a stale set silently produces zero

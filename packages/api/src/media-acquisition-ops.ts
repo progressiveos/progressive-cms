@@ -628,7 +628,10 @@ async function extensionIdForProvider(
  * with bounded retries; failure marks the run failed — it never blocks the
  * queue.
  */
-export function createMediaGenerationJobHandler(app: ApplicationServices) {
+export function createMediaGenerationJobHandler(
+  app: ApplicationServices,
+  logFailure?: (runId: string, code: string) => void,
+) {
   return async (payload: { run_id?: unknown }): Promise<void> => {
     const runId = typeof payload.run_id === "string" ? payload.run_id : "";
     if (runId === "") return;
@@ -642,6 +645,7 @@ export function createMediaGenerationJobHandler(app: ApplicationServices) {
         "PROVIDER_NOT_CONFIGURED",
         "provider is not available",
       );
+      logFailure?.(runId, "PROVIDER_NOT_CONFIGURED");
       return;
     }
     await markGenerationRunRunning(app.pool, runId);
@@ -752,6 +756,7 @@ export function createMediaGenerationJobHandler(app: ApplicationServices) {
       const code = error instanceof ProviderError ? error.code : "PROVIDER_FAILED";
       const message = error instanceof Error ? error.message : "generation failed";
       await markGenerationRunFailed(app.pool, runId, code, message);
+      logFailure?.(runId, code);
     }
   };
 }

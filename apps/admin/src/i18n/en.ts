@@ -133,10 +133,15 @@ export const en: Messages = {
   entry_no_revisions: "This entry has no revisions",
   needs_draft_title: "No working draft",
   published_content_readonly: "Published version · read only",
+  published_content_sealed_readonly: "Sealed version · read only",
   published_content_show: "View published version",
+  published_content_preview_changes: "Preview changes",
   published_content_return_draft: "Return to draft",
   published_content_missing: "This entry has no published version",
   published_content_changed: "The publication changed. Refresh the entry and compare the versions.",
+  draft_created: "Draft created — you can edit now",
+  published_content_sealed_dirty:
+    "The sealed version has local edits. Publish it or create a draft — viewing does not save edits.",
   legacy_base_title: "Check the draft base",
   changed_base_warning:
     "The published version changed after this draft was created. Compare the versions: publishing may replace newer changes.",

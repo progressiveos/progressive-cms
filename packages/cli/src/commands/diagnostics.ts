@@ -74,6 +74,7 @@ export interface DiagnosticsInvocation {
 interface CheckResult {
   readonly name: string;
   readonly ok: boolean;
+  readonly warning?: boolean;
   readonly detail: string;
 }
 
@@ -548,6 +549,41 @@ export async function doctorCommand(invocation: DiagnosticsInvocation): Promise<
       checks.push({ name: "content-types", ok: true, detail: "not configured (empty registry)" });
     }
 
+    // Keep reserved paths available for republishing, but tell the operator why they return 404.
+    try {
+      const routes = await withPool(env, cwd, options, (pool) =>
+        pool.query<{ path: string }>(
+          `SELECT DISTINCT r.path FROM routes r
+           JOIN entries e ON e.id::text = r.target_id
+           WHERE r.target_type = 'entry' AND r.is_canonical AND r.retired_at IS NULL
+             AND EXISTS (SELECT 1 FROM publications p
+                         WHERE p.entity_type = 'entry' AND p.entity_id = e.id
+                           AND p.first_published_at IS NOT NULL)
+             AND NOT EXISTS (SELECT 1 FROM publications p
+                             WHERE p.entity_type = 'entry' AND p.entity_id = e.id
+                               AND p.state = 'PUBLISHED')
+           ORDER BY r.path LIMIT 6`,
+        ),
+      );
+      const examples = routes.rows.slice(0, 5).map((route) => route.path);
+      checks.push({
+        name: "unpublished-canonical-routes",
+        ok: true,
+        ...(examples.length === 0 ? {} : { warning: true }),
+        detail:
+          examples.length === 0
+            ? "no active canonical routes for previously published entries without a publication"
+            : `active routes without a publication: ${examples.join(", ")}${routes.rows.length > 5 ? ", …" : ""}; republish the entry or retire its route`,
+      });
+    } catch (error) {
+      checks.push({
+        name: "unpublished-canonical-routes",
+        ok: true,
+        warning: true,
+        detail: `not checked: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+
     // 6. Search index state (M11; Search spec §20/§26). Search is a derived
     // subsystem: its failure degrades search, never core operations, so a
     // mismatch reports degraded (exit 1) without failing earlier checks.
@@ -739,7 +775,10 @@ function render(options: GlobalOptions, checks: readonly CheckResult[]): CliComm
     exitCode: ok ? 0 : 1,
     stdout: `${[
       `doctor: ${ok ? "HEALTHY" : "DEGRADED"}`,
-      ...checks.map((check) => `  [${check.ok ? "ok" : "FAIL"}] ${check.name}: ${check.detail}`),
+      ...checks.map(
+        (check) =>
+          `  [${check.warning ? "WARN" : check.ok ? "ok" : "FAIL"}] ${check.name}: ${check.detail}`,
+      ),
       "",
     ].join("\n")}`,
     stderr: "",

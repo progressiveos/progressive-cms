@@ -157,7 +157,7 @@ export function registerMarkdownFiles(
           candidates
             .filter(
               (candidate) =>
-                candidate.markdown?.enabled &&
+                (candidate.markdown?.enabled || candidate.extensionMarkdown?.enabled) &&
                 hasUnambiguousMarkdownPath(candidate.path) &&
                 (candidate.locale === localization.defaultLocale ||
                   (localization.enabled &&
@@ -173,9 +173,52 @@ export function registerMarkdownFiles(
     let checks = 0;
     let bytes = 0;
     for (const candidate of candidates) {
-      if (!isStableId(candidate.entryId) || !/^\/(?!\/)[^\s<>\\]*$/.test(candidate.path)) continue;
+      if (!/^\/(?!\/)[^\s<>\\]*$/.test(candidate.path)) continue;
       if (!hasUnambiguousMarkdownPath(candidate.path)) {
         skipped.ambiguous_markdown_path = (skipped.ambiguous_markdown_path ?? 0) + 1;
+        continue;
+      }
+      if (candidate.extensionMarkdown !== undefined) {
+        if (
+          candidate.noindex ||
+          !candidate.extensionMarkdown.enabled ||
+          candidate.locale === undefined ||
+          (candidate.locale !== localization.defaultLocale &&
+            (!localization.enabled || !localization.locales.includes(candidate.locale)))
+        )
+          continue;
+        if (checks >= MAX_LLMS_CHECKS) {
+          skipped.check_limit = 1;
+          break;
+        }
+        checks += 1;
+        const size = Buffer.byteLength(JSON.stringify(candidate.extensionMarkdown));
+        if (size > MAX_LLMS_DOCUMENT_BYTES) {
+          skipped.document_limit = (skipped.document_limit ?? 0) + 1;
+          continue;
+        }
+        bytes += size;
+        if (bytes > MAX_LLMS_TOTAL_BYTES) {
+          skipped.byte_limit = 1;
+          break;
+        }
+        const reason = checkAvailability
+          ? await checkAvailability(candidate)
+          : "availability_unverified";
+        if (reason !== null) {
+          skipped[reason] = (skipped[reason] ?? 0) + 1;
+          continue;
+        }
+        pages.push({
+          path: candidate.path,
+          title: candidate.extensionMarkdown.title || candidate.path,
+          description: candidate.extensionMarkdown.description,
+        });
+        if (pages.length === MAX_LLMS_PAGES) break;
+        continue;
+      }
+      if (!isStableId(candidate.entryId)) {
+        skipped.extension_markdown_unproven = (skipped.extension_markdown_unproven ?? 0) + 1;
         continue;
       }
       if (

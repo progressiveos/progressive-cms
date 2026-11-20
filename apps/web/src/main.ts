@@ -27,6 +27,7 @@ import {
   systemClock,
 } from "@pcms/core";
 import {
+  createExtensionCatalog,
   finishCoreUpdateLeaseAfterWebBoot,
   loadIndependentExtensionCatalog,
   recordIndependentGeneration,
@@ -35,6 +36,7 @@ import {
 import { readSelectedReleaseStatus, resolveReleaseIdentity } from "@pcms/operations";
 import type { FastifyInstance } from "fastify";
 import { loadContentTypeDefinitions } from "./content-types.js";
+import { finishBundledExtensionUpgrade } from "./extension-release-upgrade.js";
 import { healthRoutes } from "./health.js";
 import { applyManagedMailSettings, buildMailSurface } from "./mail.js";
 import { registerMaintenanceGate } from "./maintenance-gate.js";
@@ -336,11 +338,10 @@ export async function buildWebRuntime(options: {
   const updateManifestCandidates = releaseRoot
     ? [join(incomingDir, "update-manifest.json"), join(releaseRoot, "update-manifest.json")]
     : [];
-  const updateManifestPath = updateManifestCandidates.find((candidate) => existsSync(candidate));
-  const updateManifestDocument =
-    updateManifestPath !== undefined
-      ? JSON.parse(readFileSync(updateManifestPath, "utf8"))
-      : undefined;
+  const loadUpdateManifest = () => {
+    const path = updateManifestCandidates.find((candidate) => existsSync(candidate));
+    return path === undefined ? undefined : JSON.parse(readFileSync(path, "utf8"));
+  };
   // ADR-0017 R2: the update orchestrator reconciles installed extensions
   // with the shipped artifacts through the same trusted catalog (a second
   // lifecycle INSTANCE is fine — the DB revision/ledger is the authority).
@@ -368,8 +369,26 @@ export async function buildWebRuntime(options: {
       }),
     );
   }
+  if (resolvedRelease.mode === "release") {
+    const bundledCatalog = createExtensionCatalog();
+    for (const artifact of createFirstPartyExtensionCatalog({ pool }).list()) {
+      if (extensionCatalog.get(artifact.manifest.id)?.independentPackage === undefined)
+        bundledCatalog.register(artifact);
+    }
+    await finishBundledExtensionUpgrade({
+      pool,
+      version: resolvedRelease.identity.version,
+      lifecycle: createExtensionLifecycleService({
+        pool,
+        clock: systemClock,
+        coreVersion: readCmsVersionFromRelease(),
+        catalog: bundledCatalog,
+        systemCapabilities: createCapabilityRegistry(),
+      }),
+    });
+  }
   const updateOrchestrationPorts =
-    updateManifestDocument === undefined
+    loadUpdateManifest() === undefined
       ? undefined
       : createProductionUpdatePorts({
           currentReleaseRoot: releaseRoot,
@@ -493,7 +512,7 @@ export async function buildWebRuntime(options: {
     ...(mail?.verify === undefined ? {} : { mailVerify: mail.verify }),
     ...(runtimeSecretBox === undefined ? {} : { runtimeSecretBox }),
     ...(updateOrchestrationPorts === undefined ? {} : { updateOrchestrationPorts }),
-    ...(updateManifestDocument === undefined ? {} : { updateManifest: updateManifestDocument }),
+    ...(loadUpdateManifest() === undefined ? {} : { loadUpdateManifest }),
   });
 
   // CMS Maintenance Mode (PCMS-OPS-T118): gates everything registered after
@@ -552,6 +571,7 @@ export async function buildWebRuntime(options: {
   // requests keep receiving the branded 503 while it is enabled.
   await registerSiteRoute(fastify, {
     application,
+    logger,
     sourceKey: sourceKeyOf,
     ...(config.http.publicCspMode === undefined
       ? {}

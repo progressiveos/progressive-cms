@@ -119,6 +119,10 @@ export interface ExtensionViewRegistration {
   readonly view_model_schema_version: string;
   readonly view_model_schema: Record<string, unknown>;
   readonly base_template: string;
+  /** Optional paired Liquid template for the Markdown representation. */
+  readonly markdown_template?: string;
+  /** Handler returns an explicit public semantic Markdown projection. */
+  readonly markdown_fallback?: boolean;
 }
 
 /** Named-export contributor for sitemap / search / media-usage surfaces
@@ -608,6 +612,12 @@ export const EXTENSION_MANIFEST_SCHEMA = {
                 pattern: "^[a-zA-Z0-9][a-zA-Z0-9._\\-/]*$",
                 maxLength: 300,
               },
+              markdown_template: {
+                type: "string",
+                pattern: "^[a-zA-Z0-9][a-zA-Z0-9._\\-/]*$",
+                maxLength: 300,
+              },
+              markdown_fallback: { type: "boolean" },
             },
           },
         },

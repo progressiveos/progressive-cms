@@ -177,7 +177,10 @@ export function verifyExtensionPackageDescriptor(input: {
     "LICENSE",
     "NOTICE",
     ...(manifest.admin_contributions ? ["admin/index.js"] : []),
-    ...manifest.registrations.views.map((view) => view.base_template),
+    ...manifest.registrations.views.flatMap((view) => [
+      view.base_template,
+      ...(view.markdown_template === undefined ? [] : [view.markdown_template]),
+    ]),
   ]) {
     assertExtensionAssetPath(path);
     if (!descriptor.files[path])

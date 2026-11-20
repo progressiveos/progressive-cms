@@ -306,6 +306,11 @@ export function makeMutationRoutes(): ApiRoute[] {
         method: "POST",
         url: "/revisions/:revisionId/validate",
         operationId: "validate_revision",
+        bodySchema: {
+          type: "object",
+          additionalProperties: true,
+          properties: { publish_level: {} },
+        },
         summary: "Validate a revision (draft or publish level)",
         tag: "content",
         auth: "authenticated",

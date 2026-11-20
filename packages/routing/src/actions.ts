@@ -40,6 +40,11 @@ const SAFE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Scheme allowlist for external action URLs (defense in depth, spec §69). */
 function isAllowedExternalUrl(url: string): boolean {
   try {
+    if (/[\\\x00-\x20\x7f]/.test(url)) return false;
+    if (url.startsWith("/") && !url.startsWith("//")) {
+      const parsed = new URL(url, "https://site.invalid");
+      return parsed.origin === "https://site.invalid";
+    }
     const parsed = new URL(url);
     return (
       (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname.length > 0

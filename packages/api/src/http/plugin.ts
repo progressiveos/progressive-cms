@@ -394,6 +394,21 @@ export function createApiV1(domainRoutes: readonly ApiRoute[]) {
           );
           registerRoute(scope);
         });
+      } else if (route.spec.operationId === "validate_revision") {
+        await fastify.register(async (scope) => {
+          scope.removeContentTypeParser("application/json");
+          const parseJson = scope.getDefaultJsonParser("error", "error");
+          scope.addContentTypeParser(
+            "application/json",
+            { parseAs: "string" },
+            (request, body, done) => {
+              const json = body.toString();
+              if (json === "") return done(null, {});
+              return parseJson(request, json, done);
+            },
+          );
+          registerRoute(scope);
+        });
       } else {
         registerRoute(fastify);
       }

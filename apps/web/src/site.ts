@@ -100,7 +100,7 @@ import {
   registerMarkdownFiles,
 } from "./markdown-files.js";
 import { preparePublishedMarkdown } from "./markdown-projections.js";
-import { MarkdownRenderError } from "./markdown-render.js";
+import { escapeMarkdownInline, MarkdownRenderError } from "./markdown-render.js";
 import { publicSecurityHeaders } from "./public-headers.js";
 import { registerRichTextAssets, withRichTextStyles } from "./richtext-assets.js";
 import { createSearchPageHandler, registerSearchPageRoute, wrapSearchPage } from "./search-page.js";
@@ -114,6 +114,7 @@ import { loadThemePlacements } from "./theme-placements.js";
 
 export interface SiteRouteOptions {
   readonly application: ApplicationServices;
+  readonly logger?: import("@pcms/core").Logger;
   readonly publicCspMode?: PublicCspMode;
   /**
    * Derives the opaque network-source identifier (CORE-SHOP-SECURITY-SOURCE-01)
@@ -430,6 +431,10 @@ export async function registerSiteRoute(
   options: SiteRouteOptions,
 ): Promise<void> {
   const { application, sourceKey } = options;
+  const warn = (fields: Record<string, unknown>, message: string) => {
+    if (options.logger) options.logger.warn(message, fields);
+    else fastify.log.warn(fields, message);
+  };
   registerRichTextAssets(fastify);
   const themeDir = application.themeDir;
   registerMarkdownFiles(fastify, {
@@ -1168,7 +1173,7 @@ export async function registerSiteRoute(
     if (!stack.manifest.media_presets.some((preset) => preset.id === options.imagePreset)) {
       // Known-at-seal preset that the CURRENT theme no longer declares: cards
       // degrade to no image; GET never seals, migrates or transforms.
-      fastify.log.warn({ preset: options.imagePreset }, "render.feed_image_preset_unknown");
+      warn({ preset: options.imagePreset }, "render.feed_image_preset_unknown");
     }
     return buildFeedCards(rows, options, cardDeps(stack, batch));
   }
@@ -1231,7 +1236,7 @@ export async function registerSiteRoute(
       const wantsFill = mode === "collection" || mode === "hybrid";
       if (wantsFill && typeof props.collection_key === "string") {
         if (binding === undefined) {
-          fastify.log.warn(
+          warn(
             { collection_key: props.collection_key, code: "COLLECTION_UNKNOWN" },
             "render.collection_unknown",
           );
@@ -1256,7 +1261,7 @@ export async function registerSiteRoute(
             fill = feed.items;
           } catch (error) {
             if (batch) throw error;
-            fastify.log.warn(
+            warn(
               { err: error, collection_key: props.collection_key },
               "render.collection_unresolved",
             );
@@ -1548,7 +1553,7 @@ export async function registerSiteRoute(
       // A broken binding (unknown content type, transient DB issue) must not
       // take the page down; the REST surface answers the typed error for the
       // same key, and the log names the code.
-      fastify.log.warn({ err: error, collection: key }, "render.collection_unresolved");
+      warn({ err: error, collection: key }, "render.collection_unresolved");
       return {
         key,
         items: [],
@@ -1803,6 +1808,17 @@ export async function registerSiteRoute(
     const reasons = new Map<SitemapCandidate, string>();
     const mediaIds = new Set<string>();
     for (const candidate of candidates) {
+      if (candidate.extensionMarkdown !== undefined) {
+        if (
+          stack.manifest.templates.some(
+            (template) =>
+              template.markdown_file !== undefined &&
+              (template.accepts_views ?? []).includes(candidate.extensionMarkdown!.viewKey),
+          )
+        )
+          reasons.set(candidate, "extension_theme_template_unproven");
+        continue;
+      }
       const data = candidate.markdown;
       const selected = discoveryTemplate(candidate, stack);
       if (!data || !selected) {
@@ -1971,6 +1987,7 @@ export async function registerSiteRoute(
         if (doc.richIds.size) reasons.set(candidate, "media_dependency_unavailable");
     }
     return async (candidate: SitemapCandidate): Promise<string | null> => {
+      if (candidate.extensionMarkdown !== undefined) return reasons.get(candidate) ?? null;
       const reason = reasons.get(candidate);
       if (reason) return reason;
       const doc = docs.get(candidate);
@@ -2195,7 +2212,7 @@ export async function registerSiteRoute(
       // Rec 1 (152fz recommendations): a site-wide 404 outage with zero
       // diagnostics is unacceptable — warn once per process with the
       // identifying tuple so `journalctl` points at the version/theme drift.
-      fastify.log.warn(
+      warn(
         {
           entry_id: entry.id,
           content_type: `${entry.contentTypeId}@${contentType.version}`,
@@ -2232,7 +2249,7 @@ export async function registerSiteRoute(
     const richTextBody =
       contentType.bodyPolicy === "block_document" ? undefined : (payload.body ?? fields.body);
     const blockNodes = blockNodesOf(payload.blocks, application.blocks, (issues) =>
-      fastify.log.warn({ issues }, "render.blocks_dropped"),
+      warn({ issues }, "render.blocks_dropped"),
     );
     const forms =
       outputFormat === "html"
@@ -2299,7 +2316,7 @@ export async function registerSiteRoute(
       (node) => blocks.checkBlockSupport(node as never) === null,
     );
     if (renderable.length !== blockNodes.length) {
-      fastify.log.warn(
+      warn(
         { dropped: blockNodes.length - renderable.length },
         "render.blocks_unsupported_by_theme",
       );
@@ -2713,11 +2730,12 @@ export async function registerSiteRoute(
       if (outputFormat !== "markdown") throw error;
       if (!explicitMarkdown) appendVaryAccept(reply);
       const unsupported = error instanceof MarkdownRenderError;
-      fastify.log.warn(
+      warn(
         {
           entry_id: entry.id,
           code: unsupported ? error.code : "MARKDOWN_TEMPLATE_RENDER_FAILED",
           block_type: unsupported ? error.blockType : undefined,
+          reason: unsupported ? error.message : undefined,
         },
         "render.markdown_unavailable",
       );
@@ -3193,7 +3211,11 @@ export async function registerSiteRoute(
       localizationSettings?.defaultLocale ??
       siteRecord?.defaultLocale ??
       "x-default";
-    const mediaScope = await buildMediaScope(stack, new Set(result.response.media_ids ?? []));
+    const markdownSettings = await getPublicAgentMarkdownSettings(application, null);
+    const mediaIds = new Set(result.response.media_ids ?? []);
+    if (result.view.requestedMarkdown && markdownSettings.globalEnabled)
+      for (const image of result.response.markdown?.images ?? []) mediaIds.add(image.media_id);
+    const mediaScope = await buildMediaScope(stack, mediaIds);
     // Site scope is best-effort: a stale or disabled locale degrades to the
     // minimal default scope rather than failing the public page.
     let siteScope: Record<string, unknown>;
@@ -3229,19 +3251,150 @@ export async function registerSiteRoute(
       theme_settings: stack.themeSettings,
       request: { locale: viewLocale, path: new URL(request.url, "http://local").pathname },
     };
-    let contentHtml: string;
-    // (1) theme override
     const themeTemplate = stack.manifest.templates.find((candidate) =>
       (candidate.accepts_views ?? []).includes(viewKey),
     );
+    const markdownAvailable =
+      result.view.markdownEligible &&
+      (themeTemplate?.markdown_file !== undefined ||
+        result.view.markdownTemplate !== undefined ||
+        (result.view.markdownFallback && result.response.markdown !== undefined));
+    const markdownImageHref = (id: string) =>
+      Object.values(scope.media[id]?.presets ?? {}).find(
+        (preset) => typeof preset?.src === "string",
+      )?.src ??
+      scope.media[id]?.download?.href ??
+      null;
+    if (
+      !result.view.explicitMarkdown &&
+      !result.view.requestedMarkdown &&
+      !acceptsHtml(request.headers.accept)
+    ) {
+      appendVaryAccept(reply);
+      void reply.header("content-type", "text/plain; charset=utf-8");
+      void reply.header("x-content-type-options", "nosniff");
+      return reply.status(406).send("No acceptable representation\n");
+    }
+    if (result.view.requestedMarkdown && !markdownSettings.globalEnabled) {
+      if (result.view.explicitMarkdown) return renderNotFound(reply, viewLocale);
+      if (!acceptsHtml(request.headers.accept)) {
+        appendVaryAccept(reply);
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        void reply.header("x-content-type-options", "nosniff");
+        return reply.status(406).send("Markdown representation is disabled\n");
+      }
+    }
+    if (
+      result.view.requestedMarkdown &&
+      markdownSettings.globalEnabled &&
+      !markdownAvailable &&
+      (!acceptsHtml(request.headers.accept) || result.view.explicitMarkdown)
+    ) {
+      appendVaryAccept(reply);
+      void reply.header("content-type", "text/plain; charset=utf-8");
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header("x-agent-markdown-status", "unsupported");
+      return reply.status(406).send("Markdown representation unavailable\n");
+    }
+    if (result.view.requestedMarkdown && markdownSettings.globalEnabled) {
+      const missing = (result.response.markdown?.images ?? []).some(
+        (image) => markdownImageHref(image.media_id) === null,
+      );
+      if (missing) {
+        warn(
+          { extension_id: result.extensionId, view: viewKey },
+          "render.extension_markdown_media_unavailable",
+        );
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        void reply.header("cache-control", "no-store");
+        void reply.header("x-agent-markdown-status", "render-failed");
+        return reply.status(503).send("Markdown media is unavailable\n");
+      }
+    }
+    let markdownOutput: string | null = null;
+    if (result.view.requestedMarkdown && markdownSettings.globalEnabled && markdownAvailable) {
+      if (themeTemplate?.markdown_file !== undefined) {
+        markdownOutput = await stack.markdownRenderService.renderMarkdownTemplate(
+          themeTemplate.id,
+          scope,
+          { componentId: viewKey },
+        );
+      } else if (result.view.markdownTemplate !== undefined) {
+        const source = readFileSync(
+          resolve(process.cwd(), result.view.extensionsDir, result.view.markdownTemplate),
+          "utf8",
+        );
+        const engine = createThemeEngine({
+          templates: { __extension_markdown__: source },
+          outputFormat: "markdown",
+        });
+        markdownOutput = await engine.renderFile("__extension_markdown__", scope);
+      } else if (result.response.markdown !== undefined) {
+        const title = result.response.markdown.title ?? result.response.head.title ?? "";
+        const images = (result.response.markdown.images ?? []).map((image) => {
+          const href = markdownImageHref(image.media_id)!;
+          return `![${escapeMarkdownInline(image.alt)}](${href})`;
+        });
+        if (result.response.markdown.body.trim() === "" && images.length === 0) markdownOutput = "";
+        else
+          markdownOutput = `${title.trim() === "" ? "" : `# ${escapeMarkdownInline(title)}\n\n`}${result.response.markdown.body.trim()}${images.length ? `\n\n${images.join("\n\n")}` : ""}\n`;
+      }
+    }
+    if (markdownOutput !== null && markdownOutput.trim() === "") {
+      warn({ extension_id: result.extensionId, view: viewKey }, "render.extension_markdown_empty");
+      appendVaryAccept(reply);
+      void reply.header("content-type", "text/plain; charset=utf-8");
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header("x-agent-markdown-status", "unsupported");
+      return reply.status(406).send("Markdown representation unavailable\n");
+    }
+    if (
+      result.view.requestedMarkdown &&
+      markdownSettings.globalEnabled &&
+      markdownOutput === null
+    ) {
+      if (!acceptsHtml(request.headers.accept) || result.view.explicitMarkdown) {
+        appendVaryAccept(reply);
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        void reply.header("x-content-type-options", "nosniff");
+        void reply.header("x-agent-markdown-status", "unsupported");
+        return reply.status(406).send("Markdown representation unavailable\n");
+      }
+    }
+    if (markdownOutput !== null) {
+      const query = new URL(request.url, "http://local").search;
+      void reply.header("content-type", "text/markdown; charset=utf-8");
+      void reply.header("cache-control", "no-cache");
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header("content-language", viewLocale);
+      if (result.view.explicitMarkdown) {
+        void reply.header(
+          "content-location",
+          `${markdownPathForHtml(result.view.canonicalPath)}${query}`,
+        );
+      } else appendVaryAccept(reply);
+      let robots = result.response.head.robots ?? null;
+      if (result.view.explicitMarkdown)
+        robots = [
+          "noindex",
+          ...new Set(
+            (robots ?? "")
+              .split(",")
+              .map((part) => part.trim())
+              .filter((part) => part && !/^(?:index|noindex)$/i.test(part)),
+          ),
+        ].join(", ");
+      if (robots !== null) void reply.header("x-robots-tag", robots);
+      const canonical = canonicalUrl ?? result.view.canonicalPath;
+      void reply.header("link", `<${canonical}>; rel="canonical"`);
+      return reply.status(200).send(markdownOutput);
+    }
+    let contentHtml: string;
     if (themeTemplate !== undefined && stack.renderService.hasTemplate(themeTemplate.id)) {
       contentHtml = await stack.renderService.renderTemplate(themeTemplate.id, scope, {
         componentId: viewKey,
       });
     } else {
-      // (2) package base template — the SAME hardened engine. Like a theme
-      // override, it produces content only; the active theme owns the page
-      // layout so extension views never duplicate site chrome.
       try {
         const source = readFileSync(
           resolve(process.cwd(), result.view.extensionsDir, result.view.baseTemplate),
@@ -3250,8 +3403,7 @@ export async function registerSiteRoute(
         const engine = createThemeEngine({ templates: { __extension_view__: source } });
         contentHtml = await engine.renderFile("__extension_view__", scope);
       } catch (error) {
-        // (3) named diagnostic — NEVER a fake 404 (R2)
-        fastify.log.warn(
+        warn(
           {
             extension_id: result.extensionId,
             view: viewKey,
@@ -3304,6 +3456,14 @@ export async function registerSiteRoute(
     )) {
       void reply.header(header, value);
     }
+    if (markdownSettings.globalEnabled && markdownAvailable) {
+      appendVaryAccept(reply);
+      const query = new URL(request.url, "http://local").search;
+      void reply.header(
+        "link",
+        `<${markdownPathForHtml(result.view.canonicalPath)}${query}>; rel="alternate"; type="text/markdown"`,
+      );
+    }
     return reply.status(200).send(pageHtml);
   }
 
@@ -3339,6 +3499,9 @@ export async function registerSiteRoute(
         path,
         method: request.method,
         query: (request.query ?? {}) as Record<string, string | string[]>,
+        ...(request.method === "GET" || request.method === "HEAD"
+          ? { representation: preferredRepresentation(request.headers.accept) }
+          : {}),
         ...(scope?.locale === undefined ? {} : { locale: scope.locale }),
         body: request.body,
         mutation: {
@@ -3361,6 +3524,11 @@ export async function registerSiteRoute(
     switch (result.kind) {
       case "miss":
         return false;
+      case "not-found":
+        void reply.header("content-type", "text/plain; charset=utf-8");
+        void reply.header("x-content-type-options", "nosniff");
+        await reply.status(404).send("Not Found\n");
+        return true;
       case "view":
         await renderExtensionView(result, reply, request);
         return true;

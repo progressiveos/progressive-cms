@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { evaluateSkillCompatibility, loadCommunitySkills, loadInstalledSkills } from "@pcms/skills";
 import type { ApplicationServices, OperationContext } from "./context.js";
 import { buildCapabilities } from "./mcp-surface.js";
+import { getPublicAgentMarkdownSettings } from "./markdown-settings-ops.js";
 
 export async function getAgentBootstrapOp(
   app: ApplicationServices,
@@ -69,6 +70,7 @@ export async function getAgentBootstrapOp(
   // language semantics from content): mode, default, enabled locales,
   // routing strategy.
   const localization = await app.localization.get();
+  const markdown = await getPublicAgentMarkdownSettings(app, null);
 
   // The operator-facing name (owner 2026-10-08: the Admin sidebar must show
   // the site NAME, not "default"): SEO identity site_name — the same value
@@ -120,6 +122,14 @@ export async function getAgentBootstrapOp(
         hostname: binding.hostname,
         is_primary: binding.isPrimary,
       })),
+    },
+    agent_markdown: {
+      enabled: markdown.globalEnabled,
+      url_convention: "remove a trailing slash and append .md; / maps to /index.md",
+      accept: "text/markdown",
+      discovery_url: "/llms.txt",
+      settings_url: "/api/v1/markdown/settings",
+      entry_overrides_apply: true,
     },
     media: {
       import_available: app.mediaStorage !== null,
